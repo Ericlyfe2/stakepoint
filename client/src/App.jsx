@@ -5,6 +5,7 @@ import Home from './pages/Home.jsx';
 import LoginPage from './pages/LoginPage.jsx';
 import ProfilePage from './pages/ProfilePage.jsx';
 import WalletPage from './pages/WalletPage.jsx';
+import BetHistoryPage from './pages/BetHistoryPage.jsx';
 import CasinoPage from './pages/CasinoPage.jsx';
 import VirtualsPage from './pages/VirtualsPage.jsx';
 import JackpotPage from './pages/JackpotPage.jsx';
@@ -70,7 +71,7 @@ export default function App() {
             <Route element={<AppShell />}>
               <Route path="/"          element={<Home />} />
               <Route path="/live"      element={<Home initialChip="live" />} />
-              <Route path="/my-bets"   element={<Home initialSlipTab="mybets" />} />
+              <Route path="/my-bets"   element={<BetHistoryPage />} />
               <Route path="/casino"    element={<CasinoPage />} />
               <Route path="/virtuals"  element={<VirtualsPage />} />
               <Route path="/jackpot"   element={<JackpotPage />} />

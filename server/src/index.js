@@ -28,6 +28,7 @@ import adminSupportRouter   from './routes/admin/support.js';
 import { seedAdmins } from './db/seedAdmins.js';
 import { seedDemoData } from './db/seedDemo.js';
 import { seedPromotionsIfEmpty } from './db/promotions.js';
+import { initStores } from './db/store.js';
 import { PROMOTIONS } from './matchesData.js';
 import { startSettlementLoop } from './services/settlement.js';
 import { attachRealtime } from './services/realtime.js';
@@ -102,27 +103,40 @@ app.use(errorHandler);
 const server = http.createServer(app);
 attachRealtime(server);
 
-server.listen(PORT, async () => {
+async function boot() {
+  // Load every KV store (Postgres or JSON files) into memory so that
+  // synchronous get/set in route handlers is safe.
+  await initStores();
+
+  // Seeds depend on stores being loaded.
+  await seedAdmins();
+  await seedDemoData();
+  const seeded = seedPromotionsIfEmpty((PROMOTIONS || []).map((p, i) => ({
+    title: p.title || p.name || 'Offer',
+    body: p.body || p.subtitle || '',
+    badge: p.badge || 'OFFER',
+    cta: p.cta || 'View',
+    accent: p.accent || '#7c5cff',
+    image: p.image || '',
+    eligibility: 'all',
+    bonusRate: p.bonusRate || 0,
+    active: true,
+    order: i,
+  })));
+  if (seeded) log.info(`Seeded ${seeded} promotions.`);
+
+  await new Promise((resolve) => server.listen(PORT, resolve));
   log.info(`Xenbet API listening on http://127.0.0.1:${PORT}`);
+
   try {
-    await seedAdmins();
-    await seedDemoData();
-    const seeded = seedPromotionsIfEmpty((PROMOTIONS || []).map((p, i) => ({
-      title: p.title || p.name || 'Offer',
-      body: p.body || p.subtitle || '',
-      badge: p.badge || 'OFFER',
-      cta: p.cta || 'View',
-      accent: p.accent || '#7c5cff',
-      image: p.image || '',
-      eligibility: 'all',
-      bonusRate: p.bonusRate || 0,
-      active: true,
-      order: i,
-    })));
-    if (seeded) log.info(`Seeded ${seeded} promotions.`);
     startSettlementLoop();
     startAggregator();
   } catch (e) {
-    log.error('seed error', e?.message || e);
+    log.error('post-boot error', e?.message || e);
   }
+}
+
+boot().catch((e) => {
+  log.error('boot failed:', e?.stack || e);
+  process.exit(1);
 });
