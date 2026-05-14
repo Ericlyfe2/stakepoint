@@ -168,8 +168,13 @@ router.post('/place',
         throw conflict('Selection suspended — refresh and try a different market.', { code: 'SELECTION_SUSPENDED' });
       }
       const serverOdds = found.selection.odds;
-      if (!Number.isFinite(sel.odds) || Math.abs(sel.odds - serverOdds) > 0.02) {
-        throw conflict('Odds changed — refresh the fixture list.', {
+      // Live odds drift constantly. Only reject when the price *dropped*
+      // by more than 15%, which would meaningfully hurt the player.
+      // Anything else: silently accept the server's current odds.
+      const clientOdds = Number.isFinite(sel.odds) ? sel.odds : serverOdds;
+      const droppedTooMuch = serverOdds < clientOdds * 0.85;
+      if (droppedTooMuch) {
+        throw conflict('Odds dropped significantly — refresh the fixture list.', {
           code: 'ODDS_CHANGED',
           matchId: sel.matchId,
           market: sel.market,

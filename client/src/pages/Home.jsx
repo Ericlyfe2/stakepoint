@@ -389,12 +389,34 @@ export default function Home({ initialChip, initialSlipTab }) {
         </aside>
 
         <main id="main-matches" className={mainClass}>
-          <div className="col-header">
-            <h2>{sportTabs.find((s) => s.id === sportId)?.name || 'Sports'} <em>today</em></h2>
-            <div className="meta">
-              {visibleLeagues.reduce((n, l) => n + l.matches.length, 0)} matches · auto-refreshed every 30s
+          {chip === 'live' ? (() => {
+            const liveCount = visibleLeagues.reduce(
+              (n, l) => n + l.matches.filter((m) => m.isLive).length, 0,
+            );
+            return (
+              <div className="live-banner">
+                <div className="live-banner-pulse" aria-hidden />
+                <div className="live-banner-text">
+                  <h2><span className="live-dot" /> Live now</h2>
+                  <p>
+                    {liveCount > 0
+                      ? `${liveCount} match${liveCount === 1 ? '' : 'es'} happening right now — odds update in real time.`
+                      : 'No matches are live this moment — check back any minute.'}
+                  </p>
+                </div>
+                <button type="button" className="btn btn-ghost" onClick={() => setChip('all')}>
+                  Show all matches
+                </button>
+              </div>
+            );
+          })() : (
+            <div className="col-header">
+              <h2>{sportTabs.find((s) => s.id === sportId)?.name || 'Sports'} <em>today</em></h2>
+              <div className="meta">
+                {visibleLeagues.reduce((n, l) => n + l.matches.length, 0)} matches · auto-refreshed every 30s
+              </div>
             </div>
-          </div>
+          )}
 
           <div className="filter-bar">
             {[
@@ -414,6 +436,17 @@ export default function Home({ initialChip, initialSlipTab }) {
               </button>
             ))}
           </div>
+
+          {chip === 'live' && visibleLeagues.every((lg) => lg.matches.every((m) => !m.isLive)) && (
+            <div className="live-empty fade-up">
+              <div className="live-empty-icon" aria-hidden>📡</div>
+              <h3>Nothing live right now</h3>
+              <p>The next kickoff will appear here automatically — no refresh needed.</p>
+              <button type="button" className="btn btn-primary" onClick={() => setChip('soon')}>
+                See starting soon
+              </button>
+            </div>
+          )}
 
           {visibleLeagues.map((lg) => (
             <div key={lg.id} className="league-section fade-up" data-region={lg.region}>

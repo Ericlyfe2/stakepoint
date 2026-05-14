@@ -1719,3 +1719,65 @@ nav a:active { transform: scale(.96); }
   .foot-inner { grid-template-columns: 1fr; gap: 20px; }
   .foot-brand p { max-width: none; }
 }
+
+/* ============================================================
+   Live page — banner + empty state
+   ============================================================ */
+.live-banner {
+  position: relative;
+  display: flex; align-items: center; gap: 16px;
+  padding: 16px 20px;
+  margin-bottom: 16px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgba(255, 77, 61, .12), rgba(255, 181, 71, .08));
+  border: 1px solid rgba(255, 77, 61, .35);
+  overflow: hidden;
+}
+.live-banner-pulse {
+  position: absolute; left: -40px; top: 50%;
+  width: 140px; height: 140px; border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 77, 61, .35), transparent 60%);
+  transform: translateY(-50%);
+  animation: liveBannerPulse 2.4s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes liveBannerPulse {
+  0%, 100% { transform: translate(-10px, -50%) scale(1);   opacity: .55; }
+  50%      { transform: translate(10px,  -50%) scale(1.15); opacity: .85; }
+}
+.live-banner-text { flex: 1; position: relative; z-index: 1; }
+.live-banner-text h2 {
+  margin: 0; font-size: 18px; font-weight: 800;
+  display: flex; align-items: center; gap: 8px;
+  letter-spacing: -.01em;
+}
+.live-banner-text h2 .live-dot {
+  width: 9px; height: 9px; border-radius: 50%;
+  background: var(--accent-hot);
+  box-shadow: 0 0 0 4px rgba(255, 77, 61, .18);
+  animation: livePulse 1.4s ease-in-out infinite;
+}
+@keyframes livePulse {
+  0%, 100% { box-shadow: 0 0 0 4px rgba(255, 77, 61, .18); }
+  50%      { box-shadow: 0 0 0 9px rgba(255, 77, 61, .06); }
+}
+.live-banner-text p {
+  margin: 4px 0 0; font-size: 13px; color: var(--text-soft);
+}
+
+.live-empty {
+  text-align: center;
+  padding: 48px 24px;
+  background: var(--surface);
+  border: 1px solid var(--surface-2);
+  border-radius: 16px;
+  margin-bottom: 16px;
+}
+.live-empty-icon { font-size: 40px; margin-bottom: 8px; opacity: .8; }
+.live-empty h3 { margin: 0 0 6px; font-size: 17px; font-weight: 800; }
+.live-empty p  { margin: 0 0 16px; color: var(--text-soft); font-size: 13.5px; }
+
+@media (max-width: 640px) {
+  .live-banner { flex-direction: column; align-items: flex-start; padding: 14px; gap: 10px; }
+  .live-banner .btn { width: 100%; }
+}
