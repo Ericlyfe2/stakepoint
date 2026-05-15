@@ -32,24 +32,31 @@ const lastPriceByKey = new Map(); // canonicalKey -> { [market]: { [sel]: odds }
 const failureStreak  = new Map(); // providerId -> consecutive failures
 
 const liveLastByKey  = new Map(); // fixtureKey -> { scoreHome, scoreAway, minute, redCardsHome, redCardsAway }
-const liveFailureStreak = new Map(); // 'live:<providerId>' -> consecutive failures
+const liveFailureStreak = new Map(); // 'live' -> consecutive global live-loop failures
 let liveTimer = null;
 let liveRunning = false;
 
-function liveBackoffMs(streak) {
-  // Live track recovers faster than pre-match: cap at 60s.
-  return Math.min(6_000 * Math.pow(2, streak), 60_000);
+function isKickOff(next) {
+  const n = Number(next?.minute);
+  return Number.isFinite(n) && n <= 1;
 }
 
-function deriveEventKind(prev, next) {
-  if (!prev) return next.minute && Number(next.minute) <= 1 ? 'kick_off' : null;
-  if (next.scoreHome > (prev.scoreHome ?? 0)) return 'goal_home';
-  if (next.scoreAway > (prev.scoreAway ?? 0)) return 'goal_away';
-  if ((next.redCardsHome ?? 0) > (prev.redCardsHome ?? 0)) return 'red_card';
-  if ((next.redCardsAway ?? 0) > (prev.redCardsAway ?? 0)) return 'red_card';
-  if (prev.minute !== 'HT' && next.minute === 'HT') return 'half_time';
-  if (prev.minute !== 'FT' && next.minute === 'FT') return 'full_time';
-  return null;
+/**
+ * Returns the set of event kinds that occurred between prev and next.
+ * Empty array when nothing notable changed. Multiple deltas in one tick
+ * (e.g. goal AND red card) all surface so downstream consumers don't
+ * lose state-changing events.
+ */
+function deriveEventKinds(prev, next) {
+  const out = [];
+  if (!prev) { if (isKickOff(next)) out.push('kick_off'); return out; }
+  if (next.scoreHome > (prev.scoreHome ?? 0)) out.push('goal_home');
+  if (next.scoreAway > (prev.scoreAway ?? 0)) out.push('goal_away');
+  if ((next.redCardsHome ?? 0) > (prev.redCardsHome ?? 0)) out.push('red_card');
+  if ((next.redCardsAway ?? 0) > (prev.redCardsAway ?? 0)) out.push('red_card');
+  if (prev.minute !== 'HT' && next.minute === 'HT') out.push('half_time');
+  if (prev.minute !== 'FT' && next.minute === 'FT') out.push('full_time');
+  return out;
 }
 
 function teamFromKind(kind) {
@@ -245,32 +252,44 @@ async function liveLoop() {
     // 1) Score & match-event emits.
     const { emitScoreUpdate } = await import('./realtime.js');
     for (const fx of scoreRows) {
+      if (!fx?.key) continue;
       const prev = liveLastByKey.get(fx.key);
-      const kind = deriveEventKind(prev, fx);
+      const kinds = deriveEventKinds(prev, fx);
       liveLastByKey.set(fx.key, {
         scoreHome: fx.scoreHome, scoreAway: fx.scoreAway, minute: fx.minute,
         redCardsHome: fx.redCardsHome, redCardsAway: fx.redCardsAway,
       });
-      if (!prev
-          || prev.scoreHome !== fx.scoreHome
-          || prev.scoreAway !== fx.scoreAway
-          || prev.minute    !== fx.minute
-          || kind) {
+      const scoreOrMinuteChanged = !prev
+        || prev.scoreHome !== fx.scoreHome
+        || prev.scoreAway !== fx.scoreAway
+        || prev.minute    !== fx.minute;
+      if (kinds.length > 0) {
+        for (const kind of kinds) {
+          emitScoreUpdate({
+            fixtureId: fx.key,
+            sport: fx.sport,
+            scoreHome: fx.scoreHome,
+            scoreAway: fx.scoreAway,
+            minute: fx.minute,
+            eventKind: kind,
+            team: teamFromKind(kind),
+          });
+        }
+      } else if (scoreOrMinuteChanged) {
         emitScoreUpdate({
           fixtureId: fx.key,
           sport: fx.sport,
           scoreHome: fx.scoreHome,
           scoreAway: fx.scoreAway,
           minute: fx.minute,
-          eventKind: kind || undefined,
-          team: teamFromKind(kind),
         });
       }
     }
 
-    // 2) Odds emits via existing diffEmit machinery (private to this file).
-    const grouped = new Map(); // key -> Odds[]
+    // 2) Odds emits via existing diffEmit machinery.
+    const grouped = new Map();
     for (const row of oddsRows) {
+      if (!row?.key) continue;
       const arr = grouped.get(row.key) || [];
       arr.push(row);
       grouped.set(row.key, arr);
@@ -284,15 +303,17 @@ async function liveLoop() {
     const engine = await import('./cashOutEngine.js');
     const lookup = makeOddsLookup(oddsRows);
     const { LIVE_BETTING } = await import('../config/env.js');
-    for (const fx of scoreRows) engine.onLiveChange(fx.key, lookup, LIVE_BETTING.houseMargin);
+    for (const fx of scoreRows) {
+      if (!fx?.key) continue;
+      engine.onLiveChange(fx.key, lookup, LIVE_BETTING.houseMargin);
+    }
     engine.sweep();
 
     liveFailureStreak.clear();
   } catch (e) {
     const streak = (liveFailureStreak.get('live') || 0) + 1;
     liveFailureStreak.set('live', streak);
-    const next = liveBackoffMs(streak);
-    log.warn(`Live track failure ×${streak} — next attempt in ${Math.round(next / 1000)}s: ${e.message}`);
+    log.warn(`Live track failure ×${streak}: ${e.message}`);
   } finally {
     liveRunning = false;
   }
