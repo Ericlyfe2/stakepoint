@@ -92,6 +92,7 @@ function normaliseOdds(r, providerId) {
   // type from every bookmaker into one canonical market, keeping the highest
   // odds per selection (the aggregator further merges across providers).
   for (const bm of r?.bookmakers || []) {
+    const bookmakerName = bm?.name || (bm?.id != null ? String(bm.id) : 'apiFootball');
     for (const bet of bm?.bets || []) {
       const name = String(bet?.name || '').toLowerCase();
 
@@ -107,7 +108,7 @@ function normaliseOdds(r, providerId) {
           else if (value === 'draw' || value === 'x') { selKey = 'X'; label = 'Draw'; }
           else if (value === 'away' || value === '2') { selKey = '2'; label = 'Away'; }
           if (!selKey) continue;
-          upsertSelection(m.selections, selKey, label, odds);
+          upsertSelection(m.selections, selKey, label, odds, bookmakerName);
         }
         continue;
       }
@@ -119,8 +120,8 @@ function normaliseOdds(r, providerId) {
           const value = String(v?.value || '').toLowerCase();
           const odds  = Number(v?.odd);
           if (!Number.isFinite(odds)) continue;
-          if (value === 'over 2.5')  upsertSelection(m.selections, 'Over',  'Over 2.5',  odds);
-          if (value === 'under 2.5') upsertSelection(m.selections, 'Under', 'Under 2.5', odds);
+          if (value === 'over 2.5')  upsertSelection(m.selections, 'Over',  'Over 2.5',  odds, bookmakerName);
+          if (value === 'under 2.5') upsertSelection(m.selections, 'Under', 'Under 2.5', odds, bookmakerName);
         }
         continue;
       }
@@ -132,8 +133,8 @@ function normaliseOdds(r, providerId) {
           const value = String(v?.value || '').toLowerCase();
           const odds  = Number(v?.odd);
           if (!Number.isFinite(odds)) continue;
-          if (value === 'yes') upsertSelection(m.selections, 'Yes', 'Yes', odds);
-          if (value === 'no')  upsertSelection(m.selections, 'No',  'No',  odds);
+          if (value === 'yes') upsertSelection(m.selections, 'Yes', 'Yes', odds, bookmakerName);
+          if (value === 'no')  upsertSelection(m.selections, 'No',  'No',  odds, bookmakerName);
         }
         continue;
       }
@@ -145,16 +146,15 @@ function normaliseOdds(r, providerId) {
 
   return {
     key,
-    sourceId: r?.fixture?.id ?? null,
+    sourceId: String(r?.fixture?.id || ''),
     provider: providerId,
-    bookmaker: 'aggregated',
     markets,
     updatedAt: new Date().toISOString(),
   };
 }
 
-function upsertSelection(arr, key, label, odds) {
+function upsertSelection(arr, key, label, odds, bookmaker) {
   const existing = arr.find((s) => s.key === key);
-  if (!existing) { arr.push({ key, label, odds }); return; }
-  if (odds > existing.odds) existing.odds = odds;
+  if (!existing) { arr.push({ key, label, odds, bookmaker }); return; }
+  if (odds > existing.odds) { existing.odds = odds; existing.bookmaker = bookmaker; }
 }
