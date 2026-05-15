@@ -25,3 +25,29 @@ export function listProviders() { return _providers; }
 export function enabledProviders() { return _providers.filter((p) => p.enabled); }
 export function getProvider(id) { return _providers.find((p) => p.id === id) || null; }
 export function providersHealth() { return _providers.map((p) => p.health()); }
+
+/**
+ * Fetch live in-play odds across all enabled providers. Each provider
+ * decides whether it supports live; non-supporting providers return [].
+ * Errors are isolated per provider so one bad upstream doesn't blank the feed.
+ */
+export async function fetchLiveOddsAll(sport = 'football') {
+  const results = await Promise.all(
+    enabledProviders().map((p) =>
+      Promise.resolve(p.fetchOdds(sport, { live: true })).catch(() => [])
+    )
+  );
+  return results.flat();
+}
+
+/**
+ * Fetch live scores across all enabled providers. Same isolation contract.
+ */
+export async function fetchLiveScoresAll(sport = 'football') {
+  const results = await Promise.all(
+    enabledProviders().map((p) =>
+      Promise.resolve(p.fetchScores(sport)).catch(() => [])
+    )
+  );
+  return results.flat();
+}
