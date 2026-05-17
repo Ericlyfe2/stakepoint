@@ -216,7 +216,14 @@ router.post('/place',
       const found = adminLookupSelection({ matchId: sel.matchId, market: sel.market, outcome: sel.outcome });
       if (!found) return res.json({ success: false, error: `Invalid selection ${sel.market} ${sel.outcome} for match ${sel.matchId}.` });
       const fxView = found.row?.match || found.row;
-      if (fxView?.finished || fxView?.suspended) {
+      // Only block placement when the market is *actually* closed:
+      //   - admin has explicitly suspended the fixture, or
+      //   - the fixture has a real authoritative result (manual or feed).
+      // Auto-simulated demo results (finalSource === 'simulated') should not
+      // block bets — the engine will settle them on the next tick using the
+      // same simulated score, so the user still gets a booking code now.
+      const hasRealResult = fxView?.finished && (fxView.finalSource === 'feed' || fxView.finalSource === 'manual');
+      if (hasRealResult || fxView?.suspended) {
         return res.json({ success: false, error: 'Market closed — fixture is no longer available.', code: 'MARKET_CLOSED' });
       }
       if (found.market?.suspended || found.selection?.suspended) {
