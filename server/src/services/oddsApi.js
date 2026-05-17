@@ -4,6 +4,8 @@
  * Strategy: 4-hour TTL per (sport,region) tuple, h2h only, stale-on-error.
  */
 
+import { buildMarkets } from '../matchesData.js';
+
 const API_KEY  = process.env.ODDS_API_KEY || 'f29329416dc60d4defee32c746c2f9e2';
 const BASE     = 'https://api.the-odds-api.com/v4';
 const TTL_MS   = 4 * 60 * 60 * 1000;   // 4 hours
@@ -103,12 +105,7 @@ function formDots() {
 }
 
 function buildFootballMarkets(home, draw, away) {
-  const dc = {
-    '1X': Number((1 / (1 / home + 1 / draw)).toFixed(2)),
-    'X2': Number((1 / (1 / draw + 1 / away)).toFixed(2)),
-    '12': Number((1 / (1 / home + 1 / away)).toFixed(2)),
-  };
-  // Synthetic OU/BTTS based on goals expectation implied by 1X2 (rough heuristic)
+  // Synthetic OU/BTTS based on goals expectation implied by 1X2 (rough heuristic).
   const total = 1 / home + 1 / draw + 1 / away;
   const homeProb = (1 / home) / total;
   const awayProb = (1 / away) / total;
@@ -117,26 +114,13 @@ function buildFootballMarkets(home, draw, away) {
   const ouUnder = Number((1 / (1 - 1 / ouOver) * 0.92).toFixed(2));
   const bttsYes = Number((1.6 + (1 - intensity) * 0.4).toFixed(2));
   const bttsNo  = Number((1 / (1 - 1 / bttsYes) * 0.92).toFixed(2));
-  return {
-    '1X2':  { name: 'Match Result', selections: [
-      { key: '1', label: 'Home', odds: home },
-      { key: 'X', label: 'Draw', odds: draw },
-      { key: '2', label: 'Away', odds: away },
-    ]},
-    'OU25': { name: 'Total Goals (Over/Under 2.5)', selections: [
-      { key: 'Over',  label: 'Over 2.5',  odds: ouOver  },
-      { key: 'Under', label: 'Under 2.5', odds: ouUnder },
-    ]},
-    'BTTS': { name: 'Both Teams To Score', selections: [
-      { key: 'Yes', label: 'Yes', odds: bttsYes },
-      { key: 'No',  label: 'No',  odds: bttsNo  },
-    ]},
-    'DC':   { name: 'Double Chance', selections: [
-      { key: '1X', label: 'Home or Draw', odds: dc['1X'] },
-      { key: 'X2', label: 'Draw or Away', odds: dc['X2'] },
-      { key: '12', label: 'Home or Away', odds: dc['12'] },
-    ]},
-  };
+
+  // Delegate to the canonical builder so live fixtures expose the full market list.
+  return buildMarkets({
+    odds: { '1': home, 'X': draw, '2': away },
+    ou: [ouOver, ouUnder],
+    btts: [bttsYes, bttsNo],
+  });
 }
 
 function buildBasketballMarkets(home, away) {

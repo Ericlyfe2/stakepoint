@@ -21,19 +21,49 @@ function formatAmt(n) {
 }
 
 function pickLabel(market, key, match) {
-  if (market === '1X2') {
-    if (key === '1') return `${match.home} to win`;
-    if (key === '2') return `${match.away} to win`;
-    return 'Draw';
+  const team = (k) => (k === '1' ? match.home : k === '2' ? match.away : 'Draw');
+
+  if (market === '1X2' || market === '1H1X2') {
+    const prefix = market === '1H1X2' ? '1H · ' : '';
+    if (key === '1') return `${prefix}${match.home} to win`;
+    if (key === '2') return `${prefix}${match.away} to win`;
+    return `${prefix}Draw`;
   }
   if (market === 'ML') return `${key === '1' ? match.home : match.away} to win`;
   if (market === 'OU25') return `${key} 2.5 goals`;
+  if (market === 'OU15') return `${key} 1.5 goals`;
+  if (market === 'OU35') return `${key} 3.5 goals`;
+  if (market === '1HOU05') return `1H · ${key} 0.5 goals`;
   if (market === 'BTTS') return `Both Teams To Score · ${key}`;
+  if (market === '1HBTTS') return `1H · Both Teams To Score · ${key}`;
   if (market === 'DC') {
     if (key === '1X') return `${match.home} or Draw`;
     if (key === 'X2') return `Draw or ${match.away}`;
     return `${match.home} or ${match.away}`;
   }
+  if (market === 'DNB') return `Draw No Bet · ${team(key)}`;
+  if (market === 'AH1') {
+    if (key === 'H-1') return `${match.home} -1`;
+    if (key === 'A+1') return `${match.away} +1`;
+    return `Handicap ${key}`;
+  }
+  if (market === 'WINBTTS') {
+    const result = key[0] === '1' ? match.home : key[0] === '2' ? match.away : 'Draw';
+    return `${result} & BTTS ${key[1] === 'Y' ? 'Yes' : 'No'}`;
+  }
+  if (market === 'WINOU25') {
+    const result = key[0] === '1' ? match.home : key[0] === '2' ? match.away : 'Draw';
+    return `${result} & ${key[1] === 'O' ? 'Over' : 'Under'} 2.5`;
+  }
+  if (market === 'BTTSOU25') {
+    return `BTTS ${key[0] === 'Y' ? 'Yes' : 'No'} & ${key[1] === 'O' ? 'Over' : 'Under'} 2.5`;
+  }
+  if (market === 'HTFT') {
+    const half = (k) => (k === '1' ? match.home : k === '2' ? match.away : 'Draw');
+    const [a, b] = key.split('/');
+    return `HT/FT · ${half(a)} / ${half(b)}`;
+  }
+  if (market === 'CS') return `Correct Score ${key === 'OTHER' ? 'Any Other' : key}`;
   if (market === 'TP')   return `${key} ${match.line || ''} pts`;
   if (market === 'SETS') return `${key} 2.5 sets`;
   if (market === 'HCAP') return `Handicap ${key}`;
@@ -290,6 +320,42 @@ export default function Home({ initialChip }) {
     return stakePerLine * totalOdds * (1 + BONUS);
   }, [selections, stakePerLine, totalOdds, betMode, systemDef, systemType]);
 
+  // Hydrate a booking code into the live slip — looks up the legs and replaces
+  // the current selection list, then opens the slip.
+  const loadFromCode = useCallback(async (rawCode) => {
+    const code = String(rawCode || '').trim().toUpperCase();
+    if (!code) return false;
+    try {
+      const { bet } = await fetchBetByCode(code);
+      if (!bet?.legs?.length) {
+        toast(`Booking code ${code} has no selections.`);
+        return false;
+      }
+      const hydrated = bet.legs.map((l, i) => ({
+        id: `sel-${Date.now()}-${i}`,
+        matchId: l.matchId,
+        market: l.market,
+        outcome: l.outcome,
+        odds: l.odds,
+        pickLabel: pickLabel(l.market, l.outcome, { home: l.home, away: l.away }),
+        marketLabel: l.marketName || `${l.market} · ${l.outcome}`,
+        meta: `${l.home} vs ${l.away}`,
+        home: l.home,
+        away: l.away,
+        trend: null,
+      }));
+      setSelections(hydrated);
+      setBetMode(hydrated.length === 1 ? 'single' : 'multiple');
+      setSlipOpen(true);
+      setSlipErr('');
+      toast(`Loaded ${hydrated.length} selection${hydrated.length === 1 ? '' : 's'} from ${code}.`);
+      return true;
+    } catch {
+      toast(`Booking code ${code} not found.`);
+      return false;
+    }
+  }, [toast]);
+
   const onPlaceBet = async () => {
     setSlipErr('');
     if (!selections.length) { setSlipErr('Add at least one selection to your bet slip.'); return; }
@@ -353,14 +419,136 @@ export default function Home({ initialChip }) {
 
   const onPayslip = async (e) => {
     e.preventDefault();
-    const code = payslip.trim().toUpperCase();
-    if (!code) return;
-    try {
-      await fetchBetByCode(code);
-      navigate(`/my-bets?code=${encodeURIComponent(code)}`);
-    } catch {
-      toast(`Booking code ${code} not found.`);
+    const ok = await loadFromCode(payslip);
+    if (ok) setPayslip('');
+  };
+
+  // Code-loader state for the Featured/Codes tab input (declared above early
+  // returns so hook order stays stable across renders).
+  const [featuredCode, setFeaturedCode] = useState('');
+
+  // Featured cards built from the live snapshot. Each card holds real legs
+  // (matchId + market + outcome + odds) so "Add to Betslip" hydrates them
+  // straight into the slip.
+  const featuredCards = useMemo(() => {
+    if (!snapshot?.leagues?.length) return [];
+
+    const flat = [];
+    for (const lg of snapshot.leagues) {
+      for (const m of (lg.matches || [])) {
+        if (m.finished || m.suspended) continue;
+        flat.push({ league: lg, match: m });
+      }
     }
+    if (!flat.length) return [];
+
+    const buildLeg = (match, market, outcome) => {
+      const mk = match.markets?.[market];
+      if (!mk) return null;
+      const sel = mk.selections?.find((s) => s.key === outcome);
+      if (!sel) return null;
+      const dot = market === '1X2'
+        ? (outcome === '1' ? 'home' : outcome === '2' ? 'away' : 'draw')
+        : market === 'OU25' && outcome === 'Over' ? 'home'
+        : market === 'BTTS' && outcome === 'Yes' ? 'home'
+        : 'draw';
+      const pretty = (() => {
+        if (market === '1X2') return outcome === '1' ? `Home @${sel.odds.toFixed(2)}` : outcome === '2' ? `Away @${sel.odds.toFixed(2)}` : `Draw @${sel.odds.toFixed(2)}`;
+        if (market === 'OU25') return `${outcome} 2.5 @${sel.odds.toFixed(2)}`;
+        if (market === 'BTTS') return `BTTS ${outcome} @${sel.odds.toFixed(2)}`;
+        if (market === 'WINBTTS') return `${sel.label} @${sel.odds.toFixed(2)}`;
+        return `${sel.label || outcome} @${sel.odds.toFixed(2)}`;
+      })();
+      return {
+        matchId: match.id,
+        market,
+        outcome,
+        odds: sel.odds,
+        home: match.home,
+        away: match.away,
+        marketName: mk.name,
+        pick: pretty,
+        type: market === '1X2' ? '1X2' : market === 'OU25' ? 'O/U' : market,
+        match: `${match.home} vs ${match.away}`,
+        time: match.isLive ? `LIVE ${match.minute || ''}` : `${match.day || 'Today'} ${match.kickoff || ''}`.trim(),
+        dot,
+      };
+    };
+
+    const favourites = flat
+      .map(({ match }) => {
+        const m = match.markets?.['1X2'];
+        if (!m) return null;
+        const best = m.selections.reduce((a, b) => (a.odds < b.odds ? a : b));
+        return { match, outcome: best.key, odds: best.odds };
+      })
+      .filter(Boolean)
+      .filter((x) => x.odds >= 1.3 && x.odds <= 2.5)
+      .sort((a, b) => a.odds - b.odds)
+      .slice(0, 3);
+
+    const overPicks = flat
+      .map(({ match }) => {
+        const m = match.markets?.['OU25'];
+        if (!m) return null;
+        const over = m.selections.find((s) => s.key === 'Over');
+        return over ? { match, odds: over.odds } : null;
+      })
+      .filter(Boolean)
+      .sort((a, b) => a.odds - b.odds)
+      .slice(0, 3);
+
+    const bttsPicks = flat
+      .map(({ match }) => {
+        const m = match.markets?.['BTTS'];
+        if (!m) return null;
+        const yes = m.selections.find((s) => s.key === 'Yes');
+        return yes ? { match, odds: yes.odds } : null;
+      })
+      .filter(Boolean)
+      .sort((a, b) => a.odds - b.odds)
+      .slice(0, 3);
+
+    const buildCard = (id, code, picks, mapToLeg) => {
+      const legs = picks.map(mapToLeg).filter(Boolean);
+      if (legs.length < 2) return null;
+      const odds = Number(legs.reduce((acc, l) => acc * l.odds, 1).toFixed(2));
+      return { id, code, folds: legs.length, odds, legs };
+    };
+
+    return [
+      buildCard('top-picks', 'TOP' + flat.length.toString().padStart(3, '0'), favourites, ({ match, outcome }) => buildLeg(match, '1X2', outcome)),
+      buildCard('goals-galore', 'GOL' + flat.length.toString().padStart(3, '0'), overPicks, ({ match }) => buildLeg(match, 'OU25', 'Over')),
+      buildCard('btts-special', 'BTS' + flat.length.toString().padStart(3, '0'), bttsPicks, ({ match }) => buildLeg(match, 'BTTS', 'Yes')),
+    ].filter(Boolean);
+  }, [snapshot]);
+
+  const loadCardToSlip = useCallback((card) => {
+    if (!card?.legs?.length) return;
+    const hydrated = card.legs.map((l, i) => ({
+      id: `sel-${Date.now()}-${i}`,
+      matchId: l.matchId,
+      market: l.market,
+      outcome: l.outcome,
+      odds: l.odds,
+      pickLabel: pickLabel(l.market, l.outcome, { home: l.home, away: l.away }),
+      marketLabel: l.marketName || `${l.market} · ${l.outcome}`,
+      meta: `${l.home} vs ${l.away}`,
+      home: l.home,
+      away: l.away,
+      trend: null,
+    }));
+    setSelections(hydrated);
+    setBetMode(hydrated.length === 1 ? 'single' : 'multiple');
+    setSlipOpen(true);
+    setSlipErr('');
+    toast(`Loaded ${hydrated.length} legs onto your slip.`);
+  }, [toast]);
+
+  const onFeaturedCodeLoad = async (e) => {
+    e.preventDefault();
+    const ok = await loadFromCode(featuredCode);
+    if (ok) setFeaturedCode('');
   };
 
   if (loadErr) {
@@ -384,26 +572,6 @@ export default function Home({ initialChip }) {
     { id: 'serie_a', label: 'Italy Serie A' },
     { id: 'bundesliga', label: 'Germany Bundesliga' },
     { id: 'ligue1', label: 'France Ligue 1' },
-  ];
-
-  // Sample featured booking codes (SportyBet-style)
-  const sampleCodes = [
-    {
-      id: 'code1', code: 'AL4LU6', folds: 4, odds: 22.52,
-      legs: [
-        { pick: 'Away @2.18', type: '1X2', match: 'Caykur Rizes... vs Besiktas Ista...', time: 'Today 17:00', dot: 'away' },
-        { pick: 'Home @1.82', type: '1X2', match: 'Saint-Etienne vs Rodez Aveyro...', time: 'Today 18:30', dot: 'home' },
-        { pick: 'Away @2.45', type: '1X2', match: 'Oud-Heverlee... vs Royal Antwer...', time: 'Today 18:45', dot: 'away' },
-      ],
-    },
-    {
-      id: 'code2', code: 'BK9XM3', folds: 3, odds: 8.74,
-      legs: [
-        { pick: 'Home @1.65', type: '1X2', match: 'Arsenal vs Chelsea', time: 'Today 20:00', dot: 'home' },
-        { pick: 'Over 2.5 @1.90', type: 'O/U', match: 'Barcelona vs Real Madrid', time: 'Today 21:00', dot: 'draw' },
-        { pick: 'BTTS Yes @1.78', type: 'BTTS', match: 'Liverpool vs Man City', time: 'Tomorrow 16:00', dot: 'home' },
-      ],
-    },
   ];
 
   const visibleLeagues = activeLeague
@@ -474,9 +642,9 @@ export default function Home({ initialChip }) {
         <div className="sb-featured-tabs">
           {[
             ['featured',  'Featured'],
+            ['codes',     'Load Code'],
             ['matches',   'Matches'],
             ['games',     'Games'],
-            ['codes',     'Codes'],
             ['virtuals',  'Virtuals'],
           ].map(([key, label]) => (
             <button
@@ -489,45 +657,137 @@ export default function Home({ initialChip }) {
             </button>
           ))}
         </div>
+
+        {/* Booking-code loader — visible on Featured and Load Code tabs */}
+        {(featuredTab === 'featured' || featuredTab === 'codes') && (
+          <form
+            onSubmit={onFeaturedCodeLoad}
+            style={{
+              display: 'flex', gap: 8, padding: '10px 12px 4px',
+              alignItems: 'stretch',
+            }}
+          >
+            <input
+              type="text"
+              value={featuredCode}
+              onChange={(e) => setFeaturedCode(e.target.value.toUpperCase().replace(/\s+/g, ''))}
+              placeholder="Enter booking code (e.g. ME94621)"
+              maxLength={12}
+              autoCapitalize="characters"
+              spellCheck={false}
+              style={{
+                flex: 1, padding: '12px 14px', borderRadius: 10,
+                border: '1px solid var(--surface-border, #2a2a2a)',
+                background: 'var(--surface, #161616)',
+                color: 'var(--text, #fff)',
+                fontSize: 14, fontWeight: 700, letterSpacing: '0.06em',
+                outline: 'none',
+              }}
+            />
+            <button
+              type="submit"
+              disabled={!featuredCode.trim()}
+              style={{
+                padding: '0 18px', borderRadius: 10, border: 'none',
+                background: featuredCode.trim() ? '#116f43' : '#2a2a2a',
+                color: '#fff', fontWeight: 800, fontSize: 13, cursor: featuredCode.trim() ? 'pointer' : 'not-allowed',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              Load Slip
+            </button>
+          </form>
+        )}
+
         <div className="sb-featured-body">
-          {sampleCodes.map((sc) => (
-            <div key={sc.id} className="sb-code-card">
-              <div className="sb-code-header">
-                <span className="sb-code-id">{sc.code}</span>
-                <div className="sb-code-meta">
-                  <span>Folds: <strong>{sc.folds}</strong></span>
-                  <span>Odds: <span className="odds-val">{sc.odds.toFixed(2)}</span></span>
-                </div>
-              </div>
-              {sc.legs.map((leg, li) => (
-                <div key={li} className="sb-code-leg">
-                  <span className={`sb-code-leg-dot ${leg.dot}`} />
-                  <div className="sb-code-leg-info">
-                    <div className="sb-code-leg-pick">{leg.pick} | {leg.type}</div>
-                    <div className="sb-code-leg-match">{leg.match}</div>
-                  </div>
-                  <span className="sb-code-leg-time">{leg.time}</span>
-                </div>
-              ))}
-              <div className="sb-code-actions">
-                <button type="button" className="sb-code-share">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
-                    <polyline points="16 6 12 2 8 6" />
-                    <line x1="12" y1="2" x2="12" y2="15" />
-                  </svg>
-                  Share
-                </button>
-                <button type="button" className="sb-code-add" onClick={() => toast(`Code ${sc.code} added to slip.`)}>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <line x1="12" y1="5" x2="12" y2="19" />
-                    <line x1="5" y1="12" x2="19" y2="12" />
-                  </svg>
-                  Add to Betslip
-                </button>
-              </div>
+          {featuredTab === 'codes' && featuredCards.length === 0 && (
+            <div style={{ padding: '20px 12px', textAlign: 'center', color: 'var(--text-dim)', fontSize: 13 }}>
+              Enter a booking code above to load its selections onto your slip.
             </div>
-          ))}
+          )}
+
+          {featuredTab !== 'codes' && featuredCards.length === 0 && (
+            <div style={{ padding: '20px 12px', textAlign: 'center', color: 'var(--text-dim)', fontSize: 13 }}>
+              No featured cards available — check back after the next odds refresh.
+            </div>
+          )}
+
+          {(featuredTab === 'featured' || featuredTab === 'codes' || featuredTab === 'matches') &&
+            featuredCards.map((sc) => (
+              <div key={sc.id} className="sb-code-card">
+                <div className="sb-code-header">
+                  <span className="sb-code-id">{sc.code}</span>
+                  <div className="sb-code-meta">
+                    <span>Folds: <strong>{sc.folds}</strong></span>
+                    <span>Odds: <span className="odds-val">{sc.odds.toFixed(2)}</span></span>
+                  </div>
+                </div>
+                {sc.legs.map((leg, li) => (
+                  <div key={li} className="sb-code-leg">
+                    <span className={`sb-code-leg-dot ${leg.dot}`} />
+                    <div className="sb-code-leg-info">
+                      <div className="sb-code-leg-pick">{leg.pick} | {leg.type}</div>
+                      <div className="sb-code-leg-match">{leg.match}</div>
+                    </div>
+                    <span className="sb-code-leg-time">{leg.time}</span>
+                  </div>
+                ))}
+                <div className="sb-code-actions">
+                  <button
+                    type="button"
+                    className="sb-code-share"
+                    onClick={async () => {
+                      try {
+                        if (navigator.share) {
+                          await navigator.share({ title: 'Xenbet slip', text: `Check out this slip on Xenbet — booking idea ${sc.code}` });
+                        } else {
+                          await navigator.clipboard?.writeText(sc.code);
+                          toast(`Code ${sc.code} copied.`);
+                        }
+                      } catch {/* user cancelled */}
+                    }}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
+                      <polyline points="16 6 12 2 8 6" />
+                      <line x1="12" y1="2" x2="12" y2="15" />
+                    </svg>
+                    Share
+                  </button>
+                  <button type="button" className="sb-code-add" onClick={() => loadCardToSlip(sc)}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <line x1="12" y1="5" x2="12" y2="19" />
+                      <line x1="5" y1="12" x2="19" y2="12" />
+                    </svg>
+                    Add to Betslip
+                  </button>
+                </div>
+              </div>
+            ))}
+
+          {featuredTab === 'games' && (
+            <div style={{ padding: '24px 12px', textAlign: 'center' }}>
+              <button
+                type="button"
+                onClick={() => navigate('/casino')}
+                style={{ padding: '12px 20px', borderRadius: 10, border: 'none', background: '#116f43', color: '#fff', fontWeight: 800, cursor: 'pointer', fontSize: 14 }}
+              >
+                Open Casino
+              </button>
+            </div>
+          )}
+
+          {featuredTab === 'virtuals' && (
+            <div style={{ padding: '24px 12px', textAlign: 'center' }}>
+              <button
+                type="button"
+                onClick={() => navigate('/virtuals')}
+                style={{ padding: '12px 20px', borderRadius: 10, border: 'none', background: '#116f43', color: '#fff', fontWeight: 800, cursor: 'pointer', fontSize: 14 }}
+              >
+                Open Virtuals
+              </button>
+            </div>
+          )}
         </div>
       </section>
 
