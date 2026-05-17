@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { fetchPromotions } from '../api/betApi.js';
 import { useToast, useAccount } from '../layout/AppShell.jsx';
+import PageBack from '../components/PageBack.jsx';
 
 const ACCENTS = {
   WELCOME:  { hue: 'hsl(95, 90%, 60%)', tone: 'accent' },
@@ -48,6 +49,7 @@ export default function PromosPage() {
   return (
     <main className="promos-page">
       <div className="promos-shell">
+        <PageBack />
         <header className="promos-hero fade-up">
           <div className="promos-hero-bg" aria-hidden />
           <div className="promos-hero-inner">

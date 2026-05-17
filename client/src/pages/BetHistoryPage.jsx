@@ -1,8 +1,23 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { fetchBetHistory, cashOutBet } from '../api/betApi.js';
 import { useAccount, useToast } from '../providers/AccountProvider.jsx';
 import { toBookingCode } from '../components/BetSuccessModal.jsx';
+import PageBack from '../components/PageBack.jsx';
+
+const AUTO_TARGETS_KEY = 'bv_auto_cashout_targets';
+
+function loadAutoTargets() {
+  if (typeof localStorage === 'undefined') return {};
+  try {
+    return JSON.parse(localStorage.getItem(AUTO_TARGETS_KEY) || '{}');
+  } catch { return {}; }
+}
+
+function saveAutoTargets(map) {
+  if (typeof localStorage === 'undefined') return;
+  try { localStorage.setItem(AUTO_TARGETS_KEY, JSON.stringify(map)); } catch {/* ignore */}
+}
 
 function fmt(n) {
   return Number(n || 0).toLocaleString('en-GH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -24,6 +39,11 @@ const STATUS_LABEL = {
   void: 'VOID',
 };
 
+function computeOffer(b) {
+  if (b.status !== 'open') return 0;
+  return b.lastCashOutOffer?.amount ?? b.cashoutOffer ?? Number((b.stake * (b.totalOdds * 0.6)).toFixed(2));
+}
+
 export default function BetHistoryPage() {
   const navigate = useNavigate();
   const { account, adjustBalance } = useAccount();
@@ -33,14 +53,42 @@ export default function BetHistoryPage() {
   const [busy, setBusy]       = useState(false);
   const [copiedCode, setCopiedCode] = useState(null);
 
+  // Live ticker: map of betId -> previous offer so we can show green/red trend.
+  const prevOffersRef = useRef({});
+  const [trends, setTrends] = useState({});
+
+  // Auto cash-out targets per bet, persisted to localStorage so the page can
+  // reload without losing the user's intent. { [betId]: number }
+  const [autoTargets, setAutoTargets] = useState(() => loadAutoTargets());
+  const autoFiredRef = useRef({}); // dedupe so we only auto-fire once per bet.
+
+  // Confirmation dialog state for tapped cash-outs.
+  const [confirmCashOut, setConfirmCashOut] = useState(null); // { id, amount, code, bet }
+  const [confirmFraction, setConfirmFraction] = useState(1);  // 1 = full, 0.25/0.5/0.75 = partial
+
+  const refresh = useCallback(async () => {
+    try {
+      const data = await fetchBetHistory();
+      setBets(data.bets || []);
+      return data.bets || [];
+    } catch {
+      return null;
+    }
+  }, []);
+
+  // Initial load.
   useEffect(() => {
     if (!account) { navigate('/login?next=/my-bets'); return; }
     let alive = true;
     (async () => {
       try {
         setBusy(true);
-        const data = await fetchBetHistory();
-        if (alive) setBets(data.bets || []);
+        const list = await refresh();
+        if (alive && list) {
+          const seed = {};
+          for (const b of list) seed[b.id] = computeOffer(b);
+          prevOffersRef.current = seed;
+        }
       } catch (e) {
         if (alive) toast(e.message || 'Could not load bets.', 'error');
       } finally {
@@ -48,7 +96,34 @@ export default function BetHistoryPage() {
       }
     })();
     return () => { alive = false; };
-  }, [account, navigate, toast]);
+  }, [account, navigate, toast, refresh]);
+
+  // Live polling — refresh every 4s while there are open bets and the tab is
+  // visible. Computes trend (up/down/flat) by diffing against previous offers.
+  useEffect(() => {
+    if (!account) return undefined;
+    const tick = async () => {
+      if (typeof document !== 'undefined' && document.hidden) return;
+      const list = await refresh();
+      if (!list) return;
+      const nextTrends = {};
+      const nextPrev = {};
+      for (const b of list) {
+        if (b.status !== 'open') continue;
+        const cur = computeOffer(b);
+        const prev = prevOffersRef.current[b.id];
+        if (prev != null) {
+          if (cur > prev + 0.005) nextTrends[b.id] = 'up';
+          else if (cur < prev - 0.005) nextTrends[b.id] = 'down';
+        }
+        nextPrev[b.id] = cur;
+      }
+      prevOffersRef.current = nextPrev;
+      setTrends(nextTrends);
+    };
+    const id = setInterval(tick, 4000);
+    return () => clearInterval(id);
+  }, [account, refresh]);
 
   const openBets = useMemo(() => bets.filter((b) => b.status === 'open'), [bets]);
   const settled  = useMemo(() => bets.filter((b) => b.status !== 'open'), [bets]);
@@ -61,16 +136,70 @@ export default function BetHistoryPage() {
     settledCount: settled.length,
   }), [openBets, settled]);
 
-  const onCashOut = async (id, expectedAmount) => {
+  const performCashOut = useCallback(async (id, expectedAmount, fraction = 1) => {
     try {
-      const res = await cashOutBet(id, expectedAmount);
+      const res = await cashOutBet(id, expectedAmount, fraction);
       const cash = res.bet.cashOut || 0;
-      adjustBalance(cash, `Cashed out: GHS ${fmt(cash)}.`);
-      const refreshed = await fetchBetHistory();
-      setBets(refreshed.bets || []);
+      const partial = fraction != null && fraction > 0 && fraction < 1;
+      adjustBalance(cash, partial
+        ? `Partial cash-out: GHS ${fmt(cash)}. Remainder still in play.`
+        : `Cashed out: GHS ${fmt(cash)}.`);
+      // Drop any auto-target for this ticket (the residual gets a fresh slate).
+      setAutoTargets((prev) => {
+        if (prev[id] == null) return prev;
+        const { [id]: _, ...rest } = prev;
+        saveAutoTargets(rest);
+        return rest;
+      });
+      await refresh();
     } catch (e) {
       toast(e.message || 'Cash-out unavailable.', 'error');
     }
+  }, [adjustBalance, refresh, toast]);
+
+  // Auto cash-out: whenever bets/targets change, check whether any open bet
+  // has an offer that has reached its target and hasn't fired yet.
+  useEffect(() => {
+    for (const b of openBets) {
+      const target = Number(autoTargets[b.id] || 0);
+      if (target <= 0) continue;
+      const cur = computeOffer(b);
+      if (cur >= target && !autoFiredRef.current[b.id]) {
+        autoFiredRef.current[b.id] = true;
+        toast(`Auto cash-out triggered at GHS ${fmt(cur)}.`);
+        performCashOut(b.id, cur);
+      }
+    }
+  }, [openBets, autoTargets, performCashOut, toast]);
+
+  // User-tap path: show confirmation dialog with the latest offer.
+  const onCashOut = (b) => {
+    const amount = computeOffer(b);
+    const code = b.bookingCode || toBookingCode(b.id);
+    setConfirmCashOut({ id: b.id, amount, code, bet: b });
+    setConfirmFraction(1);
+  };
+
+  const confirmAndCashOut = async () => {
+    if (!confirmCashOut) return;
+    const { id, amount } = confirmCashOut;
+    const f = confirmFraction;
+    // The server drift-checks against the FULL offer and then applies the
+    // fraction itself, so we pass the full offer as acceptedAmount.
+    setConfirmCashOut(null);
+    await performCashOut(id, amount, f);
+  };
+
+  const setAutoTarget = (betId, raw) => {
+    const v = Number(String(raw).replace(/,/g, ''));
+    setAutoTargets((prev) => {
+      const next = { ...prev };
+      if (!Number.isFinite(v) || v <= 0) delete next[betId];
+      else next[betId] = v;
+      saveAutoTargets(next);
+      return next;
+    });
+    autoFiredRef.current[betId] = false; // re-arm if user changed target
   };
 
   const onCopy = async (code) => {
@@ -86,6 +215,7 @@ export default function BetHistoryPage() {
   return (
     <main className="bh-page">
       <div className="bh-shell">
+        <PageBack />
         <header className="bh-head fade-up">
           <div>
             <h1>My Bets</h1>
@@ -144,7 +274,9 @@ export default function BetHistoryPage() {
             {visible.map((b) => {
               const code = b.bookingCode || toBookingCode(b.id);
               const isOpen = b.status === 'open';
-              const cashOutAmount = isOpen ? (b.lastCashOutOffer?.amount ?? b.cashoutOffer ?? Number((b.stake * (b.totalOdds * 0.6)).toFixed(2))) : 0;
+              const cashOutAmount = isOpen ? computeOffer(b) : 0;
+              const trend = trends[b.id]; // 'up' | 'down' | undefined
+              const autoTarget = autoTargets[b.id] || '';
               const hasLegs = b.legs?.length > 0;
               const firstLeg = hasLegs ? b.legs[0] : null;
               return (
@@ -206,13 +338,35 @@ export default function BetHistoryPage() {
                   )}
 
                   {isOpen && (
-                    <button
-                      type="button"
-                      className="bh-cashout"
-                      onClick={() => onCashOut(b.id, cashOutAmount)}
-                    >
-                      Cash Out · GHS {fmt(cashOutAmount)}
-                    </button>
+                    <>
+                      <button
+                        type="button"
+                        className={`bh-cashout trend-${trend || 'flat'}`}
+                        onClick={() => onCashOut(b)}
+                      >
+                        Cash Out · GHS {fmt(cashOutAmount)}
+                        {trend === 'up'   && <span className="bh-trend up"   aria-label="offer rose">▲</span>}
+                        {trend === 'down' && <span className="bh-trend down" aria-label="offer dropped">▼</span>}
+                      </button>
+                      <div className="bh-auto-row">
+                        <label htmlFor={`auto-${b.id}`} className="bh-auto-lbl">Auto cash-out at</label>
+                        <span className="bh-auto-prefix">GHS</span>
+                        <input
+                          id={`auto-${b.id}`}
+                          type="number"
+                          inputMode="decimal"
+                          min="0"
+                          step="1"
+                          placeholder="e.g. 400"
+                          value={autoTarget}
+                          onChange={(e) => setAutoTarget(b.id, e.target.value)}
+                          className="bh-auto-input"
+                        />
+                        {autoTarget ? (
+                          <button type="button" className="bh-auto-clear" onClick={() => setAutoTarget(b.id, '')}>Clear</button>
+                        ) : null}
+                      </div>
+                    </>
                   )}
 
                   {!isOpen && b.status === 'cashed_out' && (
@@ -245,6 +399,64 @@ export default function BetHistoryPage() {
           </ul>
         )}
       </div>
+
+      {confirmCashOut && (() => {
+        const isSystem = confirmCashOut.bet?.mode === 'system';
+        const payoutNow = Number((confirmCashOut.amount * confirmFraction).toFixed(2));
+        const remainStake = Number((confirmCashOut.bet.stake * (1 - confirmFraction)).toFixed(2));
+        const remainPotWin = Number((remainStake * confirmCashOut.bet.totalOdds * 1.08).toFixed(2));
+        const isPartial = confirmFraction > 0 && confirmFraction < 1;
+        const fractionOptions = isSystem ? [1] : [0.25, 0.5, 0.75, 1];
+        return (
+          <div className="bh-confirm-overlay" role="dialog" aria-modal="true" onClick={() => setConfirmCashOut(null)}>
+            <div className="bh-confirm-card" onClick={(e) => e.stopPropagation()}>
+              <h3>Confirm cash-out</h3>
+              <p className="bh-confirm-sub">Booking <code>{confirmCashOut.code}</code></p>
+
+              {!isSystem && (
+                <div className="bh-fraction-row">
+                  {fractionOptions.map((f) => (
+                    <button
+                      key={f}
+                      type="button"
+                      className={`bh-fraction-chip${confirmFraction === f ? ' active' : ''}`}
+                      onClick={() => setConfirmFraction(f)}
+                    >
+                      {f === 1 ? 'Full' : `${Math.round(f * 100)}%`}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              <div className="bh-confirm-amount">
+                <span className="lbl">You'll receive</span>
+                <strong>GHS {fmt(payoutNow)}</strong>
+              </div>
+
+              {isPartial && (
+                <div className="bh-confirm-residual">
+                  <span className="lbl">Remaining ticket</span>
+                  <div>
+                    <div>Stake <strong>GHS {fmt(remainStake)}</strong></div>
+                    <div>Potential win <strong>GHS {fmt(remainPotWin)}</strong></div>
+                  </div>
+                </div>
+              )}
+
+              <p className="bh-confirm-note">
+                The offer can move between now and submission. We'll reject the
+                cash-out if it drifts more than a few percent.
+              </p>
+              <div className="bh-confirm-actions">
+                <button type="button" className="bh-confirm-cancel" onClick={() => setConfirmCashOut(null)}>Cancel</button>
+                <button type="button" className="bh-confirm-go" onClick={confirmAndCashOut}>
+                  {isPartial ? `Cash out ${Math.round(confirmFraction * 100)}%` : 'Confirm cash-out'}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       <style>{BH_CSS}</style>
     </main>
@@ -467,4 +679,157 @@ const BH_CSS = `
   .bh-stats { padding: 10px; gap: 6px; }
   .bh-stat strong { font-size: 13.5px; }
 }
+
+/* Trend arrows on the cash-out button */
+.bh-cashout { position: relative; transition: background .2s, color .2s; }
+.bh-cashout.trend-up   { background: #1eaf6a; color: #fff; }
+.bh-cashout.trend-down { background: #e54848; color: #fff; }
+.bh-cashout .bh-trend {
+  display: inline-block;
+  margin-left: 8px;
+  font-size: 12px;
+  font-weight: 800;
+  animation: bh-trend-flash 1.6s ease-out 1;
+}
+.bh-cashout .bh-trend.up   { color: #ddffe7; }
+.bh-cashout .bh-trend.down { color: #ffdcdc; }
+@keyframes bh-trend-flash {
+  0%   { transform: translateY(0); opacity: 0; }
+  20%  { transform: translateY(0); opacity: 1; }
+  100% { transform: translateY(0); opacity: 1; }
+}
+
+/* Auto cash-out target input */
+.bh-auto-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--surface);
+  border: 1px solid var(--surface-2);
+  flex-wrap: wrap;
+}
+.bh-auto-lbl { font-size: 11px; letter-spacing: 0.06em; color: var(--text-dim); text-transform: uppercase; font-weight: 700; }
+.bh-auto-prefix { font-size: 11px; color: var(--text-dim); font-weight: 600; }
+.bh-auto-input {
+  flex: 1;
+  min-width: 80px;
+  padding: 7px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--surface-2);
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  outline: none;
+}
+.bh-auto-input:focus { border-color: var(--accent); }
+.bh-auto-clear {
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: none;
+  background: transparent;
+  color: var(--text-dim);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.bh-auto-clear:hover { color: var(--text); }
+
+/* Confirmation modal */
+.bh-confirm-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.6);
+  display: grid; place-items: center;
+  z-index: 9999;
+  padding: 16px;
+  animation: bh-confirm-fade 0.18s ease-out both;
+}
+@keyframes bh-confirm-fade { from { opacity: 0; } to { opacity: 1; } }
+.bh-confirm-card {
+  background: var(--surface, #161616);
+  border: 1px solid var(--surface-2, #2a2a2a);
+  border-radius: 16px;
+  padding: 24px;
+  max-width: 380px;
+  width: 100%;
+  color: var(--text, #fff);
+  animation: bh-confirm-pop 0.22s cubic-bezier(.2,1.3,.4,1) both;
+}
+@keyframes bh-confirm-pop { from { transform: scale(0.92); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+.bh-confirm-card h3 { margin: 0 0 4px; font-size: 20px; font-weight: 800; letter-spacing: -0.01em; }
+.bh-confirm-sub { margin: 0 0 16px; font-size: 13px; color: var(--text-dim); }
+.bh-confirm-sub code { background: var(--bg); padding: 2px 6px; border-radius: 6px; font-size: 12px; }
+.bh-confirm-amount {
+  padding: 14px 16px;
+  background: var(--bg);
+  border-radius: 12px;
+  border: 1px solid var(--surface-2);
+  display: flex; justify-content: space-between; align-items: baseline;
+  margin-bottom: 12px;
+}
+.bh-confirm-amount .lbl { font-size: 12px; color: var(--text-dim); }
+.bh-confirm-amount strong { font-size: 20px; font-weight: 800; color: var(--accent); }
+.bh-confirm-note { font-size: 11.5px; color: var(--text-dim); margin: 0 0 18px; line-height: 1.5; }
+.bh-confirm-actions { display: flex; gap: 10px; }
+.bh-confirm-cancel,
+.bh-confirm-go {
+  flex: 1;
+  padding: 12px 0;
+  border-radius: 10px;
+  border: none;
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.bh-confirm-cancel { background: var(--bg); color: var(--text); border: 1px solid var(--surface-2); }
+.bh-confirm-cancel:hover { background: var(--surface-2); }
+.bh-confirm-go { background: #116f43; color: #fff; }
+.bh-confirm-go:hover { background: #1eaf6a; }
+
+/* Partial-cash-out fraction chips */
+.bh-fraction-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  margin-bottom: 14px;
+}
+.bh-fraction-chip {
+  padding: 9px 0;
+  border-radius: 9px;
+  border: 1px solid var(--surface-2);
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all .15s;
+}
+.bh-fraction-chip:hover { border-color: var(--accent); }
+.bh-fraction-chip.active {
+  background: var(--accent);
+  color: var(--bg);
+  border-color: var(--accent);
+}
+.bh-confirm-residual {
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--surface-2);
+  background: var(--bg);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  margin-bottom: 12px;
+  gap: 12px;
+}
+.bh-confirm-residual > .lbl { color: var(--text-dim); font-weight: 600; }
+.bh-confirm-residual > div { text-align: right; }
+.bh-confirm-residual strong { font-variant-numeric: tabular-nums; }
 `;

@@ -14,7 +14,7 @@ function formatAmt(n) {
   return Number(n || 0).toLocaleString('en-GH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-export default function BetSuccessModal({ bet, onClose, onRebet }) {
+export default function BetSuccessModal({ bet, onClose, onRebet, onConfirm }) {
   const dlg = useRef(null);
 
   useEffect(() => {
@@ -115,9 +115,9 @@ export default function BetSuccessModal({ bet, onClose, onRebet }) {
         >Rebet</button>
         <button
           type="button"
-          onClick={() => dlg.current?.close()}
+          onClick={() => { dlg.current?.close(); onConfirm?.(); }}
           style={{ flex: 1, padding: '15px 0', borderRadius: 12, border: 'none', background: '#116f43', color: '#fff', fontWeight: 800, cursor: 'pointer', fontSize: 15 }}
-        >OK</button>
+        >View Open Bet</button>
       </div>
     </dialog>
   );

@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo } from 'react';
 import { fetchCasinoGames } from '../api/betApi.js';
 import { useToast, useAccount } from '../layout/AppShell.jsx';
 import Skeleton from '../components/Skeleton.jsx';
+import PageBack from '../components/PageBack.jsx';
 
 const CATEGORIES = ['All', 'Slots', 'Live', 'Crash'];
 
@@ -34,6 +35,7 @@ export default function CasinoPage() {
 
   return (
     <main className="page-wrap">
+      <PageBack />
       <div className="page-head">
         <p className="eyebrow">CASINO</p>
         <h1>Play and win, instantly.</h1>

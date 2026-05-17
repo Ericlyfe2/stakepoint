@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
+import PageBack from '../components/PageBack.jsx';
 
 const SECTIONS = [
   { id: 'terms', title: 'Terms & Conditions' },
@@ -20,6 +21,7 @@ export default function InfoPage() {
 
   return (
     <main className="page-wrap" style={{ maxWidth: 960, margin: '0 auto', padding: '32px 24px 80px' }}>
+      <PageBack />
       <header className="page-head" style={{ marginBottom: 32 }}>
         <h1 style={{ fontSize: 36, letterSpacing: '-0.02em' }}>Information &amp; Compliance</h1>
         <p style={{ color: 'var(--text-soft)', marginTop: 6 }}>

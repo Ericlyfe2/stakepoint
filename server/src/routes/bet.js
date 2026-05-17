@@ -107,6 +107,13 @@ const cashoutSchema = z.object({
     .optional()
     .transform((v) => v === undefined ? undefined : Number(v))
     .refine((v) => v === undefined || (Number.isFinite(v) && v >= 0), 'invalid acceptedAmount'),
+  // Partial cash-out: a fraction in (0, 1) of the stake to cash out now.
+  // The remaining (1 - fraction) of the stake stays in play on a residual
+  // ticket. Omit or set to 1 for a full cash-out.
+  fraction: z.union([z.number(), z.string()])
+    .optional()
+    .transform((v) => v === undefined ? undefined : Number(v))
+    .refine((v) => v === undefined || (Number.isFinite(v) && v > 0 && v <= 1), 'fraction must be in (0, 1]'),
 });
 
 /* ------------ public meta ------------ */
@@ -401,26 +408,73 @@ router.delete('/bets/:id',
       }
     }
 
+    // Partial cash-out: cash out only `fraction` of the stake; leave the rest
+    // running on a fresh residual ticket. System bets keep the v1 behaviour
+    // (full cash-out only) — partial only applies to single/multiple.
+    const rawFraction = req.body?.fraction;
+    const fraction = (bet.mode !== 'system' && rawFraction !== undefined && rawFraction > 0 && rawFraction < 1)
+      ? Number(rawFraction)
+      : 1;
+    const cashedPortion = Number((cashOut * fraction).toFixed(2));
+    const residualStake = Number((bet.stake * (1 - fraction)).toFixed(2));
+
+    if (fraction < 1 && residualStake < 1) {
+      // Avoid creating a ticket so small it can't be cashed out again.
+      throw conflict('Remaining stake would be too small. Cash out fully or pick a smaller fraction.', {
+        code: 'RESIDUAL_TOO_SMALL',
+      });
+    }
+
     bet.status = 'cashed_out';
-    bet.cashOut = cashOut;
+    bet.cashOut = cashedPortion;
+    bet.cashOutFraction = fraction;
     bet.cashOutAt = new Date().toISOString();
     betsStore.set(bet.id, bet);
     cashOutEngine.unregisterBet(bet.id);
 
+    let residual = null;
+    if (fraction < 1) {
+      // Create a residual ticket that carries the remaining stake at the
+      // original odds. Same legs, fresh id and booking code.
+      const newId = `bv-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      residual = {
+        ...bet,
+        id: newId,
+        bookingCode: uniqueBookingCode(),
+        placedAt: new Date().toISOString(),
+        parentBetId: bet.id,
+        stake: residualStake,
+        potentialWin: Number((residualStake * bet.totalOdds * (1 + BONUS_RATE)).toFixed(2)),
+        status: 'open',
+        cashOut: undefined,
+        cashOutFraction: undefined,
+        cashOutAt: undefined,
+        lastCashOutOffer: null,
+        cashOutHistory: [],
+      };
+      bet.residualBetId = newId;
+      betsStore.set(bet.id, bet);
+      pushBet(residual);
+      cashOutEngine.registerBet(residual);
+    }
+
     const updated = updateUser(req.user.id, {
-      balance: Number((req.user.balance + cashOut).toFixed(2)),
+      balance: Number((req.user.balance + cashedPortion).toFixed(2)),
     });
     pushTx(req.user.id, {
-      kind: 'cash_out', amount: cashOut, status: 'completed',
-      balanceAfter: updated.balance, ref: bet.id,
+      kind: fraction < 1 ? 'cash_out_partial' : 'cash_out',
+      amount: cashedPortion,
+      status: 'completed',
+      balanceAfter: updated.balance,
+      ref: bet.id,
     });
-    logActivity(req.user.id, { kind: 'cash_out', betId: bet.id, cashOut });
+    logActivity(req.user.id, { kind: 'cash_out', betId: bet.id, cashOut: cashedPortion, fraction });
 
-    emitToUser(req.user.id, 'wallet:update', { balance: updated.balance, delta: cashOut, reason: 'cash_out', ref: bet.id });
-    emitAdmin('cashout:executed', { betId: bet.id, userId: req.user.id, cashOut, ts: Date.now() });
+    emitToUser(req.user.id, 'wallet:update', { balance: updated.balance, delta: cashedPortion, reason: 'cash_out', ref: bet.id });
+    emitAdmin('cashout:executed', { betId: bet.id, userId: req.user.id, cashOut: cashedPortion, fraction, ts: Date.now() });
 
     res.json({
-      ok: true, bet,
+      ok: true, bet, residual,
       account: { ...updated, passwordHash: undefined, googleId: undefined, activity: undefined },
     });
   })

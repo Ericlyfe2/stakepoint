@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { fetchProfile, updateProfile, fetchActivity, fetchTransactions, changePassword } from '../api/betApi.js';
 import { useAccount, useToast } from '../providers/AccountProvider.jsx';
 import Skeleton from '../components/Skeleton.jsx';
+import PageBack from '../components/PageBack.jsx';
 
 function formatAmt(n) {
   return Number(n || 0).toLocaleString('en-GH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -68,6 +69,7 @@ export default function ProfilePage() {
 
   return (
     <main className="page-wrap">
+      <PageBack />
       <div className="page-head">
         <p className="eyebrow">ACCOUNT</p>
         <h1>{account.displayName || account.email}</h1>

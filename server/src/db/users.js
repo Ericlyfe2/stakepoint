@@ -24,7 +24,7 @@ export function createUser(record) {
     email: id,
     displayName: record.displayName || id,
     role: record.role || 'user',
-    balance: typeof record.balance === 'number' ? record.balance : 50,
+    balance: typeof record.balance === 'number' ? record.balance : 0,
     currency: 'GHS',
     country: record.country || null,
     totalDeposited: 0,
