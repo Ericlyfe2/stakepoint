@@ -272,6 +272,9 @@ router.post('/place',
       potentialWin = totalStake * totalOdds * (1 + BONUS_RATE);
     }
 
+    if (totalStake < 300) {
+      return res.json({ success: false, error: `Minimum stake is GHS 300. This ticket requires only GHS ${totalStake.toFixed(2)}.` });
+    }
     if (totalStake > user.balance) {
       return res.json({ success: false, error: `Insufficient balance. This ticket requires GHS ${totalStake.toFixed(2)} (your balance is GHS ${user.balance.toFixed(2)}).` });
     }

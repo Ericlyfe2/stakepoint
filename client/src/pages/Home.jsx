@@ -86,7 +86,7 @@ function columnsFor(marketChip, match) {
 
 export default function Home({ initialChip }) {
   const { toast } = useToast();
-  const { account, adjustBalance } = useAccount();
+  const { account, adjustBalance, setAccount } = useAccount();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const sportParam = searchParams.get('sport') || 'football';
@@ -97,7 +97,7 @@ export default function Home({ initialChip }) {
   const [selections, setSelections]   = useState([]);
   const [betMode, setBetMode]         = useState('multiple');
   const [systemType, setSystemType]   = useState(null);
-  const [stake, setStake]             = useState('50.00');
+  const [stake, setStake]   = useState('300.00');
   const [activeLeague, setActiveLeague] = useState(null);
 
   // new mobile-first UI state
@@ -301,19 +301,22 @@ export default function Home({ initialChip }) {
     }
     const linePrice = parseStake(stake);
     if (linePrice <= 0) { setSlipErr('Enter a stake amount.'); return; }
+    const cost = betMode === 'system' ? linePrice * linesCount : linePrice;
+    if (cost < 300) { setSlipErr(`Minimum bet is GHS 300 (this ticket costs GHS ${formatAmt(cost)}).`); return; }
     if (!account) { 
       setSlipOpen(false);
       navigate('/login?next=/');
       toast('Sign in to place a bet.'); 
       return; 
     }
-    const cost = betMode === 'system' ? linePrice * linesCount : linePrice;
     if (cost > account.balance) {
       setSlipErr(`Insufficient balance — this ticket costs GHS ${formatAmt(cost)}.`); 
       return;
     }
     
     setIsPlacing(true);
+    // Optimistic balance update for instant feedback
+    adjustBalance(-cost);
     try {
       const res = await placeBet({
         mode: betMode,
@@ -323,11 +326,14 @@ export default function Home({ initialChip }) {
           matchId: s.matchId, market: s.market, outcome: s.outcome, odds: s.odds,
         })),
       });
-      adjustBalance(-cost, `Bet placed — booking code ${res.bet.bookingCode}.`);
+      if (res.account) setAccount(res.account);
+      toast(`Bet placed — booking code ${res.bet.bookingCode}.`);
       setSelections([]);
       setSlipOpen(false);
       setSuccessBet(res.bet);
     } catch (e) {
+      // Revert optimistic update on failure
+      adjustBalance(cost);
       if (e.status === 409) {
         setSlipErr(e.message || 'Odds changed or market closed — refreshing.');
         setSelections([]); // Clear invalid selections
@@ -412,13 +418,7 @@ export default function Home({ initialChip }) {
         .filter((lg) => lg.matches.length > 0)
     : visibleLeagues;
 
-  // Three top winners (placeholder when no settled bets yet — adapted to your real
-  // bet history once any are won/cashed-out).
-  const winners = [
-    { id: 'w1', who: 'GHS***044', amt: 53501.75, src: `in ${snapshot.sport === 'football' ? 'Sports' : snapshot.sport}`, ago: '1 min ago' },
-    { id: 'w2', who: 'GHS***118', amt:  4120.00, src: 'in Sports', ago: '1 min ago' },
-    { id: 'w3', who: 'GHS***ABC', amt: 10250.00, src: 'in Sports', ago: '1 min ago' },
-  ];
+  // Grand Prize Winners state (replaced by animated GrandPrizeWinners component)
 
   const marketChips = [
     ['1X2',  '1X2'],
@@ -698,28 +698,7 @@ export default function Home({ initialChip }) {
                   </div>
                 </section>
 
-                {/* Inject winners card right after the first league */}
-                {lgIdx === 0 && (
-                  <section className="sb-winners">
-                    <div className="sb-winners-head">
-                      <h3>Grand Prize Winners</h3>
-                      <a href="/my-bets">View More ›</a>
-                    </div>
-                    <div className="sb-winners-scroll">
-                      {winners.map((w) => (
-                        <div key={w.id} className="sb-winner">
-                          <div className="sb-winner-bg-icon">
-                            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19,5h-2V3c0-0.55-0.45-1-1-1H8C7.45,2,7,2.45,7,3v2H5C3.9,5,3,5.9,3,7v1c0,2.55,1.92,4.63,4.39,4.94C8.23,14.73,9.44,16,11,16v3H7v2h10v-2h-4v-3c1.56,0,2.77-1.27,3.61-3.06C19.08,12.63,21,10.55,21,8V7C21,5.9,20.1,5,19,5z M5,8V7h2v3.82C5.84,10.4,5,9.3,5,8z M19,8c0,1.3-0.84,2.4-2,2.82V7h2V8z"/></svg>
-                          </div>
-                          <span className="who">{w.who}</span>
-                          <span className="amt">GHS{formatAmt(w.amt)}</span>
-                          <span className="src">{w.src}</span>
-                          <span className="ago">{w.ago}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </section>
-                )}
+                {lgIdx === 0 && <GrandPrizeWinners />}
               </Fragment>
             );
           })}
@@ -768,7 +747,14 @@ export default function Home({ initialChip }) {
         <div className="sb-sheet-grip" />
         <div className="sb-sheet-head">
           <h3>Bet slip · <span style={{ color: 'var(--accent)' }}>{selections.length}</span></h3>
-          <button type="button" className="sb-sheet-close" onClick={() => setSlipOpen(false)} aria-label="Close">×</button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginLeft: 'auto' }}>
+            {account && (
+              <span className="slip-balance" style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-soft)', background: 'rgba(30,200,81,0.1)', padding: '4px 8px', borderRadius: 6 }}>
+                Balance: <span style={{ color: '#1ec851' }}>₵{formatAmt(account.balance)}</span>
+              </span>
+            )}
+            <button type="button" className="sb-sheet-close" onClick={() => setSlipOpen(false)} aria-label="Close" style={{ position: 'static', margin: 0 }}>×</button>
+          </div>
         </div>
         <div className="sb-sheet-body">
           <div className="betslip">
@@ -954,5 +940,51 @@ export default function Home({ initialChip }) {
         }}
       />
     </>
+  );
+}
+
+/* ─── Helper: generate a random winner entry ─── */
+function makeWinner() {
+  const pool = ['3XK', '9QP', '7FN', '2BV', '4HM', '8WZ', '1JD', '5RT', '6YL', '0CG'];
+  const who = `GHS***${pool[Math.floor(Math.random() * pool.length)]}`;
+  const amt = 200000 + Math.random() * (600501.75 - 200000);
+  const mins = Math.floor(Math.random() * 3) + 1;
+  return { who, amt, src: 'in Sports', ago: mins === 1 ? '1 min ago' : `${mins} mins ago` };
+}
+
+/* ─── Live Grand Prize Winners ticker ─── */
+function GrandPrizeWinners() {
+  const [items, setItems] = useState(() => Array.from({ length: 10 }, () => makeWinner()));
+
+  useEffect(() => {
+    const id = setInterval(() => {
+      setItems((prev) => { const n = [...prev]; n.shift(); n.push(makeWinner()); return n; });
+    }, 3500);
+    return () => clearInterval(id);
+  }, []);
+
+  const doubled = [...items, ...items];
+
+  return (
+    <section className="sb-winners">
+      <div className="sb-winners-head">
+        <h3>🏆 Grand Prize Winners</h3>
+      </div>
+      <div className="sb-winners-scroll">
+        <div className="sb-winners-track">
+          {doubled.map((w, i) => (
+            <div key={i} className="sb-winner">
+              <div className="sb-winner-bg-icon">
+                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19,5h-2V3c0-0.55-0.45-1-1-1H8C7.45,2,7,2.45,7,3v2H5C3.9,5,3,5.9,3,7v1c0,2.55,1.92,4.63,4.39,4.94C8.23,14.73,9.44,16,11,16v3H7v2h10v-2h-4v-3c1.56,0,2.77-1.27,3.61-3.06C19.08,12.63,21,10.55,21,8V7C21,5.9,20.1,5,19,5z M5,8V7h2v3.82C5.84,10.4,5,9.3,5,8z M19,8c0,1.3-0.84,2.4-2,2.82V7h2V8z"/></svg>
+              </div>
+              <span className="who">{w.who}</span>
+              <span className="amt">GHS {formatAmt(w.amt)}</span>
+              <span className="src">{w.src}</span>
+              <span className="ago">{w.ago}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
   );
 }

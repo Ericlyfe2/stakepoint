@@ -87,38 +87,55 @@ export default function WalletPage() {
           </div>
         </header>
 
-        <section className="wallet-cards fade-up" style={{ animationDelay: '0.05s' }}>
-          <article className="wallet-card">
-            <header className="wallet-card-head">
-              <h3>Deposit conditions</h3>
-              <span className="wallet-pill wallet-pill-good">Instant</span>
-            </header>
-            <ul className="wallet-list">
-              <li><span>Minimum deposit</span><strong>GHS 300</strong></li>
-              <li><span>Methods</span><strong>MoMo · Vodafone · AirtelTigo · Card</strong></li>
-              <li><span>Processing</span><strong>Instant</strong></li>
-              <li><span>Fees</span><strong>0%</strong></li>
-              <li><span>Currency</span><strong>GHS only</strong></li>
-            </ul>
+        <section className="wallet-split fade-up" style={{ animationDelay: '0.05s' }}>
+          <article className="wallet-split-panel wallet-split-deposit">
+            <div className="wallet-split-bg" />
+            <div className="wallet-split-inner">
+              <header className="wallet-split-head">
+                <h3>Deposit Funds</h3>
+                <span className="wallet-pill wallet-pill-good">Instant</span>
+              </header>
+              <p className="wallet-split-desc">Add money to your wallet and start betting instantly.</p>
+              <ul className="wallet-list">
+                <li><span>Minimum deposit</span><strong>GHS 300</strong></li>
+                <li><span>Methods</span><strong>MoMo · Vodafone · AirtelTigo · Card</strong></li>
+                <li><span>Fees</span><strong>0%</strong></li>
+                <li><span>Processing</span><strong>Instant</strong></li>
+              </ul>
+              <button type="button" className="wallet-split-cta" onClick={openDeposit}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+                Deposit Now
+              </button>
+            </div>
           </article>
 
-          <article className="wallet-card">
-            <header className="wallet-card-head">
-              <h3>Withdrawal conditions</h3>
-              <span className="wallet-pill wallet-pill-warn">Verified accounts</span>
-            </header>
-            <ul className="wallet-list">
-              <li><span>Minimum withdrawal</span><strong>GHS 10,000</strong></li>
-              <li><span>Deposit-to-withdraw ratio</span><strong>10% lifetime deposits required</strong></li>
-              <li><span>Processing</span><strong>Within 24 hours</strong></li>
-              <li><span>Fees</span><strong>0%</strong></li>
-              <li><span>Methods</span><strong>MoMo to phone on file</strong></li>
-              <li><span>Identity check</span><strong>Required above GHS 50,000</strong></li>
-            </ul>
-            <p className="wallet-note">
-              Example: to withdraw <strong>GHS 10,000</strong> you must have deposited at least <strong>GHS 1,000</strong> in your lifetime.
-            </p>
+          <article className="wallet-split-panel wallet-split-withdraw">
+            <div className="wallet-split-bg" />
+            <div className="wallet-split-inner">
+              <header className="wallet-split-head">
+                <h3>Withdraw Funds</h3>
+                <span className="wallet-pill wallet-pill-warn">Verified accounts</span>
+              </header>
+              <p className="wallet-split-desc">Cash out your winnings directly to your mobile money.</p>
+              <ul className="wallet-list">
+                <li><span>Minimum withdrawal</span><strong>GHS 10,000</strong></li>
+                <li><span>Deposit-to-withdraw ratio</span><strong>10% deposits</strong></li>
+                <li><span>Processing</span><strong>Within 24 hours</strong></li>
+                <li><span>Methods</span><strong>MoMo to phone on file</strong></li>
+              </ul>
+              <button type="button" className="wallet-split-cta wallet-split-cta-out" onClick={openWithdraw}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 7l-5 5-5-5M12 17V5"/></svg>
+                Withdraw
+              </button>
+            </div>
           </article>
+        </section>
+
+        <section className="wallet-note-section fade-up" style={{ animationDelay: '0.07s' }}>
+          <p className="wallet-note">
+            <strong>Deposit-to-withdraw rule:</strong> to withdraw <strong>GHS 10,000</strong> you must have deposited at least <strong>GHS 1,000</strong> in your lifetime.
+            Identity check required above <strong>GHS 50,000</strong>.
+          </p>
         </section>
 
         <section className="wallet-history fade-up" style={{ animationDelay: '0.1s' }}>
@@ -216,6 +233,74 @@ const WALLET_CSS = `
   display: flex; gap: 10px; flex-wrap: wrap;
 }
 .wallet-cta { min-width: 140px; padding: 12px 18px; font-weight: 700; }
+
+/* deposit / withdraw split panels */
+.wallet-split {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 16px;
+}
+.wallet-split-panel {
+  position: relative;
+  overflow: hidden;
+  border-radius: 18px;
+  padding: 24px;
+  border: 1px solid var(--surface-2);
+  transition: transform .2s ease, border-color .2s ease;
+}
+.wallet-split-panel:hover { transform: translateY(-2px); }
+.wallet-split-deposit {
+  background: linear-gradient(135deg, var(--surface) 0%, #0f1a14 100%);
+  border-color: rgba(197, 255, 61, .15);
+}
+.wallet-split-withdraw {
+  background: linear-gradient(135deg, var(--surface) 0%, #1a1010 100%);
+  border-color: rgba(255, 77, 61, .12);
+}
+.wallet-split-bg {
+  position: absolute; inset: -10%;
+  pointer-events: none;
+}
+.wallet-split-deposit .wallet-split-bg {
+  background: radial-gradient(500px 350px at 20% -30%, rgba(197, 255, 61, .08), transparent 60%);
+}
+.wallet-split-withdraw .wallet-split-bg {
+  background: radial-gradient(500px 350px at 80% -30%, rgba(255, 77, 61, .07), transparent 60%);
+}
+.wallet-split-inner { position: relative; z-index: 1; }
+.wallet-split-head {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 4px;
+}
+.wallet-split-head h3 { margin: 0; font-size: 18px; font-weight: 800; }
+.wallet-split-desc {
+  margin: 4px 0 14px;
+  font-size: 13px;
+  color: var(--text-soft);
+  line-height: 1.5;
+}
+.wallet-split-cta {
+  display: inline-flex; align-items: center; gap: 8px;
+  margin-top: 16px;
+  width: 100%;
+  padding: 14px 18px;
+  border: none;
+  border-radius: 12px;
+  font-size: 15px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: opacity .2s ease, transform .15s ease;
+  justify-content: center;
+}
+.wallet-split-cta:hover { opacity: .85; transform: scale(1.01); }
+.wallet-split-cta:active { transform: scale(.98); }
+.wallet-split-deposit .wallet-split-cta {
+  background: linear-gradient(135deg, var(--accent), #b0e82d);
+  color: #0a0d0c;
+}
+.wallet-split-withdraw .wallet-split-cta {
+  background: linear-gradient(135deg, #ff4d3d, #cc3a2e);
+  color: #fff;
+}
+.wallet-note-section { margin-top: -4px; }
 
 .wallet-cards {
   display: grid; grid-template-columns: 1fr 1fr; gap: 16px;
@@ -317,7 +402,9 @@ const WALLET_CSS = `
   .wallet-hero { padding: 22px 18px; }
   .wallet-hero-amt .amt { font-size: 36px; }
   .wallet-cards { grid-template-columns: 1fr; }
+  .wallet-split { grid-template-columns: 1fr; }
   .wallet-card { padding: 16px; }
+  .wallet-split-panel { padding: 18px; }
   .wallet-history { padding: 16px; }
   .wallet-cta { flex: 1; min-width: 0; }
 }

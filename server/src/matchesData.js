@@ -299,17 +299,9 @@ export function lookupSelection({ matchId, market, outcome }) {
 
 export const CASINO_GAMES = [
   { id: 'aviator',     title: 'Aviator',         provider: 'Spribe',    category: 'Crash', rtp: 97.0, hot: true,  hue: '#ff5252' },
-  { id: 'jetx',        title: 'JetX',            provider: 'Smartsoft', category: 'Crash', rtp: 97.0, hue: '#ffb000' },
-  { id: 'gates-olymp', title: 'Gates of Olympus',provider: 'Pragmatic', category: 'Slots', rtp: 96.5, hot: true,  hue: '#36c8ff' },
-  { id: 'sweet-bonanz',title: 'Sweet Bonanza',   provider: 'Pragmatic', category: 'Slots', rtp: 96.5, hue: '#ff7ab8' },
-  { id: 'big-bass',    title: 'Big Bass Bonanza',provider: 'Pragmatic', category: 'Slots', rtp: 96.7, hue: '#3aa1ff' },
   { id: 'live-rolette',title: 'Lightning Roulette', provider: 'Evolution', category: 'Live', rtp: 97.3, hot: true, hue: '#ffd000' },
-  { id: 'live-bj',     title: 'Speed Blackjack', provider: 'Evolution', category: 'Live',  rtp: 99.3, hue: '#1ec97a' },
-  { id: 'crazy-time',  title: 'Crazy Time',      provider: 'Evolution', category: 'Live',  rtp: 96.0, hot: true,  hue: '#a47bff' },
   { id: 'mines',       title: 'Mines',           provider: 'Spribe',    category: 'Crash', rtp: 97.0, hue: '#27e0c4' },
   { id: 'plinko',      title: 'Plinko',          provider: 'Spribe',    category: 'Crash', rtp: 97.0, hue: '#7a8cff' },
-  { id: 'andar-bahar', title: 'Andar Bahar',     provider: 'Evolution', category: 'Live',  rtp: 97.8, hue: '#ff9e3a' },
-  { id: 'dragon-tiger',title: 'Dragon Tiger',    provider: 'Evolution', category: 'Live',  rtp: 96.3, hue: '#e93b6a' },
 ];
 
 export const VIRTUAL_LEAGUES = [
