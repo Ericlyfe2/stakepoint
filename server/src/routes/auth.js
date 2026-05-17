@@ -92,7 +92,7 @@ router.post('/register',
       email,
       displayName: displayName || email,
       passwordHash,
-      balance: 50,
+      balance: 0,
       country: countryCode,
       emailVerified: true,
     });

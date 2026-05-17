@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { fetchJackpot, enterJackpot } from '../api/betApi.js';
 import { useToast, useAccount } from '../layout/AppShell.jsx';
+import PageBack from '../components/PageBack.jsx';
 
 function fmt(n) {
   return Number(n || 0).toLocaleString('en-GH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -100,6 +101,7 @@ export default function JackpotPage() {
   return (
     <main className="jp-page">
       <div className="jp-shell">
+        <PageBack />
         <header className="jp-hero fade-up">
           <div className="jp-hero-bg" aria-hidden />
           <div className="jp-hero-inner">

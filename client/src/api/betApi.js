@@ -95,7 +95,12 @@ export const placeBet       = (payload) => post('/bet/place', payload);
 export const fetchBetHistory= ()        => get('/bet/history');
 export const fetchBet       = (id)      => get(`/bet/bets/${encodeURIComponent(id)}`);
 export const fetchBetByCode = (code)    => get(`/bet/code/${encodeURIComponent(code)}`);
-export const cashOutBet     = (id, acceptedAmount) => del(`/bet/bets/${encodeURIComponent(id)}`, acceptedAmount != null ? { acceptedAmount } : {});
+export const cashOutBet     = (id, acceptedAmount, fraction) => {
+  const body = {};
+  if (acceptedAmount != null) body.acceptedAmount = acceptedAmount;
+  if (fraction != null && fraction > 0 && fraction < 1) body.fraction = fraction;
+  return del(`/bet/bets/${encodeURIComponent(id)}`, body);
+};
 export const fetchUnacknowledgedWins = () => get('/bet/bets/unacknowledged');
 export const acknowledgeBet = (id) => post(`/bet/bets/${encodeURIComponent(id)}/ack`);
 

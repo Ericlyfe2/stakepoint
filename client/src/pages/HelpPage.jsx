@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useToast, useAccount } from '../providers/AccountProvider.jsx';
 import { submitTicket } from '../api/betApi.js';
+import PageBack from '../components/PageBack.jsx';
 
 const FAQ = [
   {
@@ -55,6 +56,7 @@ export default function HelpPage() {
 
   return (
     <main className="page-wrap" style={{ maxWidth: 960, margin: '0 auto', padding: '32px 24px 80px' }}>
+      <PageBack />
       <header className="page-head" style={{ marginBottom: 24 }}>
         <h1 style={{ fontSize: 36, letterSpacing: '-0.02em' }}>Help &amp; Support</h1>
         <p style={{ color: 'var(--text-soft)', marginTop: 6 }}>

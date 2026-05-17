@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { fetchVirtuals, placeBet } from '../api/betApi.js';
 import { useToast, useAccount } from '../layout/AppShell.jsx';
+import PageBack from '../components/PageBack.jsx';
 
 function formatAmt(n) {
   return Number(n || 0).toLocaleString('en-GH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -54,6 +55,7 @@ export default function VirtualsPage() {
 
   return (
     <main className="page-wrap">
+      <PageBack />
       <div className="page-head">
         <p className="eyebrow">VIRTUALS</p>
         <h1>Football, every minute.</h1>

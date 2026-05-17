@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAccount, useToast } from '../providers/AccountProvider.jsx';
 import { fetchTransactions } from '../api/betApi.js';
+import PageBack from '../components/PageBack.jsx';
 
 function fmt(n) {
   return Number(n || 0).toLocaleString('en-GH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -63,6 +64,7 @@ export default function WalletPage() {
   return (
     <main className="wallet-page">
       <div className="wallet-shell">
+        <PageBack />
         <header className="wallet-hero fade-up">
           <div className="wallet-hero-grain" aria-hidden />
           <div className="wallet-hero-inner">

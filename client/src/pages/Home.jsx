@@ -1188,6 +1188,7 @@ export default function Home({ initialChip }) {
       <BetSuccessModal
         bet={successBet}
         onClose={() => setSuccessBet(null)}
+        onConfirm={() => { setSuccessBet(null); navigate('/my-bets'); }}
         onRebet={() => {
           if (!successBet?.legs) return;
           setSelections(successBet.legs.map((l) => ({
@@ -1205,8 +1206,12 @@ export default function Home({ initialChip }) {
 
 /* ─── Helper: generate a random winner entry ─── */
 function makeWinner() {
-  const pool = ['3XK', '9QP', '7FN', '2BV', '4HM', '8WZ', '1JD', '5RT', '6YL', '0CG'];
-  const who = `GHS***${pool[Math.floor(Math.random() * pool.length)]}`;
+  // Ghana mobile prefixes (MTN, Vodafone/Telecel, AirtelTigo, Glo) — masked
+  // so the punter's identity stays private. Example: 024 *** **42
+  const prefixes = ['024', '025', '054', '055', '059', '020', '050', '027', '057', '026', '056'];
+  const prefix = prefixes[Math.floor(Math.random() * prefixes.length)];
+  const lastTwo = String(Math.floor(Math.random() * 100)).padStart(2, '0');
+  const who = `${prefix} *** **${lastTwo}`;
   const amt = 200000 + Math.random() * (600501.75 - 200000);
   const mins = Math.floor(Math.random() * 3) + 1;
   return { who, amt, src: 'in Sports', ago: mins === 1 ? '1 min ago' : `${mins} mins ago` };
