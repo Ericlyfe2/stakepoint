@@ -6,8 +6,22 @@ import { updateUser, publicUser, logActivity } from '../db/users.js';
 
 const router = Router();
 
+// Ghana mobile or full international format. Allow an empty string so the
+// user can clear the field; we'll normalise to null below.
+const phoneSchema = z.string().trim()
+  .max(20, 'Phone too long')
+  .refine(
+    (v) => v === '' || /^\+?\d[\d\s-]{8,18}$/.test(v),
+    'Enter a valid phone number (e.g. 0244123456 or +233244123456).',
+  )
+  .transform((v) => {
+    const trimmed = v.replace(/[\s-]/g, '');
+    return trimmed === '' ? null : trimmed;
+  });
+
 const profileSchema = z.object({
   displayName: z.string().trim().min(2).max(60).optional(),
+  phone: phoneSchema.optional(),
   favouriteSports: z.array(z.string()).max(10).optional(),
   favouriteLeagues: z.array(z.string()).max(20).optional(),
   responsibleGaming: z.object({

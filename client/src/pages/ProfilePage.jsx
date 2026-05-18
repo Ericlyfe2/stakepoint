@@ -13,16 +13,19 @@ export default function ProfilePage() {
   const { account, refresh } = useAccount();
   const { toast } = useToast();
   const [displayName, setDisplayName] = useState(account?.displayName || '');
+  const [phone, setPhone]             = useState(account?.phone || '');
   const [activity, setActivity]       = useState(null);
   const [transactions, setTransactions] = useState(null);
   const [tab, setTab] = useState('overview');
   const [pwForm, setPwForm] = useState({ current: '', next: '', confirm: '' });
   const [busy, setBusy] = useState(false);
   const [err, setErr]   = useState('');
+  const [profileErr, setProfileErr] = useState('');
 
   useEffect(() => {
     if (!account) return;
     setDisplayName(account.displayName || '');
+    setPhone(account.phone || '');
     fetchActivity().then((d) => setActivity(d.activity || [])).catch(() => {});
     fetchTransactions().then((d) => setTransactions(d.transactions || [])).catch(() => {});
   }, [account]);
@@ -40,13 +43,21 @@ export default function ProfilePage() {
 
   const saveProfile = async (e) => {
     e.preventDefault();
+    setProfileErr('');
+    const trimmedPhone = phone.trim();
+    if (trimmedPhone && !/^\+?\d[\d\s-]{8,18}$/.test(trimmedPhone)) {
+      setProfileErr('Enter a valid phone number (e.g. 0244123456 or +233244123456).');
+      return;
+    }
     try {
       setBusy(true);
-      await updateProfile({ displayName });
+      await updateProfile({ displayName, phone: trimmedPhone });
       await refresh();
       toast('Profile saved.');
     } catch (e) {
-      toast(e.message || 'Could not save profile.');
+      const msg = e.message || 'Could not save profile.';
+      setProfileErr(msg);
+      toast(msg);
     } finally { setBusy(false); }
   };
 
@@ -98,6 +109,32 @@ export default function ProfilePage() {
             <label className="dlg-label">Display name</label>
             <input className="search-input" style={{ width: '100%', marginBottom: 12 }}
                    value={displayName} onChange={(e) => setDisplayName(e.target.value)} />
+            <label className="dlg-label" htmlFor="profile-phone">
+              Phone number
+              <span style={{ marginLeft: 6, color: 'var(--text-dim)', fontWeight: 400, fontSize: 11 }}>
+                — withdrawals are sent to this number
+              </span>
+            </label>
+            <input
+              id="profile-phone"
+              type="tel"
+              inputMode="tel"
+              autoComplete="tel"
+              className="search-input"
+              style={{ width: '100%', marginBottom: 8 }}
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              placeholder="e.g. 0244123456 or +233244123456"
+              maxLength={20}
+            />
+            {profileErr && (
+              <p style={{
+                margin: '0 0 12px',
+                fontSize: 12,
+                color: 'var(--accent-hot, #e54848)',
+                fontWeight: 600,
+              }}>{profileErr}</p>
+            )}
             <button type="submit" className="btn btn-primary" disabled={busy}>{busy ? 'Saving…' : 'Save changes'}</button>
           </form>
         </section>

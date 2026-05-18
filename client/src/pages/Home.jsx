@@ -7,6 +7,7 @@ import {
 } from '../api/betApi.js';
 import { useToast, useAccount } from '../layout/AppShell.jsx';
 import BetSuccessModal, { toBookingCode } from '../components/BetSuccessModal.jsx';
+import { useFavouriteLeagues } from '../hooks/useFavourites.js';
 import {
   SYSTEM_TYPES,
   eligibleSystemTypes,
@@ -120,6 +121,8 @@ export default function Home({ initialChip }) {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const sportParam = searchParams.get('sport') || 'football';
+
+  const { favourites, isFavourite, toggle: toggleFavourite } = useFavouriteLeagues();
 
   const [sportId, setSportId]         = useState(sportParam);
   const [snapshot, setSnapshot]       = useState(null);
@@ -593,11 +596,18 @@ export default function Home({ initialChip }) {
 
   // Today = matches whose `day` doesn't read like a date string ("Sun", "Mon", a future date).
   // Live always counts as today.
-  const filteredLeagues = subTab === 'today'
+  const filteredLeaguesRaw = subTab === 'today'
     ? visibleLeagues
         .map((lg) => ({ ...lg, matches: lg.matches.filter((m) => m.isLive || /today/i.test(String(m.day || ''))) }))
         .filter((lg) => lg.matches.length > 0)
     : visibleLeagues;
+
+  // Favourited leagues float to the top so they stay sticky in the list.
+  const filteredLeagues = [...filteredLeaguesRaw].sort((a, b) => {
+    const af = isFavourite(a.id) ? 0 : 1;
+    const bf = isFavourite(b.id) ? 0 : 1;
+    return af - bf;
+  });
 
   // Grand Prize Winners state (replaced by animated GrandPrizeWinners component)
 
@@ -871,6 +881,31 @@ export default function Home({ initialChip }) {
         </div>
       ) : (
         <>
+          {favourites.length > 0 && (
+            <div className="sb-favs-strip" role="region" aria-label="Favourite leagues">
+              <span className="sb-favs-strip-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="14" height="14">
+                  <path d="M12 2.5l2.95 6.13 6.55.78-4.84 4.6 1.32 6.54L12 17.37l-5.98 3.18 1.32-6.54-4.84-4.6 6.55-.78L12 2.5z" fill="currentColor" />
+                </svg>
+              </span>
+              <span className="sb-favs-strip-label">Favourites</span>
+              {filteredLeagues
+                .filter((lg) => isFavourite(lg.id))
+                .map((lg) => (
+                  <button
+                    key={lg.id}
+                    type="button"
+                    className="sb-favs-chip"
+                    onClick={() => setActiveLeague(activeLeague === lg.id ? null : lg.id)}
+                    title={`Filter to ${lg.name}`}
+                  >
+                    {lg.name}
+                    <span className="ct">{lg.matches.length}</span>
+                  </button>
+                ))}
+            </div>
+          )}
+
           {filteredLeagues.length === 0 && (
             <p style={{ padding: '24px 16px', textAlign: 'center', color: 'var(--text-dim)', fontSize: 13 }}>
               Nothing here yet — try “Highlights”.
@@ -897,6 +932,24 @@ export default function Home({ initialChip }) {
                     <span className="sb-flag">{(lg.crest?.label || lg.name).slice(0, 2).toUpperCase()}</span>
                     <span>{lg.name}</span>
                     <span className="sb-count">{lg.matches.length}</span>
+                    <button
+                      type="button"
+                      className={`sb-fav-btn${isFavourite(lg.id) ? ' active' : ''}`}
+                      aria-label={isFavourite(lg.id) ? `Remove ${lg.name} from favourites` : `Add ${lg.name} to favourites`}
+                      aria-pressed={isFavourite(lg.id)}
+                      onClick={(e) => { e.stopPropagation(); toggleFavourite(lg.id); }}
+                      title={isFavourite(lg.id) ? 'Unfavourite league' : 'Favourite league'}
+                    >
+                      <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+                        <path
+                          d="M12 2.5l2.95 6.13 6.55.78-4.84 4.6 1.32 6.54L12 17.37l-5.98 3.18 1.32-6.54-4.84-4.6 6.55-.78L12 2.5z"
+                          fill={isFavourite(lg.id) ? 'currentColor' : 'none'}
+                          stroke="currentColor"
+                          strokeWidth="1.6"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    </button>
                   </header>
 
                   <div className="sb-league-body">
@@ -1122,7 +1175,25 @@ export default function Home({ initialChip }) {
                 {[10, 50, 100].map((n) => (
                   <button key={n} type="button" className="quick-stake" onClick={() => setStake(formatAmt(parseStake(stake) + n))}>+{n}</button>
                 ))}
-                <button type="button" className="quick-stake" onClick={() => setStake(formatAmt(account?.balance || 0))}>MAX</button>
+                <button
+                  type="button"
+                  className="quick-stake"
+                  onClick={() => {
+                    const doubled = parseStake(stake) * 2;
+                    const cap = Number(account?.balance) || doubled;
+                    setStake(formatAmt(Math.min(doubled, cap)));
+                  }}
+                >
+                  2×
+                </button>
+                <button
+                  type="button"
+                  className="quick-stake all-in"
+                  onClick={() => setStake(formatAmt(account?.balance || 0))}
+                  title="Set stake to your full balance"
+                >
+                  ALL IN
+                </button>
               </div>
               <div className="summary">
                 {betMode === 'system' ? (
