@@ -210,47 +210,52 @@ export default function Home({ initialChip }) {
   }, []);
 
   const toggleSelection = useCallback((league, match, market, key, odds) => {
-    // Toggle by exact (matchId, market, outcome): same odd clicked twice =>
-    // deselect. Different outcome in same market => stack. Different market
-    // on same match => stack.
-    const existing = selections.find(
-      (s) => s.matchId === match.id && s.market === market && s.outcome === key,
-    );
-    if (existing) {
-      removeByOutcome(match.id, market, key);
-      return;
-    }
     if (odds == null) return;
 
-    if (betMode === 'single') {
-      setSelections([{
-        id: `sel-${crypto.randomUUID?.() || Date.now()}`,
-        matchId: match.id, market, outcome: key, odds,
-        pickLabel: pickLabel(market, key, match),
-        marketLabel: market === '1X2' || market === 'ML' ? `Match · ${key}` : `${market} · ${key}`,
-        meta: matchMeta(match),
-        trend: null,
-      }]);
-      return;
-    }
+    setSelections((prev) => {
+      // Toggle by exact (matchId, market, outcome): same odd clicked twice => deselect.
+      const existing = prev.find(
+        (s) => s.matchId === match.id && s.market === market && s.outcome === key,
+      );
+      if (existing) {
+        return prev.filter((s) => !(s.matchId === match.id && s.market === market && s.outcome === key));
+      }
 
-    if (selections.length >= 12) {
-      toast('Slip is full — 12 selections max.');
-      return;
-    }
+      if (betMode === 'single') {
+        return [{
+          id: `sel-${crypto.randomUUID?.() || Date.now()}`,
+          matchId: match.id,
+          market,
+          outcome: key,
+          odds,
+          pickLabel: pickLabel(market, key, match),
+          marketLabel: market === '1X2' || market === 'ML' ? `Match · ${key}` : `${market} · ${key}`,
+          meta: matchMeta(match),
+          trend: null,
+        }];
+      }
 
-    upsertSelection({
-      id: `sel-${crypto.randomUUID?.() || Date.now()}`,
-      matchId: match.id,
-      market,
-      outcome: key,
-      odds,
-      pickLabel: pickLabel(market, key, match),
-      marketLabel: market === '1X2' || market === 'ML' ? `Match · ${key}` : `${market} · ${key}`,
-      meta: matchMeta(match),
-      trend: null,
+      if (prev.length >= 12) {
+        toast('Slip is full — 12 selections max.');
+        return prev;
+      }
+
+      return [
+        ...prev,
+        {
+          id: `sel-${crypto.randomUUID?.() || Date.now()}`,
+          matchId: match.id,
+          market,
+          outcome: key,
+          odds,
+          pickLabel: pickLabel(market, key, match),
+          marketLabel: market === '1X2' || market === 'ML' ? `Match · ${key}` : `${market} · ${key}`,
+          meta: matchMeta(match),
+          trend: null,
+        }
+      ];
     });
-  }, [selections, upsertSelection, removeByOutcome, betMode, toast]);
+  }, [betMode, toast]);
 
   const clearSlip = useCallback(() => {
     setSelections([]);
