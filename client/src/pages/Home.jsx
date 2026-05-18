@@ -127,7 +127,17 @@ export default function Home({ initialChip }) {
   const [sportId, setSportId]         = useState(sportParam);
   const [snapshot, setSnapshot]       = useState(null);
   const [loadErr, setLoadErr]         = useState(null);
-  const [selections, setSelections]   = useState([]);
+  const [selections, setSelections]   = useState(() => {
+    try {
+      const cached = localStorage.getItem('xenbet_selections');
+      return cached ? JSON.parse(cached) : [];
+    } catch {
+      return [];
+    }
+  });
+  useEffect(() => {
+    localStorage.setItem('xenbet_selections', JSON.stringify(selections));
+  }, [selections]);
   const [betMode, setBetMode]         = useState('multiple');
   const [systemType, setSystemType]   = useState(null);
   const [stake, setStake]   = useState('300.00');
@@ -594,13 +604,58 @@ export default function Home({ initialChip }) {
     ? snapshot.leagues.filter((l) => l.id === activeLeague)
     : snapshot.leagues;
 
-  // Today = matches whose `day` doesn't read like a date string ("Sun", "Mon", a future date).
-  // Live always counts as today.
+  let categoryFilteredLeagues = visibleLeagues;
+  if (activeCategory) {
+    if (activeCategory === 'today_football') {
+      categoryFilteredLeagues = visibleLeagues
+        .map((lg) => ({
+          ...lg,
+          matches: lg.matches.filter((m) => m.isLive || /today/i.test(String(m.day || '')))
+        }))
+        .filter((lg) => lg.matches.length > 0);
+    } else if (activeCategory === 'next_3h') {
+      categoryFilteredLeagues = visibleLeagues
+        .map((lg) => ({
+          ...lg,
+          matches: lg.matches.filter((m) => {
+            if (m.isLive) return true;
+            if (!m.kickoff || !/today/i.test(String(m.day || ''))) return false;
+            try {
+              const [h, min] = m.kickoff.split(':').map(Number);
+              const now = new Date();
+              const matchTime = new Date();
+              matchTime.setHours(h, min, 0, 0);
+              const diffMs = matchTime.getTime() - now.getTime();
+              return diffMs >= 0 && diffMs <= 3 * 60 * 60 * 1000;
+            } catch {
+              return true;
+            }
+          })
+        }))
+        .filter((lg) => lg.matches.length > 0);
+    } else {
+      categoryFilteredLeagues = visibleLeagues.filter((lg) => {
+        const cat = activeCategory.toLowerCase().replace('_', '');
+        const lid = lg.id.toLowerCase().replace('_', '');
+        const lname = lg.name.toLowerCase();
+        
+        if (lid === cat || lid.includes(cat) || cat.includes(lid)) return true;
+        if (cat === 'epl' && lname.includes('premier league')) return true;
+        if (cat === 'laliga' && lname.includes('la liga')) return true;
+        if (cat === 'seriea' && lname.includes('serie a')) return true;
+        if (cat === 'bundesliga' && lname.includes('bundesliga')) return true;
+        if (cat === 'ligue1' && lname.includes('ligue 1')) return true;
+        
+        return false;
+      });
+    }
+  }
+
   const filteredLeaguesRaw = subTab === 'today'
-    ? visibleLeagues
+    ? categoryFilteredLeagues
         .map((lg) => ({ ...lg, matches: lg.matches.filter((m) => m.isLive || /today/i.test(String(m.day || ''))) }))
         .filter((lg) => lg.matches.length > 0)
-    : visibleLeagues;
+    : categoryFilteredLeagues;
 
   // Favourited leagues float to the top so they stay sticky in the list.
   const filteredLeagues = [...filteredLeaguesRaw].sort((a, b) => {
@@ -735,7 +790,7 @@ export default function Home({ initialChip }) {
             </div>
           )}
 
-          {(featuredTab === 'featured' || featuredTab === 'codes' || featuredTab === 'matches') &&
+          {(featuredTab === 'featured' || featuredTab === 'codes') &&
             featuredCards.map((sc) => (
               <div key={sc.id} className="sb-code-card">
                 <div className="sb-code-header">
@@ -787,6 +842,98 @@ export default function Home({ initialChip }) {
                 </div>
               </div>
             ))}
+
+          {featuredTab === 'matches' && (() => {
+            const allMatches = snapshot.leagues.flatMap((lg) =>
+              lg.matches.map((m) => ({ ...m, league: lg }))
+            ).slice(0, 5);
+
+            if (allMatches.length === 0) {
+              return (
+                <div style={{ padding: '20px 12px', textAlign: 'center', color: 'var(--text-dim)', fontSize: 13 }}>
+                  No upcoming matches available right now.
+                </div>
+              );
+            }
+
+            return (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {allMatches.map((m) => {
+                  const cols = columnsFor('1X2', m);
+                  const market = cols?.market;
+                  const myPicks = selections.filter((s) => s.matchId === m.id && s.market === market);
+
+                  return (
+                    <div
+                      key={m.id}
+                      style={{
+                        background: 'var(--surface-2)',
+                        border: '1px solid var(--line)',
+                        borderRadius: 12,
+                        padding: 12,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: 8
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>
+                          {m.league.name} · {m.isLive ? 'LIVE' : [m.kickoff, m.day].filter(Boolean).join(' ')}
+                        </span>
+                        {m.isLive && (
+                          <span className="sb-live-badge" style={{ transform: 'scale(0.85)', transformOrigin: 'right' }}>
+                            LIVE {m.scoreHome}-{m.scoreAway}
+                          </span>
+                        )}
+                      </div>
+                      <div
+                        onClick={() => openMarkets(m.league, m)}
+                        style={{ cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: 2 }}
+                      >
+                        <div style={{ fontWeight: 800, fontSize: 14, color: 'var(--text)' }}>
+                          {m.home} vs {m.away}
+                        </div>
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginTop: 4 }}>
+                        {cols ? (
+                          cols.selections.map((s) => {
+                            const isSel = myPicks.some((p) => p.outcome === s.key);
+                            return (
+                              <button
+                                key={s.key}
+                                type="button"
+                                className={`sb-odd${isSel ? ' selected' : ''}`}
+                                onClick={() => toggleSelection(m.league, m, market, s.key, s.odds)}
+                                style={{
+                                  height: 34,
+                                  fontSize: 12,
+                                  background: isSel ? 'var(--accent)' : 'var(--surface)',
+                                  color: isSel ? '#0a0d0c' : 'var(--text)',
+                                  border: '1px solid var(--line)',
+                                  borderRadius: 8,
+                                  fontWeight: 800,
+                                  cursor: 'pointer'
+                                }}
+                              >
+                                <span style={{ fontSize: 9, opacity: 0.6, marginRight: 4 }}>{s.key}</span>
+                                {s.odds?.toFixed(2)}
+                              </button>
+                            );
+                          })
+                        ) : (
+                          <>
+                            <span className="sb-odd disabled">—</span>
+                            <span className="sb-odd disabled">—</span>
+                            <span className="sb-odd disabled">—</span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })()}
 
           {featuredTab === 'games' && (
             <div style={{ padding: '24px 12px', textAlign: 'center' }}>
@@ -1237,28 +1384,30 @@ export default function Home({ initialChip }) {
             <p style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 16 }}>
               {marketsForMatch.league.name} · {matchMeta(marketsForMatch.match)}
             </p>
-            {Object.entries(marketsForMatch.match.markets || {}).map(([mkey, mkt]) => (
-              <div key={mkey} style={{ marginBottom: 16 }}>
-                <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-soft)', marginBottom: 8 }}>{mkt.name}</div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 8 }}>
-                  {mkt.selections.map((s) => {
-                    const sel = selections.find((x) => x.matchId === marketsForMatch.match.id && x.market === mkey && x.outcome === s.key);
-                    return (
-                      <button
-                        key={s.key}
-                        type="button"
-                        className={`odd-btn${sel ? ' selected' : ''}`}
-                        onClick={() => toggleSelection(marketsForMatch.league, marketsForMatch.match, mkey, s.key, s.odds)}
-                        style={{ padding: '10px 12px' }}
-                      >
-                        <span className="ol" style={{ fontSize: 11 }}>{s.label}</span>
-                        <span className="ov">{s.odds.toFixed(2)}</span>
-                      </button>
-                    );
-                  })}
+            <div className="bv-dialog-content">
+              {Object.entries(marketsForMatch.match.markets || {}).map(([mkey, mkt]) => (
+                <div key={mkey} style={{ marginBottom: 16 }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-soft)', marginBottom: 8 }}>{mkt.name}</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 8 }}>
+                    {mkt.selections.map((s) => {
+                      const sel = selections.find((x) => x.matchId === marketsForMatch.match.id && x.market === mkey && x.outcome === s.key);
+                      return (
+                        <button
+                          key={s.key}
+                          type="button"
+                          className={`odd-btn${sel ? ' selected' : ''}`}
+                          onClick={() => toggleSelection(marketsForMatch.league, marketsForMatch.match, mkey, s.key, s.odds)}
+                          style={{ padding: '10px 12px' }}
+                        >
+                          <span className="ol" style={{ fontSize: 11 }}>{s.label}</span>
+                          <span className="ov">{s.odds.toFixed(2)}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
             <div className="bv-dialog-actions">
               <button type="button" className="btn btn-ghost" onClick={() => marketsDlg.current?.close()}>Close</button>
               <button type="button" className="btn btn-primary" onClick={() => { marketsDlg.current?.close(); setSlipOpen(true); }}>
