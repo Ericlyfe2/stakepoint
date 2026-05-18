@@ -11,7 +11,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAdmin } from '../../providers/AdminProvider.jsx';
 import {
-  adminListBets, adminGetBet, adminSettleBet, adminCancelBet, adminNoteBet,
+  adminListBets, adminGetBet, adminSettleBet, adminCancelBet, adminNoteBet, adminBulkBets,
 } from '../../api/adminApi.js';
 import {
   Card, Badge, Drawer, Modal, Empty, SkeletonRow, moneyFmt, numFmt, ago, dateShort,
@@ -29,7 +29,42 @@ export default function BetsPage({ initialStatus = 'all' }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState(null);
+  const [selectedIds, setSelectedIds] = useState(new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [bulkSettleOpen, setBulkSettleOpen] = useState(false);
   const debounceRef = useRef(0);
+
+  function toggleSelect(id) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+  function toggleAll() {
+    if (!data?.bets?.length) return;
+    if (selectedIds.size === data.bets.length) { setSelectedIds(new Set()); return; }
+    setSelectedIds(new Set(data.bets.map((b) => b.id)));
+  }
+  async function doBulkSettle(result) {
+    setBulkBusy(true);
+    try {
+      const res = await adminBulkBets({ action: 'settle', betIds: [...selectedIds], result, reason: 'Bulk settle via admin' });
+      showToast(`Settled ${res.results.filter((r) => r.status !== 'error').length} bets.`);
+      setSelectedIds(new Set());
+      setBulkSettleOpen(false);
+      load();
+    } catch (e) { showToast(e.message, 'error'); } finally { setBulkBusy(false); }
+  }
+  async function doBulkCancel() {
+    setBulkBusy(true);
+    try {
+      const res = await adminBulkBets({ action: 'cancel', betIds: [...selectedIds], reason: 'Bulk cancel via admin' });
+      showToast(`Cancelled ${res.results.filter((r) => r.status !== 'error').length} bets.`);
+      setSelectedIds(new Set());
+      load();
+    } catch (e) { showToast(e.message, 'error'); } finally { setBulkBusy(false); }
+  }
 
   async function load() {
     setLoading(true);
@@ -69,7 +104,19 @@ export default function BetsPage({ initialStatus = 'all' }) {
           <h1>Bets</h1>
           <p>Audit every wager, override settlements, and investigate suspicious activity in real time.</p>
         </div>
-        <div style={{ display: 'flex', gap: 8 }}>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          {selectedIds.size > 0 && (
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center', padding: '4px 12px', background: 'var(--surface-2)', borderRadius: 8 }}>
+              <span style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text-soft)' }}>{selectedIds.size} selected</span>
+              {hasRole('odds_manager', 'finance_admin') && (
+                <>
+                  <button className="adm-btn adm-btn-sm" onClick={() => setBulkSettleOpen(true)} disabled={bulkBusy}>Settle</button>
+                  <button className="adm-btn adm-btn-sm" onClick={doBulkCancel} disabled={bulkBusy}>Cancel</button>
+                </>
+              )}
+              <button className="adm-btn adm-btn-sm" onClick={() => setSelectedIds(new Set())}>Clear</button>
+            </div>
+          )}
           <button className="adm-btn" onClick={load}><IconRefresh size={14} /> Refresh</button>
           <button className="adm-btn" onClick={exportCsv}><IconDownload size={14} /> Export CSV</button>
         </div>
@@ -125,6 +172,9 @@ export default function BetsPage({ initialStatus = 'all' }) {
           <table className="adm-table">
             <thead>
               <tr>
+                <th style={{ width: 32 }}>
+                  <input type="checkbox" checked={data?.bets?.length > 0 && selectedIds.size === data.bets.length} onChange={toggleAll} />
+                </th>
                 <th>Ticket</th>
                 <th>User</th>
                 <th>Status</th>
@@ -142,6 +192,9 @@ export default function BetsPage({ initialStatus = 'all' }) {
               )}
               {!loading && data?.bets?.map((b) => (
                 <tr key={b.id} onClick={() => setSelected(b)} className={selected?.id === b.id ? 'selected' : ''}>
+                  <td style={{ width: 32 }} onClick={(e) => e.stopPropagation()}>
+                    <input type="checkbox" checked={selectedIds.has(b.id)} onChange={() => toggleSelect(b.id)} />
+                  </td>
                   <td>
                     <div style={{ display: 'flex', flexDirection: 'column' }}>
                       <span style={{ fontFamily: 'var(--ff-mono)', fontSize: 12 }}>{b.id.slice(0, 18)}…</span>
@@ -167,6 +220,19 @@ export default function BetsPage({ initialStatus = 'all' }) {
           </table>
         </div>
       </div>
+
+      {bulkSettleOpen && (
+        <Modal open title={`Settle ${selectedIds.size} bets`} onClose={() => setBulkSettleOpen(false)} footer={
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+            <button className="adm-btn" onClick={() => setBulkSettleOpen(false)}>Cancel</button>
+            <button className="adm-btn adm-btn-success" onClick={() => doBulkSettle('won')} disabled={bulkBusy}>Pay as Won</button>
+            <button className="adm-btn adm-btn-danger"  onClick={() => doBulkSettle('lost')} disabled={bulkBusy}>Mark Lost</button>
+            <button className="adm-btn adm-btn-warn"    onClick={() => doBulkSettle('void')} disabled={bulkBusy}>Void & Refund</button>
+          </div>
+        }>
+          <p style={{ color: 'var(--text-soft)', fontSize: 13.5 }}>{selectedIds.size} bets will be settled immediately. This action cannot be easily reversed.</p>
+        </Modal>
+      )}
 
       <BetDrawer
         open={!!selected}

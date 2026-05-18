@@ -152,7 +152,9 @@ export function AuditLogsPage() {
 }
 
 /* ---------- Settings (real session + 2FA + admin invites) ---------- */
-export function SettingsPage() {
+export { default as SettingsPage } from './Settings.jsx';
+
+export function StubSettingsPage() {
   const [health, setHealth] = useState(null);
   useEffect(() => { adminHealth().then(setHealth).catch(() => {}); }, []);
   return (

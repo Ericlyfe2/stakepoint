@@ -15,7 +15,11 @@ server/data/*.json
 
 # Logs
 *.log
+*.err
 npm-debug.log*
+
+# Local test screenshots
+test-shot-*.png
 
 # Editor / OS
 .DS_Store

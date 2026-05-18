@@ -202,4 +202,19 @@ router.get('/:id/login-history', requireAdmin, (req, res, next) => {
   res.json({ events });
 });
 
+/* ─── Super admin: impersonate any user ─── */
+router.post('/:id/impersonate',
+  requireAdmin, requireRole(),
+  asyncHandler(async (req, res, next) => {
+    const u = getUserById(req.params.id);
+    if (!u) return next(notFound('User not found'));
+    if (u.role === 'admin') return next(badRequest('Cannot impersonate another admin. Use the admin login instead.'));
+    const { signAccessToken } = await import('../../services/token.js');
+    const token = signAccessToken(u);
+    audit(req, { action: 'user.impersonate', target: u.id, targetType: 'user', severity: 'critical', meta: { targetEmail: u.email } });
+    logActivity(u.id, { kind: 'admin_impersonated', by: req.admin.email });
+    res.json({ ok: true, token, user: { id: u.id, email: u.email, displayName: u.displayName, balance: u.balance } });
+  })
+);
+
 export default router;

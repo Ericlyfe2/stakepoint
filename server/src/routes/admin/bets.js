@@ -176,4 +176,65 @@ router.post('/:id/note',
   }
 );
 
+/* ─── Bulk operations ─── */
+const bulkSchema = z.object({
+  action: z.enum(['settle', 'cancel']),
+  betIds: z.array(z.string()).min(1).max(200),
+  result: z.enum(['won', 'lost', 'void']).optional(),
+  payoutOverride: z.number().nonnegative().optional(),
+  reason: z.string().max(500).optional(),
+});
+
+router.post('/bulk',
+  requireAdmin, requireRole('odds_manager', 'finance_admin'),
+  validate(bulkSchema),
+  asyncHandler(async (req, res) => {
+    const { action, betIds, result, payoutOverride, reason } = req.body;
+    const results = [];
+
+    for (const id of betIds) {
+      try {
+        const bet = betsStore.get(id);
+        if (!bet) { results.push({ betId: id, status: 'error', error: 'Not found' }); continue; }
+        if (action === 'settle') {
+          if (bet.status !== 'open') { results.push({ betId: id, status: 'error', error: `Already ${bet.status}` }); continue; }
+          const user = getUserById(bet.userId);
+          if (!user) { results.push({ betId: id, status: 'error', error: 'User not found' }); continue; }
+          const r = result || 'lost';
+          let credit = 0;
+          if (r === 'won')  credit = payoutOverride ?? bet.potentialWin;
+          if (r === 'void') credit = bet.stake;
+          const updatedBet = { ...bet, status: r, settledAt: new Date().toISOString(), settledBy: req.admin.email, settleReason: reason || null, settledPayout: credit };
+          betsStore.set(bet.id, updatedBet);
+          if (credit > 0) {
+            const updatedUser = updateUser(user.id, { balance: Number((user.balance + credit).toFixed(2)) });
+            pushTx(user.id, { kind: r === 'won' ? 'bet_won' : 'bet_void_refund', amount: credit, status: 'completed', balanceAfter: updatedUser.balance, ref: bet.id });
+          }
+          logActivity(user.id, { kind: `bet_${r}`, betId: bet.id, credit });
+          results.push({ betId: id, status: r, credit });
+        } else if (action === 'cancel') {
+          if (bet.status === 'cancelled') { results.push({ betId: id, status: 'error', error: 'Already cancelled' }); continue; }
+          if (bet.status === 'cashed_out') { results.push({ betId: id, status: 'error', error: 'Cashed out' }); continue; }
+          const user = getUserById(bet.userId);
+          if (!user) { results.push({ betId: id, status: 'error', error: 'User not found' }); continue; }
+          const refund = bet.status === 'open' ? bet.stake : 0;
+          const updatedBet = { ...bet, status: 'cancelled', cancelledAt: new Date().toISOString(), cancelledBy: req.admin.email, cancelReason: reason || 'Bulk cancel' };
+          betsStore.set(bet.id, updatedBet);
+          if (refund > 0) {
+            const updatedUser = updateUser(user.id, { balance: Number((user.balance + refund).toFixed(2)) });
+            pushTx(user.id, { kind: 'bet_cancel_refund', amount: refund, status: 'completed', balanceAfter: updatedUser.balance, ref: bet.id });
+          }
+          logActivity(user.id, { kind: 'bet_cancelled', betId: bet.id, refund });
+          results.push({ betId: id, status: 'cancelled', refund });
+        }
+      } catch (e) {
+        results.push({ betId: id, status: 'error', error: e.message });
+      }
+    }
+
+    audit(req, { action: `bet.bulk.${action}`, target: `bets:${betIds.length}`, targetType: 'bet', severity: 'warning', meta: { count: results.length, action } });
+    res.json({ ok: true, results });
+  })
+);
+
 export default router;

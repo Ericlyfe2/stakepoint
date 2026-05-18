@@ -69,6 +69,7 @@ const get   = (p)        => rawFetch(p).then(jsonOrThrow);
 const post  = (p, body)  => rawFetch(p, { method: 'POST',   body: JSON.stringify(body || {}) }).then(jsonOrThrow);
 const patch_= (p, body)  => rawFetch(p, { method: 'PATCH',  body: JSON.stringify(body || {}) }).then(jsonOrThrow);
 const del   = (p)        => rawFetch(p, { method: 'DELETE' }).then(jsonOrThrow);
+const put_   = (p, body) => rawFetch(p, { method: 'PUT',    body: JSON.stringify(body || {}) }).then(jsonOrThrow);
 
 const qs = (params = {}) => {
   const u = new URLSearchParams();
@@ -189,3 +190,14 @@ export const adminProviderLogs   = (provider, limit) => get(`/providers/logs${qs
 export const adminAggregatedOdds = ()    => get('/providers/odds');
 export const adminProviderRefresh= ()    => post('/providers/refresh');
 export const adminProviderTest   = (id)  => post(`/providers/${encodeURIComponent(id)}/test`);
+
+/* bulk operations */
+export const adminBulkBets       = (body) => post('/bets/bulk', body);
+export const adminBulkFixtures   = (body) => post('/sports/fixtures/bulk', body);
+
+/* impersonation */
+export const adminImpersonate    = (id)   => post(`/users/${encodeURIComponent(id)}/impersonate`);
+
+/* platform settings */
+export const adminGetSettings    = ()     => get('/settings');
+export const adminUpdateSettings = (body) => put_('/settings', body);

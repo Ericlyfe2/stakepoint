@@ -11,7 +11,7 @@ import {
   adminFixtures, adminFixture, adminCreateFixture, adminPatchFixture, adminDeleteFixture,
   adminPatchOdds, adminResetOdds, adminSuspend, adminClearSuspend,
   adminRecordResult, adminTriggerSettle, adminLeagues, adminCreateLeague,
-  adminAddMarket, adminRemoveMarket,
+  adminAddMarket, adminRemoveMarket, adminBulkFixtures,
 } from '../../api/adminApi.js';
 import { useAdmin } from '../../providers/AdminProvider.jsx';
 import { Card, Badge, Drawer, Modal, Empty, SkeletonRow, moneyFmt, numFmt, ago } from '../../components/admin/primitives.jsx';
@@ -28,6 +28,27 @@ export default function SportsAdmin() {
   const [selected, setSelected] = useState(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [leagueOpen, setLeagueOpen] = useState(false);
+  const [selectedFixtures, setSelectedFixtures] = useState(new Set());
+  const [bulkScoreOpen, setBulkScoreOpen] = useState(false);
+  const [bulkScoreHome, setBulkScoreHome] = useState('');
+  const [bulkScoreAway, setBulkScoreAway] = useState('');
+
+  function toggleFixture(id) {
+    setSelectedFixtures((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+  async function doBulkFixtures(action, payload) {
+    try {
+      const res = await adminBulkFixtures({ action, fixtureIds: [...selectedFixtures], payload });
+      showToast(`Bulk ${action}: ${res.results.filter((r) => r.status !== 'error').length} ok, ${res.results.filter((r) => r.status === 'error').length} failed.`);
+      setSelectedFixtures(new Set());
+      setBulkScoreOpen(false);
+      load();
+    } catch (e) { showToast(e.message, 'error'); }
+  }
 
   async function load() {
     setLoading(true);
@@ -61,7 +82,22 @@ export default function SportsAdmin() {
           <h1>Sports & odds</h1>
           <p>Fixtures, markets, real-time odds intervention, and manual results. All actions audited.</p>
         </div>
-        <div style={{ display: 'flex', gap: 8 }}>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          {selectedFixtures.size > 0 && (
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center', padding: '4px 12px', background: 'var(--surface-2)', borderRadius: 8 }}>
+              <span style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text-soft)' }}>{selectedFixtures.size} selected</span>
+              {hasRole('odds_manager') && (
+                <>
+                  <button className="adm-btn adm-btn-sm" onClick={() => doBulkFixtures('suspend')}>Suspend</button>
+                  <button className="adm-btn adm-btn-sm" onClick={() => doBulkFixtures('unsuspend')}>Unsuspend</button>
+                  <button className="adm-btn adm-btn-sm" onClick={() => doBulkFixtures('mark-live')}>Mark live</button>
+                  <button className="adm-btn adm-btn-sm" onClick={() => doBulkFixtures('mark-upcoming')}>Mark upcoming</button>
+                  <button className="adm-btn adm-btn-sm" onClick={() => setBulkScoreOpen(true)}>Set result</button>
+                </>
+              )}
+              <button className="adm-btn adm-btn-sm" onClick={() => setSelectedFixtures(new Set())}>Clear</button>
+            </div>
+          )}
           <button className="adm-btn" onClick={load}><IconRefresh size={14} /> Refresh</button>
           {hasRole('odds_manager') && <button className="adm-btn" onClick={() => setLeagueOpen(true)}><IconBook size={14} /> New league</button>}
           {hasRole('odds_manager') && <button className="adm-btn primary" onClick={() => setCreateOpen(true)}><IconCheck size={14} /> New fixture</button>}
@@ -108,6 +144,7 @@ export default function SportsAdmin() {
           <table className="adm-table">
             <thead>
               <tr>
+                <th style={{ width: 32 }}></th>
                 <th>Fixture</th>
                 <th>League</th>
                 <th>Status</th>
@@ -121,7 +158,7 @@ export default function SportsAdmin() {
             <tbody>
               {loading && Array.from({ length: 8 }).map((_, i) => <SkeletonRow key={i} cols={8} />)}
               {!loading && data?.fixtures?.length === 0 && (
-                <tr><td colSpan={8}><Empty title="No fixtures match" subtitle="Adjust filters or create a new fixture." /></td></tr>
+                <tr><td colSpan={9}><Empty title="No fixtures match" subtitle="Adjust filters or create a new fixture." /></td></tr>
               )}
               {!loading && data?.fixtures?.map((m) => {
                 const main = m.markets?.['1X2'] || m.markets?.['ML'];
@@ -131,6 +168,9 @@ export default function SportsAdmin() {
                 const status = m.finished ? 'finished' : m.isLive ? 'live' : m.suspended ? 'suspended' : 'upcoming';
                 return (
                   <tr key={m.id} onClick={() => setSelected(m)} className={selected?.id === m.id ? 'selected' : ''}>
+                    <td style={{ width: 32 }} onClick={(e) => e.stopPropagation()}>
+                      <input type="checkbox" checked={selectedFixtures.has(m.id)} onChange={() => toggleFixture(m.id)} />
+                    </td>
                     <td>
                       <div style={{ fontWeight: 600 }}>{m.home} — {m.away}</div>
                       <div style={{ color: 'var(--text-dim)', fontSize: 12 }}>{m.sport} · {m.id}</div>
@@ -163,6 +203,18 @@ export default function SportsAdmin() {
         showToast={showToast}
         onChange={load}
       />
+
+      {bulkScoreOpen && (
+        <Modal open title={`Set result for ${selectedFixtures.size} fixtures`} onClose={() => setBulkScoreOpen(false)} footer={
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+            <button className="adm-btn" onClick={() => setBulkScoreOpen(false)}>Cancel</button>
+            <button className="adm-btn primary" onClick={() => doBulkFixtures('set-result', { scoreHome: Number(bulkScoreHome) || 0, scoreAway: Number(bulkScoreAway) || 0 })}>Apply</button>
+          </div>
+        }>
+          <div className="adm-field"><label>Home score</label><input className="adm-input" type="number" min="0" value={bulkScoreHome} onChange={(e) => setBulkScoreHome(e.target.value)} /></div>
+          <div className="adm-field"><label>Away score</label><input className="adm-input" type="number" min="0" value={bulkScoreAway} onChange={(e) => setBulkScoreAway(e.target.value)} /></div>
+        </Modal>
+      )}
 
       <CreateFixtureModal
         open={createOpen}

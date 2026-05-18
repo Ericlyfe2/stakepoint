@@ -333,4 +333,61 @@ router.delete('/fixtures/:id/markets/:marketKey',
   }
 );
 
+/* ─── Bulk fixture operations ─── */
+const bulkFixtureSchema = z.object({
+  action: z.enum(['suspend', 'unsuspend', 'mark-live', 'mark-upcoming', 'set-result']),
+  fixtureIds: z.array(z.string()).min(1).max(100),
+  payload: z.object({
+    scoreHome: z.number().int().nonnegative().optional(),
+    scoreAway: z.number().int().nonnegative().optional(),
+  }).optional(),
+});
+
+router.post('/fixtures/bulk',
+  requireAdmin, requireRole('odds_manager'),
+  validate(bulkFixtureSchema),
+  asyncHandler(async (req, res) => {
+    const { action, fixtureIds, payload } = req.body;
+    const results = [];
+
+    for (const id of fixtureIds) {
+      try {
+        const fixture = compiledStore.get(id);
+        if (!fixture) { results.push({ fixtureId: id, status: 'error', error: 'Not found' }); continue; }
+        const isCustom = fixture.source === 'custom';
+
+        if (action === 'suspend') {
+          const updated = { ...fixture, suspended: true, suspendedAt: new Date().toISOString() };
+          compiledStore.set(id, updated);
+          results.push({ fixtureId: id, status: 'suspended' });
+        } else if (action === 'unsuspend') {
+          const updated = { ...fixture, suspended: false, suspendedAt: null };
+          compiledStore.set(id, updated);
+          results.push({ fixtureId: id, status: 'unsuspended' });
+        } else if (action === 'mark-live') {
+          const updated = { ...fixture, isLive: true, status: 'live', startedAt: fixture.startedAt || new Date().toISOString() };
+          compiledStore.set(id, updated);
+          results.push({ fixtureId: id, status: 'marked-live' });
+        } else if (action === 'mark-upcoming') {
+          const updated = { ...fixture, isLive: false, status: 'upcoming' };
+          compiledStore.set(id, updated);
+          results.push({ fixtureId: id, status: 'marked-upcoming' });
+        } else if (action === 'set-result') {
+          if (!isCustom) { results.push({ fixtureId: id, status: 'error', error: 'Can only set result on custom fixtures' }); continue; }
+          const sh = payload?.scoreHome ?? fixture.scoreHome ?? 0;
+          const sa = payload?.scoreAway ?? fixture.scoreAway ?? 0;
+          const updated = { ...fixture, scoreHome: sh, scoreAway: sa, status: 'finished', isLive: false };
+          compiledStore.set(id, updated);
+          results.push({ fixtureId: id, status: 'result-set', scoreHome: sh, scoreAway: sa });
+        }
+      } catch (e) {
+        results.push({ fixtureId: id, status: 'error', error: e.message });
+      }
+    }
+
+    audit(req, { action: `sports.bulk.${action}`, target: `fixtures:${fixtureIds.length}`, targetType: 'fixture', severity: 'warning', meta: { count: fixtureIds.length } });
+    res.json({ ok: true, results });
+  })
+);
+
 export default router;

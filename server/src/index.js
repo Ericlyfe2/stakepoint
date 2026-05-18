@@ -24,11 +24,13 @@ import adminPromosRouter    from './routes/admin/promotions.js';
 import adminStatsRouter     from './routes/admin/stats.js';
 import adminProvidersRouter from './routes/admin/providers.js';
 import adminNotificationsRouter from './routes/admin/notifications.js';
+import adminSettingsRouter  from './routes/admin/settings.js';
 import adminSupportRouter   from './routes/admin/support.js';
 import { seedAdmins } from './db/seedAdmins.js';
 import { seedDemoData } from './db/seedDemo.js';
 import { seedPromotionsIfEmpty } from './db/promotions.js';
 import { initStores } from './db/store.js';
+import { getSettings } from './db/settings.js';
 import { PROMOTIONS } from './matchesData.js';
 import { startSettlementLoop } from './services/settlement.js';
 import { attachRealtime } from './services/realtime.js';
@@ -73,6 +75,11 @@ app.get('/api/health', (_req, res) => {
   });
 });
 
+app.get('/api/settings/public', (_req, res) => {
+  const s = getSettings();
+  res.json({ maintenance: s.maintenance, maintenanceMessage: s.maintenanceMessage, signupsOpen: s.signupsOpen, minDeposit: s.minDeposit, minWithdraw: s.minWithdraw });
+});
+
 app.use('/api/auth',     authRouter);
 app.use('/api/bet',      betRouter);
 app.use('/api/wallet',   walletRouter);
@@ -88,6 +95,7 @@ app.use('/api/admin/promotions',    adminPromosRouter);
 app.use('/api/admin/stats',         adminStatsRouter);
 app.use('/api/admin/providers',     adminProvidersRouter);
 app.use('/api/admin/notifications', adminNotificationsRouter);
+app.use('/api/admin/settings',      adminSettingsRouter);
 app.use('/api/admin/support',       adminSupportRouter);
 
 app.use('/api', notFoundHandler);

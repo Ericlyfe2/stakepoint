@@ -32,6 +32,12 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (params.get('logout') === '1') signOut();
+    const token = params.get('token');
+    if (token) {
+      signIn({ accessToken: token });
+      navigate(params.get('redirect') || next, { replace: true });
+      return;
+    }
     if (account) navigate(next, { replace: true });
     fetchAuthConfig().then(setAuthConfig).catch(() => {});
   // eslint-disable-next-line react-hooks/exhaustive-deps
