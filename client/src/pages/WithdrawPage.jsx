@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAccount, useToast } from '../providers/AccountProvider.jsx';
 import { fetchTransactions, withdraw } from '../api/betApi.js';
+import TxHeader from '../components/TxHeader.jsx';
 
 function fmt(n) {
   return Number(n || 0).toLocaleString('en-GH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -52,8 +53,8 @@ export default function WithdrawPage() {
           const withdrawals = (data.transactions || []).filter(t => t.kind === 'withdraw' || t.kind === 'withdrawal');
           setTxs(withdrawals);
         }
-      } catch (e) {
-        console.error('Failed to load transactions', e);
+      } catch {
+        /* transactions optional — silent fail OK */
       }
     })();
     return () => { alive = false; };
@@ -103,52 +104,16 @@ export default function WithdrawPage() {
     <main style={{ minHeight: 'calc(100vh - 120px)', background: 'var(--bg)', padding: '0 0 80px' }}>
       <div style={{ maxWidth: 480, margin: '0 auto', background: 'var(--bg)' }}>
 
-        {/* Header */}
-        <div className="withdraw-header" style={{
-          background: 'linear-gradient(135deg, #116f43 0%, #0a5a37 100%)',
-          color: '#fff',
-          padding: '14px 16px',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 12,
-          position: 'sticky',
-          top: 0,
-          zIndex: 10,
-          width: '100%',
-          boxSizing: 'border-box',
-          borderBottom: 'none',
-          backdropFilter: 'none',
-        }}>
-          <button type="button" onClick={() => { if (typeof window !== 'undefined' && window.history.length > 1) navigate(-1); else navigate('/'); }} aria-label="Back"
-                  style={{ background: 'transparent', border: 'none', color: '#fff', cursor: 'pointer', padding: 6, display: 'inline-flex' }}>
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
-          </button>
-          <button type="button" onClick={() => { try { navigate(1); } catch { /* ignore */ } try { window.history.forward(); } catch { /* ignore */ } }} aria-label="Forward"
-                  style={{ background: 'transparent', border: 'none', color: '#fff', cursor: 'pointer', padding: 6, display: 'inline-flex' }}>
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
-          </button>
-          <h1 style={{ margin: 0, fontSize: 20, fontWeight: 800, flex: 1, color: '#fff' }}>Withdraw</h1>
-          <button type="button" onClick={() => navigate('/help')} aria-label="Help"
-                  style={{ background: 'rgba(255,255,255,0.18)', border: 'none', color: '#fff', cursor: 'pointer', borderRadius: '50%', width: 32, height: 32, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800 }}>?</button>
-          <button type="button" onClick={() => navigate('/')} aria-label="Home"
-                  style={{ background: 'transparent', border: 'none', color: '#fff', cursor: 'pointer', padding: 6, display: 'inline-flex' }}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
-          </button>
-        </div>
+        <TxHeader title="Withdraw" />
 
-        {/* Tabs */}
-        <div style={{ display: 'flex', borderBottom: '1px solid var(--line)' }}>
+        <div className="tx-tabs">
           {[['momo', 'Mobile Money'], ['paybill', 'Paybill'], ['card', 'Card']].map(([k, lbl]) => (
             <button
               key={k}
               type="button"
+              className="tx-tab"
+              aria-selected={tab === k}
               onClick={() => setTab(k)}
-              style={{
-                flex: 1, padding: '14px 8px', background: 'transparent',
-                border: 'none', color: tab === k ? 'var(--accent)' : 'var(--text-soft)',
-                fontWeight: tab === k ? 800 : 600, fontSize: 14, cursor: 'pointer',
-                borderBottom: tab === k ? '3px solid var(--accent)' : '3px solid transparent',
-              }}
             >
               {lbl}
             </button>

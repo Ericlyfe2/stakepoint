@@ -8,6 +8,7 @@
  *   - delete                        -> super_admin
  */
 import { Router } from 'express';
+import { randomBytes } from 'node:crypto';
 import { z } from 'zod';
 import { allUsers, getUserById, updateUser, publicUser, logActivity } from '../../db/users.js';
 import { createStore } from '../../db/store.js';
@@ -186,7 +187,7 @@ router.post('/:id/reset-password',
   asyncHandler(async (req, res, next) => {
     const u = getUserById(req.params.id);
     if (!u) return next(notFound('User not found'));
-    const tempPassword = `Stp-${Math.random().toString(36).slice(2, 10)}!`;
+    const tempPassword = `Stp-${randomBytes(6).toString('base64url')}!`;
     const passwordHash = await hashPassword(tempPassword);
     updateUser(u.id, { passwordHash });
     revokeAllForAccount(u.id);

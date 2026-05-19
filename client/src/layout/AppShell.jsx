@@ -324,7 +324,7 @@ export default function AppShell() {
         </div>
       </div>
 
-      <header>
+      <header className="app-header">
         <div className="header-inner">
           <NavLink to="/" className="logo" end>
             <div className="logo-mark"><span>X</span></div>

@@ -3,11 +3,12 @@ import { useNavigate } from 'react-router-dom';
 import {
   setTokens, clearTokens, getAccess,
   fetchMe, logout as apiLogout,
-  deposit as apiDeposit, withdraw as apiWithdraw,
+  deposit as apiDeposit,
   fetchUnacknowledgedWins, acknowledgeBet,
 } from '../api/betApi.js';
 import { onLive, refreshAuth, disconnectSocket } from '../api/socketClient.js';
 import WinTrophyModal from '../components/WinTrophyModal.jsx';
+import TxHeader from '../components/TxHeader.jsx';
 
 export const AccountCtx = React.createContext(null);
 export const ToastCtx   = React.createContext(null);
@@ -35,13 +36,9 @@ export default function AppProviders({ children }) {
   const [toasts, setToasts] = useState([]);
 
   const depositDlg  = useRef(null);
-  const withdrawDlg = useRef(null);
   const MIN_DEPOSIT  = 300;
   const MAX_DEPOSIT  = 50000;
-  const MIN_WITHDRAW = 550;
-  const WITHDRAW_DEPOSIT_RATIO = 0.10;
   const [depositAmt,  setDepositAmt]   = useState(String(MIN_DEPOSIT));
-  const [withdrawAmt, setWithdrawAmt]  = useState(String(MIN_WITHDRAW));
   const [depositMethod, setDepositMethod] = useState('momo');
   const [depositTab, setDepositTab]   = useState('momo'); // 'momo' | 'paybill' | 'card'
   const [busy, setBusy] = useState(false);
@@ -170,30 +167,6 @@ export default function AppProviders({ children }) {
     } finally { setBusy(false); }
   };
 
-  const submitWithdraw = async (e) => {
-    e.preventDefault();
-    setErr('');
-    const amt = parseFloat(String(withdrawAmt).replace(/,/g, ''));
-    if (!Number.isFinite(amt) || amt <= 0) { setErr('Enter a valid amount.'); return; }
-    if (amt < MIN_WITHDRAW) { setErr(`Minimum withdrawal is GHS ${MIN_WITHDRAW.toLocaleString('en-US')}.`); return; }
-    const totalDeposited = Number(account?.totalDeposited || 0);
-    const required = Number((amt * WITHDRAW_DEPOSIT_RATIO).toFixed(2));
-    if (totalDeposited < required) {
-      setErr(`Deposit at least GHS ${required.toLocaleString('en-US')} before withdrawing GHS ${amt.toLocaleString('en-US')}. You've deposited GHS ${totalDeposited.toLocaleString('en-US')}.`);
-      return;
-    }
-    if (amt > (account?.balance ?? 0)) { setErr('Insufficient balance.'); return; }
-    try {
-      setBusy(true);
-      const data = await apiWithdraw(amt, 'momo');
-      setAccount(data.account);
-      withdrawDlg.current?.close();
-      toast(`Withdrew GHS ${formatAmt(amt)} to your wallet.`);
-    } catch (e) {
-      setErr(e.message || 'Withdrawal failed.');
-    } finally { setBusy(false); }
-  };
-
   const accountValue = useMemo(() => ({
     account, loading,
     signIn, signOut, adjustBalance, setAccount,
@@ -232,27 +205,7 @@ export default function AppProviders({ children }) {
           ))}
         </div>
 
-        <dialog
-          ref={depositDlg}
-          className="deposit-dlg"
-          style={{
-            position: 'fixed',
-            top: 0, left: 0, right: 0, bottom: 0,
-            margin: 0,
-            width: '100%',
-            maxWidth: '100%',
-            height: '100vh',
-            maxHeight: '100vh',
-            padding: 0,
-            border: 'none',
-            borderRadius: 0,
-            background: 'var(--bg)',
-            display: 'flex',
-            flexDirection: 'column',
-            overflow: 'hidden',
-            zIndex: 99999,
-          }}
-        >
+        <dialog ref={depositDlg} className="deposit-dlg">
           {(() => {
             const networks = {
               momo:       { label: 'MTN Mobile Money', short: 'MTN', tag: 'MTN' },
@@ -265,56 +218,26 @@ export default function AppProviders({ children }) {
             const accountPhone = account?.phone || account?.email || '+233 59****943';
             const bump = (n) => setDepositAmt(String(Math.min(MAX_DEPOSIT, Math.round(amtNum + n))));
 
+            const closeDlg = () => { try { depositDlg.current?.close(); } catch { /* ignore */ } };
             return (
               <>
-                <div className="deposit-header" style={{
-                  background: 'linear-gradient(135deg, #116f43 0%, #0a5a37 100%)',
-                  color: '#fff',
-                  padding: '14px 16px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 12,
-                  flexShrink: 0,
-                  width: '100%',
-                  boxSizing: 'border-box',
-                  borderBottom: 'none',
-                  backdropFilter: 'none',
-                }}>
-                  <button
-                    type="button"
-                    onClick={() => { try { depositDlg.current?.close(); } catch { /* ignore */ } }}
-                    aria-label="Back"
-                    style={{ background: 'transparent', border: 'none', color: '#fff', cursor: 'pointer', padding: 6, display: 'inline-flex', zIndex: 2 }}
-                  >
-                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => { try { navigate(1); } catch { /* ignore */ } try { window.history.forward(); } catch { /* ignore */ } }}
-                    aria-label="Forward"
-                    style={{ background: 'transparent', border: 'none', color: '#fff', cursor: 'pointer', padding: 6, display: 'inline-flex', zIndex: 2 }}
-                  >
-                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
-                  </button>
-                  <h3 style={{ margin: 0, fontSize: 20, fontWeight: 800, flex: 1, color: '#fff' }}>Deposit</h3>
-                  <button type="button" aria-label="Help" onClick={() => { try { depositDlg.current?.close(); } catch { /* ignore */ } navigate('/help'); }} style={{ background: 'rgba(255,255,255,0.18)', border: 'none', color: '#fff', cursor: 'pointer', borderRadius: '50%', width: 32, height: 32, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, zIndex: 2 }}>?</button>
-                  <button type="button" aria-label="Home" onClick={() => { try { depositDlg.current?.close(); } catch { /* ignore */ } navigate('/', { replace: false }); }} style={{ background: 'transparent', border: 'none', color: '#fff', cursor: 'pointer', padding: 6, display: 'inline-flex', zIndex: 2 }}>
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
-                  </button>
-                </div>
+                <TxHeader
+                  asDialog
+                  title="Deposit"
+                  onBack={closeDlg}
+                  onForward={() => { closeDlg(); navigate(1); }}
+                  onHelp={() => { closeDlg(); navigate('/help'); }}
+                  onHome={() => { closeDlg(); navigate('/'); }}
+                />
 
-                <div style={{ display: 'flex', borderBottom: '1px solid var(--line)' }}>
+                <div className="tx-tabs">
                   {[['momo', 'Mobile Money'], ['paybill', 'Paybill'], ['card', 'Card']].map(([k, lbl]) => (
                     <button
                       key={k}
                       type="button"
+                      className="tx-tab"
+                      aria-selected={depositTab === k}
                       onClick={() => setDepositTab(k)}
-                      style={{
-                        flex: 1, padding: '14px 8px', background: 'transparent',
-                        border: 'none', color: depositTab === k ? 'var(--accent)' : 'var(--text-soft)',
-                        fontWeight: depositTab === k ? 800 : 600, fontSize: 14, cursor: 'pointer',
-                        borderBottom: depositTab === k ? '3px solid var(--accent)' : '3px solid transparent',
-                      }}
                     >
                       {lbl}
                     </button>
@@ -425,50 +348,6 @@ export default function AppProviders({ children }) {
               </>
             );
           })()}
-        </dialog>
-
-        <dialog ref={withdrawDlg} className="bv-dialog">
-          <h3>Withdraw funds</h3>
-          <form onSubmit={submitWithdraw}>
-            {(() => {
-              const amtNum = parseFloat(String(withdrawAmt).replace(/,/g, '')) || 0;
-              const totalDeposited = Number(account?.totalDeposited || 0);
-              const required = Number((amtNum * WITHDRAW_DEPOSIT_RATIO).toFixed(2));
-              const belowMin = amtNum > 0 && amtNum < MIN_WITHDRAW;
-              const failsRatio = amtNum >= MIN_WITHDRAW && totalDeposited < required;
-              const overBalance = amtNum > balance;
-              const invalid = !amtNum || belowMin || failsRatio || overBalance;
-              return (
-                <>
-                  <p style={{ fontSize: 13, color: 'var(--text-soft)', marginBottom: 6 }}>
-                    Available: <strong>GHS {formatAmt(balance)}</strong>
-                  </p>
-                  <p style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 12 }}>
-                    Total deposited so far: <strong>GHS {formatAmt(totalDeposited)}</strong> · You can withdraw up to <strong>GHS {formatAmt(Math.floor(totalDeposited / WITHDRAW_DEPOSIT_RATIO))}</strong> based on your deposit history.
-                  </p>
-                  <label className="dlg-label" htmlFor="wd-amt">
-                    Amount (GHS) <small style={{ color: 'var(--text-dim)', marginLeft: 6 }}>min {MIN_WITHDRAW.toLocaleString('en-US')}</small>
-                  </label>
-                  <input id="wd-amt" type="number" min={MIN_WITHDRAW} step="1" inputMode="decimal"
-                         value={withdrawAmt} onChange={(e) => setWithdrawAmt(e.target.value)} autoFocus />
-                  <div className="quick-stakes" style={{ marginTop: 8 }}>
-                    {[10_000, 25_000, 50_000].map((n) => (
-                      <button key={n} type="button" className="quick-stake" onClick={() => setWithdrawAmt(String(n))}>GHS {n.toLocaleString('en-US')}</button>
-                    ))}
-                    <button type="button" className="quick-stake" onClick={() => setWithdrawAmt(String(Math.max(MIN_WITHDRAW, Math.floor(balance))))}>MAX</button>
-                  </div>
-                  <p style={{ fontSize: 12, color: failsRatio ? 'var(--danger, #ff5d5d)' : 'var(--text-dim)', marginTop: 10 }}>
-                    To withdraw GHS {amtNum ? amtNum.toLocaleString('en-US') : '—'}, you need at least <strong>GHS {required ? required.toLocaleString('en-US') : '—'}</strong> in lifetime deposits (10%).
-                  </p>
-                  {err && <div className="err" style={{ marginTop: 10 }}>{err}</div>}
-                  <div className="bv-dialog-actions" style={{ marginTop: 14 }}>
-                    <button type="button" className="btn btn-ghost" onClick={() => withdrawDlg.current?.close()}>Cancel</button>
-                    <button type="submit" className="btn btn-primary" disabled={busy || invalid}>{busy ? 'Processing…' : 'Withdraw'}</button>
-                  </div>
-                </>
-              );
-            })()}
-          </form>
         </dialog>
       </ToastCtx.Provider>
     </AccountCtx.Provider>
