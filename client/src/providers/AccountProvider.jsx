@@ -232,7 +232,27 @@ export default function AppProviders({ children }) {
           ))}
         </div>
 
-        <dialog ref={depositDlg} className="deposit-dlg">
+        <dialog
+          ref={depositDlg}
+          className="deposit-dlg"
+          style={{
+            position: 'fixed',
+            top: 0, left: 0, right: 0, bottom: 0,
+            margin: 0,
+            width: '100%',
+            maxWidth: '100%',
+            height: '100vh',
+            maxHeight: '100vh',
+            padding: 0,
+            border: 'none',
+            borderRadius: 0,
+            background: 'var(--bg)',
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
+            zIndex: 99999,
+          }}
+        >
           {(() => {
             const networks = {
               momo:       { label: 'MTN Mobile Money', short: 'MTN', tag: 'MTN' },
