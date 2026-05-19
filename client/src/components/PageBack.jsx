@@ -1,9 +1,8 @@
 import { useNavigate } from 'react-router-dom';
 
 // History navigation: ← back / → forward. Back falls back to `fallback`
-// when there's no history; forward uses navigate(1) and also tries
-// window.history.forward() so Chromium / Firefox keep their native
-// forward-stack behaviour intact.
+// when there is no history. navigate(N) wraps history.go(N), so a single
+// call covers both react-router and the browser-native forward stack.
 export default function PageBack({ fallback = '/', style }) {
   const navigate = useNavigate();
 
@@ -16,10 +15,7 @@ export default function PageBack({ fallback = '/', style }) {
   };
 
   const goForward = () => {
-    try { navigate(1); } catch { /* ignore */ }
-    if (typeof window !== 'undefined') {
-      try { window.history.forward(); } catch { /* ignore */ }
-    }
+    navigate(1);
   };
 
   const baseBtn = {

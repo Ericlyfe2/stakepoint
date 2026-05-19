@@ -1250,6 +1250,10 @@ footer {
   overflow: hidden;
   background: var(--bg);
   color: var(--text);
+  /* showModal() promotes the element to the browser top-layer, but set
+     an explicit z-index too so legacy .show() callers (and tests that
+     toggle `[open]` directly) still render above sticky chrome. */
+  z-index: 2000;
 }
 .deposit-dlg::backdrop { background: rgba(0,0,0,.72); }
 .deposit-dlg .tx-header { flex: 0 0 auto; }
@@ -1859,14 +1863,21 @@ nav a:active { transform: scale(.96); }
   .sb-slip-pill { display: none; }
 }
 
-/* ----- mobile top bar ----- */
+/* ----- mobile top bar -----
+   Same cascade trap as `.sb-bottom-nav`: default to `display: none`
+   and switch to flex inside the mobile media query so desktop's
+   `display: none` hide-rule isn't overridden by source order. */
 .sb-mobile-header {
   position: sticky; top: 0; z-index: 80;
-  display: flex; align-items: center; gap: 10px;
+  display: none;
+  align-items: center; gap: 10px;
   padding: 10px 14px;
   background: var(--bg-soft);
   border-bottom: 1px solid var(--line);
   backdrop-filter: blur(10px);
+}
+@media (max-width: 960px) {
+  .sb-mobile-header { display: flex; }
 }
 .sb-logo {
   display: inline-flex; align-items: center; gap: 6px;
@@ -2373,15 +2384,24 @@ nav a:active { transform: scale(.96); }
   to   { transform: translate(-50%, 0);    opacity: 1; }
 }
 
-/* ----- bottom nav ----- */
+/* ----- bottom nav (mobile only) -----
+   This base declaration appears later in the source than the desktop
+   `@media (min-width: 961px) { .sb-bottom-nav { display: none } }` rule,
+   so it would normally override the desktop hide via source-order
+   cascade. Default to `display: none` and only switch to grid in the
+   mobile media query so desktop stays clean. */
 .sb-bottom-nav {
   position: fixed;
   left: 0; right: 0; bottom: 0;
   z-index: 70;
-  display: grid; grid-template-columns: repeat(5, 1fr);
+  display: none;
+  grid-template-columns: repeat(5, 1fr);
   background: var(--bg-soft);
   border-top: 1px solid var(--line);
   padding: 6px 0 max(6px, env(safe-area-inset-bottom));
+}
+@media (max-width: 960px) {
+  .sb-bottom-nav { display: grid; }
 }
 .sb-nav-item {
   position: relative;

@@ -8,7 +8,6 @@ import {
 import { useToast, useAccount } from '../layout/AppShell.jsx';
 import BetSuccessModal, { toBookingCode } from '../components/BetSuccessModal.jsx';
 import { useFavouriteLeagues } from '../hooks/useFavourites.js';
-import PageBack from '../components/PageBack.jsx';
 import { onLive, subscribeSports, unsubscribeSports } from '../api/socketClient.js';
 import {
   SYSTEM_TYPES,
@@ -682,10 +681,6 @@ export default function Home({ initialChip }) {
 
   return (
     <>
-      <div style={{ padding: '8px 12px 0' }}>
-        <PageBack />
-      </div>
-
       {/* ─── Sport tabs (with Live) ─── */}
       <div className="sb-sport-tabs">
         <button

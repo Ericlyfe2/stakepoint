@@ -357,7 +357,9 @@ const JP_CSS = `
   bottom: 0; left: 0; right: 0;
   padding: 12px 16px;
   background: linear-gradient(180deg, rgba(15, 20, 19, 0) 0%, var(--bg-soft) 40%);
-  z-index: 50;
+  /* Must sit above .sb-bottom-nav (z-index 70) on mobile or the submit
+     CTA is hidden behind the nav bar. */
+  z-index: 80;
   display: none;
 }
 .jp-sticky-submit .btn { width: 100%; padding: 14px; font-size: 14px; font-weight: 800; }
