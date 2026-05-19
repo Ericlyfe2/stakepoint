@@ -1317,8 +1317,55 @@ export default function Home({ initialChip }) {
 
       {/* ─── Markets dialog (per match) ─── */}
       <dialog ref={marketsDlg} className="bv-dialog markets-dlg" style={{ maxWidth: 560 }}>
-        {marketsForMatch && (
+        {marketsForMatch && (() => {
+          const matchesInLeague = marketsForMatch.league.matches || [];
+          const curIdx = matchesInLeague.findIndex((m) => m.id === marketsForMatch.match.id);
+          const goPrev = () => {
+            if (curIdx > 0) setMarketsForMatch({ league: marketsForMatch.league, match: matchesInLeague[curIdx - 1] });
+          };
+          const goNext = () => {
+            if (curIdx >= 0 && curIdx < matchesInLeague.length - 1) {
+              setMarketsForMatch({ league: marketsForMatch.league, match: matchesInLeague[curIdx + 1] });
+            }
+          };
+          const hasPrev = curIdx > 0;
+          const hasNext = curIdx >= 0 && curIdx < matchesInLeague.length - 1;
+          return (
           <>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, position: 'sticky', top: 0, background: 'var(--surface)', padding: '4px 0', zIndex: 5 }}>
+              <button
+                type="button"
+                onClick={() => marketsDlg.current?.close()}
+                aria-label="Close"
+                style={{ background: 'var(--surface-2)', border: '1px solid var(--line)', borderRadius: 8, padding: '8px 10px', color: 'var(--text)', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4, fontWeight: 700 }}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+                Back
+              </button>
+              <button
+                type="button"
+                onClick={goPrev}
+                disabled={!hasPrev}
+                aria-label="Previous match"
+                title="Previous match in league"
+                style={{ background: 'var(--surface-2)', border: '1px solid var(--line)', borderRadius: 8, padding: '8px 10px', color: hasPrev ? 'var(--text)' : 'var(--text-dim)', cursor: hasPrev ? 'pointer' : 'not-allowed', opacity: hasPrev ? 1 : 0.5 }}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+              </button>
+              <span style={{ fontSize: 12, color: 'var(--text-dim)', flex: 1, textAlign: 'center' }}>
+                {curIdx >= 0 ? `${curIdx + 1} / ${matchesInLeague.length}` : ''}
+              </span>
+              <button
+                type="button"
+                onClick={goNext}
+                disabled={!hasNext}
+                aria-label="Next match"
+                title="Next match in league"
+                style={{ background: 'var(--surface-2)', border: '1px solid var(--line)', borderRadius: 8, padding: '8px 10px', color: hasNext ? 'var(--text)' : 'var(--text-dim)', cursor: hasNext ? 'pointer' : 'not-allowed', opacity: hasNext ? 1 : 0.5 }}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+              </button>
+            </div>
             <h3>{marketsForMatch.match.home} vs {marketsForMatch.match.away}</h3>
             <p style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 16 }}>
               {marketsForMatch.league.name} · {matchMeta(marketsForMatch.match)}
@@ -1352,7 +1399,8 @@ export default function Home({ initialChip }) {
               </button>
             </div>
           </>
-        )}
+          );
+        })()}
       </dialog>
 
       <BetSuccessModal
