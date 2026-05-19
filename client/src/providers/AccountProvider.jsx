@@ -232,7 +232,7 @@ export default function AppProviders({ children }) {
           ))}
         </div>
 
-        <dialog ref={depositDlg} className="bv-dialog deposit-dlg" style={{ padding: 0, maxWidth: 480, width: '100%', overflow: 'hidden', borderRadius: 0, background: 'var(--bg)', border: 'none' }}>
+        <dialog ref={depositDlg} className="deposit-dlg">
           {(() => {
             const networks = {
               momo:       { label: 'MTN Mobile Money', short: 'MTN', tag: 'MTN' },
