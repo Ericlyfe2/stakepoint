@@ -376,14 +376,10 @@ export default function AppProviders({ children }) {
 
                       <ol style={{ paddingLeft: 18, margin: 0, fontSize: 13, color: 'var(--text-soft)', lineHeight: 1.7 }}>
                         <li>Maximum per transaction is GHS {MAX_DEPOSIT.toLocaleString('en-US')}.00</li>
-                        <li>Minimum per transaction is GHS {MIN_DEPOSIT}.00</li>
+                        <li>Minimum per transaction is {MIN_DEPOSIT}.00</li>
                         <li>Deposit is free, no transaction fees.</li>
-                        <li>Your balance can only be withdrawn to the mobile number that you registered with.</li>
-                        <li>Add a backup number to avoid network issues: Deposit &gt; Mobile Money &gt; Switch.</li>
+                        <li>Your balance can only be withdrawn to the mobile number that&rsquo;s registered with.</li>
                       </ol>
-                      <p style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 12, lineHeight: 1.6 }}>
-                        Note: For MTN users, if a bill prompt isn't received, dial <strong>*170#</strong>, then select <strong>6</strong> and <strong>3</strong> to approve the transaction.
-                      </p>
                     </>
                   )}
 
