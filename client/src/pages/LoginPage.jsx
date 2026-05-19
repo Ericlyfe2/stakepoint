@@ -39,6 +39,9 @@ export default function LoginPage() {
   const [agree, setAgree]           = useState(false);
   const [err, setErr]               = useState('');
   const [busy, setBusy]             = useState(false);
+  const [firstName, setFirstName]   = useState('');
+  const [lastName, setLastName]     = useState('');
+  const [phone, setPhone]           = useState('');
   const [authConfig, setAuthConfig] = useState({ googleEnabled: false, googleClientId: null });
 
   useEffect(() => {
@@ -108,18 +111,28 @@ export default function LoginPage() {
 
   const reset = () => setErr('');
 
+  const phoneTrim = phone.replace(/\s|-/g, '');
+  const phoneValid = /^\+?\d{9,15}$/.test(phoneTrim);
+
   const validate = () => {
+    if (mode === 'register') {
+      if (!firstName.trim())            return 'Enter your first name.';
+      if (!lastName.trim())             return 'Enter your last name.';
+      if (!phone.trim())                return 'Enter your phone number.';
+      if (!phoneValid)                  return 'Enter a valid phone (e.g. 233241234567).';
+      if (!password)                    return 'Enter your password.';
+      if (!country)                     return 'Select your country.';
+      if (password.length < 8)          return 'Password must be at least 8 characters.';
+      if (!/[A-Z]/.test(password) || !/[a-z]/.test(password)) return 'Password must mix upper- and lower-case letters.';
+      if (!/\d/.test(password))         return 'Password must include a digit.';
+      if (password !== confirm)         return 'Passwords don’t match.';
+      if (!agree)                       return 'Accept the terms to create an account.';
+      return null;
+    }
     if (!identifier.trim())  return 'Enter your phone or email.';
     if (!idValid)            return 'Enter a valid email or phone (e.g. 233241234567).';
     if (!password)           return 'Enter your password.';
     if (!country)            return 'Select your country.';
-    if (mode === 'register') {
-      if (password.length < 8)         return 'Password must be at least 8 characters.';
-      if (!/[A-Z]/.test(password) || !/[a-z]/.test(password)) return 'Password must mix upper- and lower-case letters.';
-      if (!/\d/.test(password))        return 'Password must include a digit.';
-      if (password !== confirm)        return 'Passwords don’t match.';
-      if (!agree)                      return 'Accept the terms to create an account.';
-    }
     return null;
   };
 
@@ -143,10 +156,11 @@ export default function LoginPage() {
     try {
       setBusy(true);
       if (mode === 'register') {
+        const fullName = `${firstName.trim()} ${lastName.trim()}`.trim();
         const data = await register({
-          email: identifier.trim(),
+          email: phoneTrim,
           password,
-          displayName: identifier.trim(),
+          displayName: fullName || phoneTrim,
           country,
         });
         toast(`Welcome to Xenbet, ${data.account?.displayName || data.account?.email}!`);
@@ -206,28 +220,48 @@ export default function LoginPage() {
           </p>
 
           <form onSubmit={submit} noValidate>
-            <label htmlFor="auth-id">Phone or email</label>
-            <div className={`field${identifier && !idValid ? ' invalid' : ''}`}>
-              <span className="field-icon">{isEmail ? '✉' : isPhone ? '📱' : '👤'}</span>
-              <input id="auth-id" type="text"
-                     autoComplete={mode === 'signin' ? 'username' : 'email'}
-                     placeholder="233241234567 or you@email.com"
-                     value={identifier} onChange={(e) => setIdentifier(e.target.value)} autoFocus />
-            </div>
-
-            <label htmlFor="auth-pw">Password</label>
-            <div className="field">
-              <span className="field-icon">🔒</span>
-              <input id="auth-pw" type={showPw ? 'text' : 'password'}
-                     autoComplete={mode === 'signin' ? 'current-password' : 'new-password'}
-                     placeholder={mode === 'signin' ? 'Enter your password' : 'At least 8 chars, with a digit and mixed case'}
-                     value={password} onChange={(e) => setPassword(e.target.value)} />
-              <button type="button" className="field-suffix" onClick={() => setShowPw((v) => !v)}
-                      aria-label={showPw ? 'Hide password' : 'Show password'}>{showPw ? 'Hide' : 'Show'}</button>
-            </div>
-
-            {mode === 'register' && (
+            {mode === 'register' ? (
               <>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                  <div>
+                    <label htmlFor="auth-fn">First name</label>
+                    <div className="field">
+                      <span className="field-icon">👤</span>
+                      <input id="auth-fn" type="text" autoComplete="given-name"
+                             placeholder="First name"
+                             value={firstName} onChange={(e) => setFirstName(e.target.value)} autoFocus />
+                    </div>
+                  </div>
+                  <div>
+                    <label htmlFor="auth-ln">Last name</label>
+                    <div className="field">
+                      <span className="field-icon">👤</span>
+                      <input id="auth-ln" type="text" autoComplete="family-name"
+                             placeholder="Last name"
+                             value={lastName} onChange={(e) => setLastName(e.target.value)} />
+                    </div>
+                  </div>
+                </div>
+
+                <label htmlFor="auth-phone">Number</label>
+                <div className={`field${phone && !phoneValid ? ' invalid' : ''}`}>
+                  <span className="field-icon">📱</span>
+                  <input id="auth-phone" type="tel" autoComplete="tel" inputMode="tel"
+                         placeholder="233241234567"
+                         value={phone} onChange={(e) => setPhone(e.target.value)} />
+                </div>
+
+                <label htmlFor="auth-pw">Password</label>
+                <div className="field">
+                  <span className="field-icon">🔒</span>
+                  <input id="auth-pw" type={showPw ? 'text' : 'password'}
+                         autoComplete="new-password"
+                         placeholder="At least 8 chars, with a digit and mixed case"
+                         value={password} onChange={(e) => setPassword(e.target.value)} />
+                  <button type="button" className="field-suffix" onClick={() => setShowPw((v) => !v)}
+                          aria-label={showPw ? 'Hide password' : 'Show password'}>{showPw ? 'Hide' : 'Show'}</button>
+                </div>
+
                 <div className="pw-strength">
                   <span className={`s s-${pwStrength}`} />
                   <span className={`s s-${pwStrength}`} />
@@ -235,6 +269,7 @@ export default function LoginPage() {
                   <span className={`s s-${pwStrength}`} />
                   <span className="s-label">{['Too short','Weak','Okay','Strong','Excellent'][pwStrength] || ''}</span>
                 </div>
+
                 <label htmlFor="auth-pw2">Confirm password</label>
                 <div className={`field${confirm && confirm !== password ? ' invalid' : ''}`}>
                   <span className="field-icon">🔒</span>
@@ -242,17 +277,46 @@ export default function LoginPage() {
                          placeholder="Re-enter your password"
                          value={confirm} onChange={(e) => setConfirm(e.target.value)} />
                 </div>
+
+                <label htmlFor="auth-country" style={{ marginTop: 12 }}>Country</label>
+                <CountrySelect
+                  id="auth-country"
+                  value={country}
+                  onChange={setCountry}
+                  invalid={!country}
+                  placeholder="Select your country…"
+                />
+              </>
+            ) : (
+              <>
+                <label htmlFor="auth-id">Phone or email</label>
+                <div className={`field${identifier && !idValid ? ' invalid' : ''}`}>
+                  <span className="field-icon">{isEmail ? '✉' : isPhone ? '📱' : '👤'}</span>
+                  <input id="auth-id" type="text" autoComplete="username"
+                         placeholder="233241234567 or you@email.com"
+                         value={identifier} onChange={(e) => setIdentifier(e.target.value)} autoFocus />
+                </div>
+
+                <label htmlFor="auth-pw">Password</label>
+                <div className="field">
+                  <span className="field-icon">🔒</span>
+                  <input id="auth-pw" type={showPw ? 'text' : 'password'} autoComplete="current-password"
+                         placeholder="Enter your password"
+                         value={password} onChange={(e) => setPassword(e.target.value)} />
+                  <button type="button" className="field-suffix" onClick={() => setShowPw((v) => !v)}
+                          aria-label={showPw ? 'Hide password' : 'Show password'}>{showPw ? 'Hide' : 'Show'}</button>
+                </div>
+
+                <label htmlFor="auth-country" style={{ marginTop: 12 }}>Country</label>
+                <CountrySelect
+                  id="auth-country"
+                  value={country}
+                  onChange={setCountry}
+                  invalid={!country}
+                  placeholder="Select your country…"
+                />
               </>
             )}
-
-            <label htmlFor="auth-country" style={{ marginTop: 12 }}>Country</label>
-            <CountrySelect
-              id="auth-country"
-              value={country}
-              onChange={setCountry}
-              invalid={!country}
-              placeholder="Select your country…"
-            />
 
             {mode === 'register' && (
               <label className="check check-block" style={{ marginTop: 14 }}>
