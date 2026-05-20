@@ -14,7 +14,7 @@ import {
   publicAdmin, bruteCheck, bumpBrute, clearBrute, issueAdminSession,
 } from './admin/auth.js';
 import { recordAudit } from '../db/audit.js';
-import { loginLimiter } from '../middleware/rateLimit.js';
+import { loginLimiter, registerLimiter } from '../middleware/rateLimit.js';
 import { validate } from '../middleware/validate.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { badRequest, unauthorized, conflict, forbidden } from '../utils/httpError.js';
@@ -80,6 +80,7 @@ router.get('/config', (_req, res) => {
 
 /** Register — creates account, immediately signs in (no OTP). */
 router.post('/register',
+  registerLimiter,
   validate(registerSchema),
   asyncHandler(async (req, res) => {
     const { email, password, displayName, country: countryCode } = req.body;

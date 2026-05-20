@@ -54,24 +54,33 @@ export default function InfoPage() {
           By creating a Xenbet account and placing wagers you agree to the following terms.
           You must be 18 years or older and physically located in a jurisdiction where online
           sports wagering is lawful. Xenbet operates under Ghana Gaming Commission licence
-          <strong> #XBGH-2026</strong>.
+          <strong> #XBGH-2026</strong>. Last updated <strong>20 May 2026</strong>.
         </p>
         <ul style={ulStyle}>
-          <li>Only one account is permitted per individual.</li>
+          <li>Only one account is permitted per individual. Accounts may be registered using either an email address or a mobile phone number — the identifier provided is the sole login credential.</li>
           <li>All wagers are final once the relevant event has commenced.</li>
           <li>Settled bets are final. Disputes must be raised within 14 days of settlement.</li>
           <li>Bonus funds carry a wagering requirement and may be voided if abused.</li>
           <li>Withdrawal eligibility requires lifetime deposits of at least 10% of the requested amount.</li>
-          <li>Xenbet reserves the right to verify identity and source of funds before processing withdrawals.</li>
+          <li>Xenbet reserves the right to verify identity and source of funds before processing withdrawals (KYC/AML).</li>
+          <li>Multiple accounts, automated betting, odds-arbitrage rings, and collusion are grounds for suspension and bonus clawback.</li>
+          <li>Account credentials must be kept confidential. You are responsible for all activity carried out under your login.</li>
         </ul>
       </section>
 
       <section id="privacy" style={sectionStyle}>
         <h2 style={h2Style}>Privacy Policy</h2>
         <p style={pStyle}>
-          Xenbet collects only the information needed to operate your account: identity
-          details for KYC, payment method metadata for deposits and withdrawals, and
-          gameplay records for fairness and compliance. We do not sell personal data.
+          Xenbet collects only the information needed to operate your account: the
+          identifier used at sign-up (email or phone number), identity details for KYC,
+          payment method metadata for deposits and withdrawals, and gameplay records for
+          fairness and compliance. Passwords are stored only as one-way bcrypt hashes —
+          we never see your plaintext password. We do not sell personal data.
+        </p>
+        <p style={pStyle}>
+          Sessions are secured with short-lived access tokens and rotating refresh tokens.
+          Failed login attempts are rate-limited per account and per IP to deter brute-force
+          attacks. Transport is encrypted with TLS end-to-end.
         </p>
         <p style={pStyle}>
           You can request a copy or deletion of your data at any time by contacting our

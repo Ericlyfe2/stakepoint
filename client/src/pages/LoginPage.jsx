@@ -6,6 +6,24 @@ import { useAccount, useToast } from '../providers/AccountProvider.jsx';
 import CountrySelect from '../components/CountrySelect.jsx';
 import PageBack from '../components/PageBack.jsx';
 
+function EyeIcon({ open }) {
+  return open ? (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+         strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
+  ) : (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+         strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M17.94 17.94A10.94 10.94 0 0 1 12 20c-7 0-11-8-11-8a19.58 19.58 0 0 1 4.22-5.36" />
+      <path d="M9.9 4.24A10.94 10.94 0 0 1 12 4c7 0 11 8 11 8a19.5 19.5 0 0 1-2.16 3.19" />
+      <path d="M14.12 14.12a3 3 0 1 1-4.24-4.24" />
+      <line x1="1" y1="1" x2="23" y2="23" />
+    </svg>
+  );
+}
+
 // Block open-redirects via ?next= / ?redirect= — only allow same-origin
 // paths that start with a single "/" (rejects "//evil.com", "http://...",
 // "javascript:", etc).
@@ -113,13 +131,16 @@ export default function LoginPage() {
 
   const phoneTrim = phone.replace(/\s|-/g, '');
   const phoneValid = /^\+?\d{9,15}$/.test(phoneTrim);
+  const regIsEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(phone.trim());
+  const regIsPhone = phoneValid;
+  const regIdValid = regIsEmail || regIsPhone;
 
   const validate = () => {
     if (mode === 'register') {
       if (!firstName.trim())            return 'Enter your first name.';
       if (!lastName.trim())             return 'Enter your last name.';
-      if (!phone.trim())                return 'Enter your phone number.';
-      if (!phoneValid)                  return 'Enter a valid phone (e.g. 233241234567).';
+      if (!phone.trim())                return 'Enter your phone or email.';
+      if (!regIdValid)                  return 'Enter a valid email or phone (e.g. you@email.com or 233241234567).';
       if (!password)                    return 'Enter your password.';
       if (!country)                     return 'Select your country.';
       if (password.length < 8)          return 'Password must be at least 8 characters.';
@@ -157,10 +178,11 @@ export default function LoginPage() {
       setBusy(true);
       if (mode === 'register') {
         const fullName = `${firstName.trim()} ${lastName.trim()}`.trim();
+        const idValue = regIsEmail ? phone.trim().toLowerCase() : phoneTrim;
         const data = await register({
-          email: phoneTrim,
+          email: idValue,
           password,
-          displayName: fullName || phoneTrim,
+          displayName: fullName || idValue,
           country,
         });
         toast(`Welcome to Xenbet, ${data.account?.displayName || data.account?.email}!`);
@@ -243,11 +265,13 @@ export default function LoginPage() {
                   </div>
                 </div>
 
-                <label htmlFor="auth-phone">Number</label>
-                <div className={`field${phone && !phoneValid ? ' invalid' : ''}`}>
-                  <span className="field-icon">📱</span>
-                  <input id="auth-phone" type="tel" autoComplete="tel" inputMode="tel"
-                         placeholder="233241234567"
+                <label htmlFor="auth-phone">Phone or email</label>
+                <div className={`field${phone && !regIdValid ? ' invalid' : ''}`}>
+                  <span className="field-icon">{regIsEmail ? '✉' : regIsPhone ? '📱' : '👤'}</span>
+                  <input id="auth-phone" type="text"
+                         autoComplete={regIsEmail ? 'email' : 'tel'}
+                         inputMode={regIsEmail ? 'email' : 'tel'}
+                         placeholder="233241234567 or you@email.com"
                          value={phone} onChange={(e) => setPhone(e.target.value)} />
                 </div>
 
@@ -258,8 +282,11 @@ export default function LoginPage() {
                          autoComplete="new-password"
                          placeholder="At least 8 chars, with a digit and mixed case"
                          value={password} onChange={(e) => setPassword(e.target.value)} />
-                  <button type="button" className="field-suffix" onClick={() => setShowPw((v) => !v)}
-                          aria-label={showPw ? 'Hide password' : 'Show password'}>{showPw ? 'Hide' : 'Show'}</button>
+                  <button type="button" className="field-suffix field-eye" onClick={() => setShowPw((v) => !v)}
+                          aria-label={showPw ? 'Hide password' : 'Show password'}
+                          title={showPw ? 'Hide password' : 'Show password'}>
+                    <EyeIcon open={showPw} />
+                  </button>
                 </div>
 
                 <div className="pw-strength">
@@ -303,8 +330,11 @@ export default function LoginPage() {
                   <input id="auth-pw" type={showPw ? 'text' : 'password'} autoComplete="current-password"
                          placeholder="Enter your password"
                          value={password} onChange={(e) => setPassword(e.target.value)} />
-                  <button type="button" className="field-suffix" onClick={() => setShowPw((v) => !v)}
-                          aria-label={showPw ? 'Hide password' : 'Show password'}>{showPw ? 'Hide' : 'Show'}</button>
+                  <button type="button" className="field-suffix field-eye" onClick={() => setShowPw((v) => !v)}
+                          aria-label={showPw ? 'Hide password' : 'Show password'}
+                          title={showPw ? 'Hide password' : 'Show password'}>
+                    <EyeIcon open={showPw} />
+                  </button>
                 </div>
 
                 <label htmlFor="auth-country" style={{ marginTop: 12 }}>Country</label>

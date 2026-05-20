@@ -1361,7 +1361,14 @@ export default function Home({ initialChip }) {
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
               </button>
             </div>
-            <h3>{marketsForMatch.match.home} vs {marketsForMatch.match.away}</h3>
+            <h3 style={{
+              fontSize: 'clamp(22px, 6.5vw, 34px)',
+              lineHeight: 1.1,
+              fontWeight: 800,
+              letterSpacing: '-0.02em',
+              margin: '8px 0 6px',
+              wordBreak: 'break-word',
+            }}>{marketsForMatch.match.home} vs {marketsForMatch.match.away}</h3>
             <p style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 16 }}>
               {marketsForMatch.league.name} · {matchMeta(marketsForMatch.match)}
             </p>

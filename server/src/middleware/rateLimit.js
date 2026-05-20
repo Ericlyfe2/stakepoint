@@ -24,6 +24,14 @@ export const loginLimiter = rateLimit({
   message: { error: 'Too many login attempts. Try again in 15 minutes.' },
 });
 
+export const registerLimiter = rateLimit({
+  ...standardOpts,
+  windowMs: 60 * 60 * 1000,
+  limit: 10,
+  keyGenerator: (req) => ipKeyGenerator(req.ip),
+  message: { error: 'Too many account-creation attempts from your network. Try again in an hour.' },
+});
+
 export const otpRequestLimiter = rateLimit({
   ...standardOpts,
   windowMs: 10 * 60 * 1000,
