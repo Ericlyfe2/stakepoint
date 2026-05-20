@@ -9,6 +9,7 @@ import {
 import { onLive, refreshAuth, disconnectSocket } from '../api/socketClient.js';
 import WinTrophyModal from '../components/WinTrophyModal.jsx';
 import TxHeader from '../components/TxHeader.jsx';
+import PaybillInstructions from '../components/PaybillInstructions.jsx';
 
 export const AccountCtx = React.createContext(null);
 export const ToastCtx   = React.createContext(null);
@@ -332,9 +333,12 @@ export default function AppProviders({ children }) {
                   )}
 
                   {depositTab === 'paybill' && (
-                    <div style={{ padding: '32px 8px', textAlign: 'center', color: 'var(--text-soft)' }}>
-                      <p style={{ fontWeight: 700, color: 'var(--text)', marginBottom: 8 }}>Pay via *711#</p>
-                      <p style={{ fontSize: 13, lineHeight: 1.7 }}>Dial <strong>*711*222#</strong> on your phone, choose <strong>Xenbet</strong>, enter your account number, and complete the prompt.</p>
+                    <div style={{ padding: '8px 0 4px' }}>
+                      <PaybillInstructions
+                        paybillId="222000"
+                        accountRef={account?.phone || account?.email || ''}
+                        context="deposit"
+                      />
                     </div>
                   )}
 

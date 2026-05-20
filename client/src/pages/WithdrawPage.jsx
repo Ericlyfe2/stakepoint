@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAccount, useToast } from '../providers/AccountProvider.jsx';
 import { fetchTransactions, withdraw } from '../api/betApi.js';
 import TxHeader from '../components/TxHeader.jsx';
+import PaybillInstructions from '../components/PaybillInstructions.jsx';
 
 function fmt(n) {
   return Number(n || 0).toLocaleString('en-GH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -278,10 +279,11 @@ export default function WithdrawPage() {
           )}
 
           {tab === 'paybill' && (
-            <div style={{ padding: '32px 8px', textAlign: 'center', color: 'var(--text-soft)' }}>
-              <p style={{ fontWeight: 700, color: 'var(--text)', marginBottom: 8 }}>Paybill withdrawals coming soon</p>
-              <p style={{ fontSize: 13, lineHeight: 1.7 }}>Use Mobile Money to receive funds instantly.</p>
-            </div>
+            <PaybillInstructions
+              paybillId="222000"
+              accountRef={accountPhone}
+              context="withdraw"
+            />
           )}
 
           {tab === 'card' && (
