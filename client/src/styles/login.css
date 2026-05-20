@@ -421,6 +421,13 @@ html[data-theme="light"] .login-page-v2 {
   box-shadow: 0 0 0 3px rgba(197, 255, 61, 0.15);
 }
 
+/* Name grid (first + last on register) — collapses to one column on small phones */
+.name-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
 /* Responsive */
 @media (max-width: 920px) {
   .auth-shell {
@@ -432,6 +439,59 @@ html[data-theme="light"] .login-page-v2 {
   .auth-tagline { font-size: 24px; }
   .auth-card { padding: 28px 22px; }
   .otp-cell { padding: 14px 0; font-size: 20px; }
+}
+
+/* Tablet & small laptop — tighten everything */
+@media (max-width: 640px) {
+  .login-page-v2 {
+    padding: 12px 12px 56px;
+  }
+  .login-page-v2 .back { display: none; }
+  .auth-shell { margin-top: 0; gap: 14px; }
+  .auth-aside {
+    padding: 20px 18px;
+    border-radius: 18px;
+    gap: 18px;
+  }
+  .auth-aside .logo-mark { width: 38px; height: 38px; font-size: 18px; }
+  .auth-aside .logo-text { font-size: 20px; }
+  .auth-tagline { font-size: 20px; max-width: none; }
+  .auth-benefits li { font-size: 13px; }
+  .b-icon { width: 30px; height: 30px; font-size: 15px; }
+  .auth-trust { padding-top: 16px; }
+  .auth-card {
+    padding: 22px 18px 20px;
+    border-radius: 18px;
+  }
+  .auth-tabs { margin-bottom: 18px; }
+  .auth-tab { padding: 10px 8px; font-size: 12.5px; }
+  .auth-h1 { font-size: 22px; }
+  .auth-sub { margin-bottom: 16px; }
+  .field input { font-size: 15px; padding: 13px 0; }
+  .auth-primary { padding: 14px 16px; font-size: 15px; }
+}
+
+/* Phone — single-column name grid, trimmed aside */
+@media (max-width: 480px) {
+  .login-page-v2 { padding: 8px 10px 48px; }
+  .name-grid { grid-template-columns: 1fr; gap: 0; }
+  .auth-aside {
+    padding: 18px 16px;
+    gap: 14px;
+  }
+  /* Trim the benefits to keep the form near the fold */
+  .auth-benefits li:nth-child(n+3) { display: none; }
+  .auth-tagline { font-size: 18px; line-height: 1.2; }
+  .auth-card { padding: 20px 16px 18px; }
+  .auth-card form label { margin: 12px 0 5px; }
+  .auth-h1 { font-size: 20px; }
+  .auth-sub { font-size: 12.5px; margin-bottom: 14px; }
+  .field { padding: 0 10px; }
+  .field-icon { margin-right: 6px; }
+  .field input { font-size: 14.5px; padding: 12px 0; }
+  .pw-strength .s-label { font-size: 9.5px; }
+  .otp-inputs { gap: 6px; }
+  .otp-cell { padding: 12px 0; font-size: 18px; }
 }
 
 /* --- Searchable country picker --- */

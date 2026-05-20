@@ -244,7 +244,7 @@ export default function LoginPage() {
           <form onSubmit={submit} noValidate>
             {mode === 'register' ? (
               <>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                <div className="name-grid">
                   <div>
                     <label htmlFor="auth-fn">First name</label>
                     <div className="field">
