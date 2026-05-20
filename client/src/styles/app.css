@@ -1264,6 +1264,39 @@ footer {
   -webkit-overflow-scrolling: touch;
   min-height: 0;
 }
+
+/* Full-viewport markets dialog so the per-match betting board uses
+   every available pixel — matches the deposit/withdraw chrome. */
+.markets-dlg[open],
+.search-dialog[open] {
+  position: fixed;
+  inset: 0;
+  margin: 0 auto;
+  max-width: 100vw;
+  width: 100%;
+  height: 100dvh;
+  max-height: 100dvh;
+  border: none;
+  border-radius: 0;
+  padding: 16px;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  background: var(--bg);
+  color: var(--text);
+  z-index: 2000;
+}
+.markets-dlg::backdrop,
+.search-dialog::backdrop { background: rgba(0,0,0,.72); }
+@media (min-width: 720px) {
+  .markets-dlg[open],
+  .search-dialog[open] {
+    max-width: 720px;
+    height: auto;
+    max-height: 90dvh;
+    border-radius: var(--r-lg);
+    padding: 28px;
+  }
+}
 .bv-dialog h3 {
   font-size: 18px;
   font-weight: 800;

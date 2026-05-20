@@ -1311,7 +1311,7 @@ export default function Home({ initialChip }) {
       </dialog>
 
       {/* ─── Markets dialog (per match) ─── */}
-      <dialog ref={marketsDlg} className="bv-dialog markets-dlg" style={{ maxWidth: 560 }}>
+      <dialog ref={marketsDlg} className="bv-dialog markets-dlg">
         {marketsForMatch && (() => {
           const matchesInLeague = marketsForMatch.league.matches || [];
           const curIdx = matchesInLeague.findIndex((m) => m.id === marketsForMatch.match.id);

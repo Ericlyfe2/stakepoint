@@ -127,7 +127,7 @@ export default function WalletPage() {
               </header>
               <p className="wallet-split-desc">Cash out your winnings directly to your mobile money.</p>
               <ul className="wallet-list">
-                <li><span>Minimum withdrawal</span><strong>GHS 10,000</strong></li>
+                <li><span>Minimum withdrawal</span><strong>GHS 550</strong></li>
                 <li><span>Processing</span><strong>Within 24 hours</strong></li>
                 <li><span>Methods</span><strong>MoMo to phone on file</strong></li>
               </ul>
@@ -135,15 +135,13 @@ export default function WalletPage() {
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 7l-5 5-5-5M12 17V5"/></svg>
                 Withdraw
               </button>
+              <ol className="wallet-withdraw-rules">
+                <li>Maximum per transaction is GHS 95,000.00</li>
+                <li>Minimum per transaction is GHS 550.00</li>
+                <li>Withdrawal is free, no fee transaction.</li>
+              </ol>
             </div>
           </article>
-        </section>
-
-        <section className="wallet-note-section fade-up" style={{ animationDelay: '0.07s' }}>
-          <p className="wallet-note">
-            <strong>Deposit-to-withdraw rule:</strong> to withdraw <strong>GHS 10,000</strong> you must have deposited at least <strong>GHS 1,000</strong> in your lifetime.
-            Identity check required above <strong>GHS 50,000</strong>.
-          </p>
         </section>
 
         <section className="wallet-history fade-up" style={{ animationDelay: '0.1s' }}>
@@ -309,6 +307,16 @@ const WALLET_CSS = `
   color: #fff;
 }
 .wallet-note-section { margin-top: -4px; }
+
+.wallet-withdraw-rules {
+  margin: 14px 0 0;
+  padding-left: 20px;
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--text-soft);
+  list-style: decimal;
+}
+.wallet-withdraw-rules li { padding-left: 2px; }
 
 .wallet-cards {
   display: grid; grid-template-columns: 1fr 1fr; gap: 16px;
