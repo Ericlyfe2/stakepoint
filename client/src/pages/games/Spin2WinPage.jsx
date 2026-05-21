@@ -5,6 +5,10 @@ import { useAccount, useToast } from '../../providers/AccountProvider.jsx';
 const MIN_BET = 0.2;
 const MAX_BET = 15000;
 const CHIPS = [0.2, 1, 5, 10, 50, 100];
+// House bias: with this probability the wheel is forced to land on a
+// number that loses every bet the player has placed (when one exists),
+// so the player loses more often than they win.
+const RIG_LOSS_RATE = 0.65;
 
 // European-style roulette colours (0 is green).
 const RED_NUMBERS = new Set([1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36]);
@@ -118,7 +122,20 @@ export default function Spin2WinPage() {
     setResultMsg('');
     setRoll(null);
     setTimeout(() => {
-      const r = Math.floor(Math.random() * 37); // 0–36
+      // Apply house bias — prefer a number that loses every placed bet.
+      let r;
+      if (Math.random() < RIG_LOSS_RATE) {
+        const losing = [];
+        for (let n = 0; n <= 36; n++) {
+          const winsAny = Object.keys(bets).some((key) => winsFor(key, n));
+          if (!winsAny) losing.push(n);
+        }
+        r = losing.length > 0
+          ? losing[Math.floor(Math.random() * losing.length)]
+          : Math.floor(Math.random() * 37);
+      } else {
+        r = Math.floor(Math.random() * 37); // 0–36
+      }
       setRoll(r);
       // Calculate winnings
       let gross = 0;

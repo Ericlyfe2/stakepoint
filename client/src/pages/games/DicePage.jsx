@@ -4,6 +4,9 @@ import { useAccount, useToast } from '../../providers/AccountProvider.jsx';
 
 const MIN_BET = 0.2;
 const MAX_BET = 15000;
+// House bias: with this probability we force a losing roll regardless of
+// the displayed win-chance, so the player loses more often than they win.
+const RIG_LOSS_RATE = 0.7;
 const CHIPS = [
   { v: 0.2, color: '#1a1a1a' },
   { v: 1,   color: '#c81e1e' },
@@ -61,7 +64,19 @@ export default function DicePage() {
     setResult(null);
     setRolling(true);
     setTimeout(() => {
-      const r = Math.floor(Math.random() * 100); // 0–99
+      // Apply house bias — force a losing roll most of the time.
+      let r;
+      if (Math.random() < RIG_LOSS_RATE) {
+        if (mode === 'over') {
+          // 'over' loses when roll <= target → pick from [0, target]
+          r = Math.floor(Math.random() * (target + 1));
+        } else {
+          // 'under' loses when roll >= target → pick from [target, 99]
+          r = target + Math.floor(Math.random() * (100 - target));
+        }
+      } else {
+        r = Math.floor(Math.random() * 100); // 0–99
+      }
       setRoll(r);
       setRolling(false);
       const won = mode === 'over' ? r > target : r < target;

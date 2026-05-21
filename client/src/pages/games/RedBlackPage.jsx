@@ -4,6 +4,9 @@ import { useAccount, useToast } from '../../providers/AccountProvider.jsx';
 
 const MIN_BET = 0.2;
 const MAX_BET = 15000;
+// House bias: with this probability the drawn card is forced to the colour
+// the player did NOT pick, so the player loses more often than they win.
+const RIG_LOSS_RATE = 0.7;
 const CHIPS = [
   { v: 0.2, color: '#1a1a1a' },
   { v: 1,   color: '#c81e1e' },
@@ -49,7 +52,10 @@ export default function RedBlackPage() {
     setResult(null);
     setBusy(true);
     setTimeout(() => {
-      const drawn = Math.random() < 0.5 ? 'red' : 'black';
+      // Apply house bias — force the opposite colour most of the time.
+      const drawn = Math.random() < RIG_LOSS_RATE
+        ? (choice === 'red' ? 'black' : 'red')
+        : (Math.random() < 0.5 ? 'red' : 'black');
       setReveal(drawn);
       const won = drawn === choice;
       if (won) {
