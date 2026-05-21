@@ -129,6 +129,12 @@ export const adminUserWallet    = (id, delta, reason)  => patch_(`/users/${encod
 export const adminUserTags      = (id, tags)           => patch_(`/users/${encodeURIComponent(id)}/tags`,   { tags });
 export const adminUserNotes     = (id, notes)          => patch_(`/users/${encodeURIComponent(id)}/notes`,  { notes });
 export const adminUserReset     = (id) => post(`/users/${encodeURIComponent(id)}/reset-password`);
+export const adminDeleteUser    = (id, reason) =>
+  rawFetch(`/users/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+    body: JSON.stringify({ reason }),
+  }).then(jsonOrThrow);
+export const adminBulkDeleteUsers = (ids, reason) => post('/users/bulk-delete', { ids, reason });
 
 /* bets */
 export const adminListBets   = (params) => get(`/bets${qs(params)}`);

@@ -10,7 +10,7 @@
 import { Router } from 'express';
 import { randomBytes } from 'node:crypto';
 import { z } from 'zod';
-import { allUsers, getUserById, updateUser, publicUser, logActivity } from '../../db/users.js';
+import { allUsers, getUserById, updateUser, publicUser, logActivity, deleteUser } from '../../db/users.js';
 import { createStore } from '../../db/store.js';
 import { requireAdmin, requireRole, audit } from '../../middleware/adminAuth.js';
 import { validate } from '../../middleware/validate.js';
@@ -202,6 +202,74 @@ router.get('/:id/login-history', requireAdmin, (req, res, next) => {
   const events = (u.activity || []).filter((a) => /login|password|admin_/.test(a.kind));
   res.json({ events });
 });
+
+/* ─── Super admin: delete a user (and all their data) ─── */
+router.delete('/:id',
+  requireAdmin, requireRole(), // super only
+  validate(z.object({ reason: z.string().max(500).optional() }).optional()),
+  asyncHandler(async (req, res, next) => {
+    const u = getUserById(req.params.id);
+    if (!u) return next(notFound('User not found'));
+    if (u.role === 'admin') return next(badRequest('Cannot delete an admin from this endpoint. Demote the role first.'));
+
+    // Cascading cleanup — sessions, bets, transactions, then the user record.
+    revokeAllForAccount(u.id);
+    const allBets = betsStore.all() || {};
+    let removedBets = 0;
+    for (const [id, b] of Object.entries(allBets)) {
+      if (b.userId === u.id) { betsStore.delete(id); removedBets++; }
+    }
+    txStore.delete(u.id);
+    deleteUser(u.id);
+
+    audit(req, {
+      action: 'user.delete',
+      target: u.id,
+      targetType: 'user',
+      severity: 'critical',
+      meta: {
+        email: u.email,
+        displayName: u.displayName,
+        balanceAtDelete: u.balance,
+        removedBets,
+        reason: req.body?.reason,
+      },
+    });
+    res.json({ ok: true, deleted: u.id, removedBets });
+  })
+);
+
+/* ─── Super admin: bulk delete multiple users ─── */
+router.post('/bulk-delete',
+  requireAdmin, requireRole(), // super only
+  validate(z.object({
+    ids: z.array(z.string().min(1)).min(1).max(200),
+    reason: z.string().max(500).optional(),
+  })),
+  asyncHandler(async (req, res) => {
+    const results = { deleted: [], skipped: [] };
+    for (const rawId of req.body.ids) {
+      const u = getUserById(rawId);
+      if (!u) { results.skipped.push({ id: rawId, reason: 'not_found' }); continue; }
+      if (u.role === 'admin') { results.skipped.push({ id: u.id, reason: 'is_admin' }); continue; }
+      revokeAllForAccount(u.id);
+      const allBets = betsStore.all() || {};
+      for (const [id, b] of Object.entries(allBets)) {
+        if (b.userId === u.id) betsStore.delete(id);
+      }
+      txStore.delete(u.id);
+      deleteUser(u.id);
+      results.deleted.push(u.id);
+    }
+    audit(req, {
+      action: 'user.bulk_delete',
+      targetType: 'user',
+      severity: 'critical',
+      meta: { count: results.deleted.length, ids: results.deleted, reason: req.body.reason },
+    });
+    res.json({ ok: true, ...results });
+  })
+);
 
 /* ─── Super admin: impersonate any user ─── */
 router.post('/:id/impersonate',

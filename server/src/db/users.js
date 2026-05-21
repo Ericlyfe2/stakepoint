@@ -64,3 +64,11 @@ export function publicUser(u) {
 }
 
 export const allUsers = () => users.list();
+
+export function deleteUser(id) {
+  const key = String(id).toLowerCase();
+  const u = users.get(key);
+  if (!u) return null;
+  users.delete(key);
+  return u;
+}
