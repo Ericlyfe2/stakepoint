@@ -10,13 +10,13 @@
 import { Router } from 'express';
 import { randomBytes } from 'node:crypto';
 import { z } from 'zod';
-import { allUsers, getUserById, updateUser, publicUser, logActivity } from '../../db/users.js';
+import { allUsers, getUserById, updateUser, createUser, deleteUser, findByEmail, publicUser, logActivity } from '../../db/users.js';
 import { createStore } from '../../db/store.js';
 import { requireAdmin, requireRole, audit } from '../../middleware/adminAuth.js';
 import { validate } from '../../middleware/validate.js';
 import { asyncHandler } from '../../utils/asyncHandler.js';
-import { badRequest, notFound } from '../../utils/httpError.js';
-import { hashPassword } from '../../services/password.js';
+import { badRequest, conflict, notFound } from '../../utils/httpError.js';
+import { hashPassword, passwordIssues } from '../../services/password.js';
 import { revokeAllForAccount } from '../../services/token.js';
 
 const router = Router();
@@ -199,9 +199,93 @@ router.post('/:id/reset-password',
 router.get('/:id/login-history', requireAdmin, (req, res, next) => {
   const u = getUserById(req.params.id);
   if (!u) return next(notFound('User not found'));
-  const events = (u.activity || []).filter((a) => /login|password|admin_/.test(a.kind));
+  const events = (u.activity || []).filter((a) => /login|logout|register|password|admin_/.test(a.kind));
   res.json({ events });
 });
+
+/* ─── Super admin: create a new user account ─── */
+router.post('/',
+  requireAdmin, requireRole(),
+  validate(z.object({
+    email: z.string().trim().toLowerCase()
+      .refine((v) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v) || /^\+?\d{9,15}$/.test(v.replace(/\s|-/g, '')),
+              { message: 'Enter a valid email or phone.' }),
+    password: z.string().min(8),
+    displayName: z.string().trim().max(60).optional(),
+    country: z.string().trim().toUpperCase().regex(/^[A-Z]{2}$/).optional(),
+    balance: z.number().nonnegative().optional(),
+  })),
+  asyncHandler(async (req, res) => {
+    const { email, password, displayName, country, balance } = req.body;
+    const issues = passwordIssues(password);
+    if (issues.length) throw badRequest(issues[0], { issues });
+    if (findByEmail(email)) throw conflict('An account with this email already exists.');
+    const passwordHash = await hashPassword(password);
+    const user = createUser({
+      email,
+      displayName: displayName || email,
+      passwordHash,
+      country: country || null,
+      balance: typeof balance === 'number' ? balance : 0,
+      emailVerified: true,
+    });
+    logActivity(user.id, { kind: 'admin_created', by: req.admin.email, ip: req.ip });
+    audit(req, { action: 'user.create', target: user.id, targetType: 'user', severity: 'warning', meta: { email, country, balance } });
+    res.status(201).json({ user: expandUser(user) });
+  })
+);
+
+/* ─── Super admin: hard delete a user (cascades bets + tx) ─── */
+router.delete('/:id',
+  requireAdmin, requireRole(),
+  asyncHandler(async (req, res) => {
+    const u = getUserById(req.params.id);
+    if (!u) throw notFound('User not found');
+    if (u.role === 'admin') throw badRequest('Cannot delete an admin account from this endpoint.');
+    const id = u.id;
+    // Cascade: revoke sessions, remove bets owned by user, drop transaction
+    // history. Audit entry captures the count of side-effects so the action
+    // is reconstructible after the fact.
+    revokeAllForAccount(id);
+    const bets = Object.values(betsStore.all() || {}).filter((b) => b.userId === id);
+    for (const b of bets) betsStore.delete(b.id);
+    txStore.delete(id);
+    const removed = deleteUser(id);
+    audit(req, { action: 'user.delete', target: id, targetType: 'user', severity: 'critical', meta: { email: u.email, betsRemoved: bets.length } });
+    res.json({ ok: !!removed, id, betsRemoved: bets.length });
+  })
+);
+
+/* ─── Super admin: surface stored credential metadata (no plaintext) ─── */
+router.get('/:id/credentials',
+  requireAdmin, requireRole(),
+  (req, res, next) => {
+    const u = getUserById(req.params.id);
+    if (!u) return next(notFound('User not found'));
+    // Plaintext passwords are never recoverable — only stored as bcrypt
+    // hashes. Expose enough metadata for an admin to confirm the account
+    // is intact (auth method, hash version, 2FA, verification state)
+    // without ever leaking the hash itself.
+    const hash = u.passwordHash || '';
+    const hashAlgo = hash.startsWith('$2a$') || hash.startsWith('$2b$') || hash.startsWith('$2y$') ? 'bcrypt' : (hash ? 'unknown' : null);
+    audit(req, { action: 'user.credentials.view', target: u.id, targetType: 'user', severity: 'warning' });
+    res.json({
+      id: u.id,
+      email: u.email,
+      emailVerified: !!u.emailVerified,
+      hasPassword: !!u.passwordHash,
+      passwordAlgo: hashAlgo,
+      passwordHashFingerprint: hash ? `${hash.slice(0, 7)}…${hash.slice(-4)}` : null,
+      googleLinked: !!u.googleId,
+      twoFactorEnabled: !!u.twoFactorEnabled,
+      kycStatus: u.kycStatus || 'unverified',
+      country: u.country || null,
+      suspended: !!u.suspended,
+      createdAt: u.createdAt,
+      updatedAt: u.updatedAt,
+    });
+  }
+);
 
 /* ─── Super admin: impersonate any user ─── */
 router.post('/:id/impersonate',

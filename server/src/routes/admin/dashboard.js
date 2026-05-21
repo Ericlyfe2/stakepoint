@@ -11,6 +11,7 @@ import { requireAdmin } from '../../middleware/adminAuth.js';
 import { SPORTS } from '../../matchesData.js';
 import { oddsApiStatus } from '../../services/oddsApi.js';
 import { SMTP, GOOGLE } from '../../config/env.js';
+import { getMetricsWindow } from '../../services/metrics.js';
 
 const router = Router();
 
@@ -215,6 +216,23 @@ router.get('/health', requireAdmin, (_req, res) => {
     memoryMb: Math.round(process.memoryUsage().rss / 1024 / 1024),
     nodeVersion: process.version,
     pid: process.pid,
+  });
+});
+
+router.get('/health/metrics', requireAdmin, (_req, res) => {
+  const metrics = getMetricsWindow();
+  res.json({
+    ok: true,
+    runtime: {
+      uptimeSec: Math.floor(process.uptime()),
+      memoryMb: Math.round(process.memoryUsage().rss / 1024 / 1024),
+      nodeVersion: process.version,
+      pid: process.pid,
+      smtp: SMTP.enabled,
+      google: GOOGLE.enabled,
+      oddsApi: oddsApiStatus(),
+    },
+    ...metrics,
   });
 });
 

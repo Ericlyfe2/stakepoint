@@ -115,6 +115,7 @@ export const adminSignup = async (body) => {
 /* dashboard */
 export const adminOverview = () => get('/dashboard/overview');
 export const adminHealth   = () => get('/dashboard/health');
+export const adminHealthMetrics = () => get('/dashboard/health/metrics');
 export const adminAudit    = (params) => get(`/dashboard/audit${qs(params)}`);
 
 /* users */
@@ -129,6 +130,9 @@ export const adminUserWallet    = (id, delta, reason)  => patch_(`/users/${encod
 export const adminUserTags      = (id, tags)           => patch_(`/users/${encodeURIComponent(id)}/tags`,   { tags });
 export const adminUserNotes     = (id, notes)          => patch_(`/users/${encodeURIComponent(id)}/notes`,  { notes });
 export const adminUserReset     = (id) => post(`/users/${encodeURIComponent(id)}/reset-password`);
+export const adminCreateUser    = (body) => post('/users', body);
+export const adminDeleteUser    = (id)   => del(`/users/${encodeURIComponent(id)}`);
+export const adminUserCredentials = (id) => get(`/users/${encodeURIComponent(id)}/credentials`);
 
 /* bets */
 export const adminListBets   = (params) => get(`/bets${qs(params)}`);
@@ -137,6 +141,8 @@ export const adminGetBet     = (id)   => get(`/bets/${encodeURIComponent(id)}`);
 export const adminSettleBet  = (id, body) => post(`/bets/${encodeURIComponent(id)}/settle`, body);
 export const adminCancelBet  = (id, reason) => post(`/bets/${encodeURIComponent(id)}/cancel`, { reason });
 export const adminNoteBet    = (id, note)   => post(`/bets/${encodeURIComponent(id)}/note`, { note });
+export const adminDeleteBet  = (id, reason) => post(`/bets/${encodeURIComponent(id)}/delete`,  { reason });
+export const adminRestoreBet = (id)   => post(`/bets/${encodeURIComponent(id)}/restore`);
 
 /* sports & odds */
 export const adminFixtures      = (params) => get(`/sports/fixtures${qs(params)}`);

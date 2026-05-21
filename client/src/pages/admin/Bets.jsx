@@ -12,7 +12,16 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAdmin } from '../../providers/AdminProvider.jsx';
 import {
   adminListBets, adminGetBet, adminSettleBet, adminCancelBet, adminNoteBet, adminBulkBets,
+  adminDeleteBet, adminRestoreBet,
 } from '../../api/adminApi.js';
+
+function toBookingCode(id = '') {
+  const s = String(id).replace(/[^a-z0-9]/gi, '').toUpperCase();
+  if (!s) return 'XX00000';
+  const letters = (s.match(/[A-Z]/g) || ['X', 'X']).slice(0, 2).join('').padEnd(2, 'X');
+  const digits  = (s.match(/[0-9]/g) || ['0']).slice(-5).join('').padStart(5, '0');
+  return letters + digits;
+}
 import {
   Card, Badge, Drawer, Modal, Empty, SkeletonRow, moneyFmt, numFmt, ago, dateShort,
 } from '../../components/admin/primitives.jsx';
@@ -24,7 +33,7 @@ const STATUS_TONES = { open: 'info', won: 'success', lost: 'danger', void: 'warn
 
 export default function BetsPage({ initialStatus = 'all' }) {
   const { hasRole, showToast } = useAdmin();
-  const [filters, setFilters] = useState({ q: '', status: initialStatus, mode: 'all', sort: 'placedAt', dir: 'desc' });
+  const [filters, setFilters] = useState({ q: '', status: initialStatus, mode: 'all', sort: 'placedAt', dir: 'desc', showDeleted: false });
   const [page, setPage] = useState({ offset: 0, limit: 100 });
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -73,6 +82,7 @@ export default function BetsPage({ initialStatus = 'all' }) {
         q: filters.q, status: filters.status, mode: filters.mode,
         sort: filters.sort, dir: filters.dir,
         offset: page.offset, limit: page.limit,
+        showDeleted: filters.showDeleted ? 1 : undefined,
       });
       setData(res);
     } catch (e) { showToast(e.message || 'Failed to load bets', 'error'); }
@@ -84,7 +94,7 @@ export default function BetsPage({ initialStatus = 'all' }) {
     debounceRef.current = setTimeout(load, 200);
     return () => clearTimeout(debounceRef.current);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters.q, filters.status, filters.mode, filters.sort, filters.dir, page.offset, page.limit]);
+  }, [filters.q, filters.status, filters.mode, filters.sort, filters.dir, filters.showDeleted, page.offset, page.limit]);
 
   function exportCsv() {
     if (!data?.bets?.length) return;
@@ -163,6 +173,11 @@ export default function BetsPage({ initialStatus = 'all' }) {
             <option value="stake:desc">Stake high → low</option>
             <option value="potentialWin:desc">Liability high → low</option>
           </select>
+          <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12.5, color: 'var(--text-soft)' }}>
+            <input type="checkbox" checked={filters.showDeleted}
+                   onChange={(e) => setFilters((f) => ({ ...f, showDeleted: e.target.checked }))} />
+            Show deleted
+          </label>
           <div className="grow" />
           <div style={{ color: 'var(--text-dim)', fontSize: 12.5 }}>
             {data ? `${data.bets.length} of ${data.total}` : '—'}
@@ -175,7 +190,7 @@ export default function BetsPage({ initialStatus = 'all' }) {
                 <th style={{ width: 32 }}>
                   <input type="checkbox" checked={data?.bets?.length > 0 && selectedIds.size === data.bets.length} onChange={toggleAll} />
                 </th>
-                <th>Ticket</th>
+                <th>Code / Ticket</th>
                 <th>User</th>
                 <th>Status</th>
                 <th>Mode</th>
@@ -183,39 +198,63 @@ export default function BetsPage({ initialStatus = 'all' }) {
                 <th className="num">Odds</th>
                 <th className="num">Liability</th>
                 <th>Placed</th>
+                <th></th>
               </tr>
             </thead>
             <tbody>
-              {loading && Array.from({ length: 10 }).map((_, i) => <SkeletonRow key={i} cols={8} />)}
+              {loading && Array.from({ length: 10 }).map((_, i) => <SkeletonRow key={i} cols={10} />)}
               {!loading && data?.bets?.length === 0 && (
-                <tr><td colSpan={8}><Empty title="No bets match" subtitle="Try a different filter or search term." /></td></tr>
+                <tr><td colSpan={10}><Empty title="No bets match" subtitle="Try a different filter or search term." /></td></tr>
               )}
-              {!loading && data?.bets?.map((b) => (
-                <tr key={b.id} onClick={() => setSelected(b)} className={selected?.id === b.id ? 'selected' : ''}>
-                  <td style={{ width: 32 }} onClick={(e) => e.stopPropagation()}>
-                    <input type="checkbox" checked={selectedIds.has(b.id)} onChange={() => toggleSelect(b.id)} />
-                  </td>
-                  <td>
-                    <div style={{ display: 'flex', flexDirection: 'column' }}>
-                      <span style={{ fontFamily: 'var(--ff-mono)', fontSize: 12 }}>{b.id.slice(0, 18)}…</span>
-                      <span style={{ color: 'var(--text-dim)', fontSize: 12 }}>
-                        {(b.legs || []).slice(0, 2).map((l) => `${l.home}–${l.away}`).join(' · ')}
-                        {b.legs?.length > 2 ? ` · +${b.legs.length - 2}` : ''}
-                      </span>
-                    </div>
-                  </td>
-                  <td>
-                    <div style={{ fontSize: 13.5, fontWeight: 600 }}>{b.user?.displayName || b.user?.email || '—'}</div>
-                    <div style={{ color: 'var(--text-dim)', fontSize: 12 }}>{b.userId}</div>
-                  </td>
-                  <td><span className={`bet-status ${b.status}`}>{b.status}</span></td>
-                  <td><Badge>{b.mode}</Badge></td>
-                  <td className="num"><strong>{moneyFmt(b.stake)}</strong></td>
-                  <td className="num">{Number(b.totalOdds || 0).toFixed(2)}</td>
-                  <td className="num">{moneyFmt(b.potentialWin)}</td>
-                  <td title={dateShort(b.placedAt)}>{ago(b.placedAt)}</td>
-                </tr>
-              ))}
+              {!loading && data?.bets?.map((b) => {
+                const code = b.bookingCode || toBookingCode(b.id);
+                return (
+                  <tr key={b.id} onClick={() => setSelected(b)} className={selected?.id === b.id ? 'selected' : ''}
+                      style={b.deleted ? { opacity: 0.55 } : undefined}>
+                    <td style={{ width: 32 }} onClick={(e) => e.stopPropagation()}>
+                      <input type="checkbox" checked={selectedIds.has(b.id)} onChange={() => toggleSelect(b.id)} />
+                    </td>
+                    <td>
+                      <div style={{ display: 'flex', flexDirection: 'column' }}>
+                        <span style={{ fontFamily: 'var(--ff-mono)', fontSize: 13, fontWeight: 700 }}>{code}</span>
+                        <span style={{ color: 'var(--text-dim)', fontSize: 12 }}>
+                          {(b.legs || []).slice(0, 2).map((l) => `${l.home}–${l.away}`).join(' · ')}
+                          {b.legs?.length > 2 ? ` · +${b.legs.length - 2}` : ''}
+                        </span>
+                      </div>
+                    </td>
+                    <td>
+                      <div style={{ fontSize: 13.5, fontWeight: 600 }}>{b.user?.displayName || b.user?.email || '—'}</div>
+                      <div style={{ color: 'var(--text-dim)', fontSize: 12 }}>{b.userId}</div>
+                    </td>
+                    <td>
+                      <span className={`bet-status ${b.status}`}>{b.status}</span>
+                      {b.deleted && <span style={{ marginLeft: 6 }}><Badge tone="danger">Deleted</Badge></span>}
+                    </td>
+                    <td><Badge>{b.mode}</Badge></td>
+                    <td className="num"><strong>{moneyFmt(b.stake)}</strong></td>
+                    <td className="num">{Number(b.totalOdds || 0).toFixed(2)}</td>
+                    <td className="num">{moneyFmt(b.potentialWin)}</td>
+                    <td title={dateShort(b.placedAt)}>{ago(b.placedAt)}</td>
+                    <td className="row-actions" onClick={(e) => e.stopPropagation()}>
+                      {hasRole('moderator', 'odds_manager', 'finance_admin') && (
+                        b.deleted ? (
+                          <button className="adm-btn sm success" onClick={async () => {
+                            try { await adminRestoreBet(b.id); showToast('Bet restored.'); load(); }
+                            catch (e) { showToast(e.message || 'Restore failed.', 'error'); }
+                          }}>Restore</button>
+                        ) : (
+                          <button className="adm-btn sm danger" onClick={async () => {
+                            const reason = window.prompt(`Reason for deleting ${code}? (optional)`) || '';
+                            try { await adminDeleteBet(b.id, reason); showToast('Bet deleted.'); load(); }
+                            catch (e) { showToast(e.message || 'Delete failed.', 'error'); }
+                          }}>Delete</button>
+                        )
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

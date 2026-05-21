@@ -38,6 +38,7 @@ const NAV = [
     { to: '/admin/providers',  label: 'API providers', icon: <IconActivity /> },
   ]},
   { section: 'System', items: [
+    { to: '/admin/health',     label: 'Health',        icon: <IconActivity /> },
     { to: '/admin/settings',   label: 'Settings',      icon: <IconCog /> },
   ]},
 ];

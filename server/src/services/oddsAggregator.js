@@ -19,6 +19,7 @@ import { get as cacheGet, set as cacheSet } from './cache.js';
 import { emitOddsTick, emitOddsMovement, emitProviderHealth } from './realtime.js';
 import { setOddsOverride } from '../db/sportsAdmin.js';
 import { log } from '../utils/logger.js';
+import { recordOddsLag } from './metrics.js';
 
 const POLL_INTERVAL_MS = 60_000;     // base cadence
 const PROVIDER_STAGGER_MS = 4_000;   // stagger so we don't burst all providers
@@ -71,13 +72,15 @@ function backoffMs(streak) {
 
 async function pullProvider(p, sport = 'football') {
   const streak = failureStreak.get(p.id) || 0;
-  // (no-op when streak is fresh; just informational)
+  const t0 = Date.now();
   try {
     const rows = await p.fetchOdds(sport).catch(() => []);
     failureStreak.set(p.id, 0);
+    recordOddsLag(Date.now() - t0);
     return rows || [];
   } catch (e) {
     failureStreak.set(p.id, streak + 1);
+    recordOddsLag(Date.now() - t0);
     const next = backoffMs(streak + 1);
     log.warn(`Provider ${p.id} failure ×${streak + 1} — backing off ${Math.round(next / 1000)}s: ${e.message}`);
     return [];

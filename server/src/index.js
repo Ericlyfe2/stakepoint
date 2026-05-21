@@ -9,6 +9,7 @@ import { isProd, PORT, GOOGLE, SMTP, CORS_ORIGINS } from './config/env.js';
 import { generalLimiter } from './middleware/rateLimit.js';
 import { errorHandler, notFoundHandler } from './middleware/error.js';
 import { log } from './utils/logger.js';
+import { metricsMiddleware } from './services/metrics.js';
 
 import authRouter    from './routes/auth.js';
 import betRouter     from './routes/bet.js';
@@ -62,6 +63,7 @@ app.use(cors({
   credentials: true,
 }));
 app.use(express.json({ limit: '256kb' }));
+app.use(metricsMiddleware);
 app.use(generalLimiter);
 
 app.get('/api/health', (_req, res) => {

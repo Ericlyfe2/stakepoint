@@ -63,4 +63,12 @@ export function publicUser(u) {
   return safe;
 }
 
+export function deleteUser(id) {
+  if (!id) return false;
+  const key = String(id).toLowerCase();
+  if (!users.get(key)) return false;
+  users.delete(key);
+  return true;
+}
+
 export const allUsers = () => users.list();

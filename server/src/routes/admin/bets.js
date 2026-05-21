@@ -39,8 +39,12 @@ function enrich(bet) {
 }
 
 router.get('/', requireAdmin, (req, res) => {
-  const { q, status, mode, userId, from, to, sort = 'placedAt', dir = 'desc', limit = 100, offset = 0 } = req.query;
+  const { q, status, mode, userId, from, to, sort = 'placedAt', dir = 'desc', limit = 100, offset = 0, showDeleted } = req.query;
   let rows = Object.values(betsStore.all() || {});
+
+  // Hide soft-deleted bets from the default view; ?showDeleted=1 to see them.
+  const includeDeleted = showDeleted === '1' || showDeleted === 'true';
+  if (!includeDeleted) rows = rows.filter((b) => !b.deleted);
 
   if (status && status !== 'all') rows = rows.filter((b) => b.status === status);
   if (mode   && mode   !== 'all') rows = rows.filter((b) => b.mode === mode);
@@ -85,7 +89,7 @@ router.get('/', requireAdmin, (req, res) => {
 
 router.get('/live', requireAdmin, (_req, res) => {
   const rows = Object.values(betsStore.all() || {})
-    .filter((b) => b.status === 'open')
+    .filter((b) => b.status === 'open' && !b.deleted)
     .sort((a, b) => (a.placedAt < b.placedAt ? 1 : -1))
     .slice(0, 100)
     .map(enrich);
@@ -172,6 +176,47 @@ router.post('/:id/note',
     const updated = { ...bet, adminNotes: [entry, ...notes].slice(0, 50) };
     betsStore.set(bet.id, updated);
     audit(req, { action: 'bet.note', target: bet.id, targetType: 'bet' });
+    res.json({ bet: enrich(updated) });
+  }
+);
+
+/* ─── Soft delete / restore ───
+ * Marks the bet as hidden without dropping its row, so a careless click
+ * doesn't lose the receipt forever. Filters in the rest of the admin UI
+ * default to deleted=false; pass ?showDeleted=1 to surface them.
+ * Hard purge (true delete) intentionally not exposed — use the audit
+ * trail to investigate and then purge via DB if absolutely required.
+ */
+router.post('/:id/delete',
+  requireAdmin, requireRole('moderator', 'odds_manager', 'finance_admin'),
+  validate(z.object({ reason: z.string().max(500).optional() })),
+  (req, res, next) => {
+    const bet = betsStore.get(req.params.id);
+    if (!bet) return next(notFound('Bet not found'));
+    if (bet.deleted) return next(conflict('Bet already deleted.'));
+    const updated = {
+      ...bet,
+      deleted: true,
+      deletedAt: new Date().toISOString(),
+      deletedBy: req.admin.email,
+      deleteReason: req.body.reason || null,
+    };
+    betsStore.set(bet.id, updated);
+    audit(req, { action: 'bet.delete', target: bet.id, targetType: 'bet', severity: 'warning', meta: { reason: req.body.reason } });
+    res.json({ bet: enrich(updated) });
+  }
+);
+
+router.post('/:id/restore',
+  requireAdmin, requireRole('moderator', 'odds_manager', 'finance_admin'),
+  (req, res, next) => {
+    const bet = betsStore.get(req.params.id);
+    if (!bet) return next(notFound('Bet not found'));
+    if (!bet.deleted) return next(conflict('Bet is not deleted.'));
+    const { deleted, deletedAt, deletedBy, deleteReason, ...rest } = bet;
+    const updated = { ...rest, restoredAt: new Date().toISOString(), restoredBy: req.admin.email };
+    betsStore.set(bet.id, updated);
+    audit(req, { action: 'bet.restore', target: bet.id, targetType: 'bet', severity: 'info' });
     res.json({ bet: enrich(updated) });
   }
 );

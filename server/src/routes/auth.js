@@ -174,6 +174,12 @@ router.post('/refresh',
 
 router.post('/logout', asyncHandler(async (req, res) => {
   const token = req.body?.refreshToken;
+  const record = token ? lookupRefresh(token) : null;
+  if (record) {
+    logActivity(record.accountId, { kind: 'logout', ip: req.ip, userAgent: req.get('user-agent') });
+  } else if (req.user?.id) {
+    logActivity(req.user.id, { kind: 'logout', ip: req.ip, userAgent: req.get('user-agent') });
+  }
   if (token) revokeRefreshToken(token);
   res.json({ ok: true });
 }));

@@ -8,17 +8,26 @@
  *      super only : password reset
  *  - CSV export
  */
-import { useEffect, useMemo, useState, useRef } from 'react';
+import { Fragment, useEffect, useMemo, useState, useRef } from 'react';
 import { useAdmin } from '../../providers/AdminProvider.jsx';
 import {
   adminListUsers, adminGetUser, adminUserBets, adminUserTx, adminUserLogins,
   adminUserStatus, adminUserKyc, adminUserWallet, adminUserTags, adminUserNotes,
-  adminUserReset, adminImpersonate,
+  adminUserReset, adminImpersonate, adminCreateUser, adminDeleteUser,
+  adminUserCredentials,
 } from '../../api/adminApi.js';
 import { Card, Badge, Drawer, Modal, Empty, SkeletonRow, moneyFmt, numFmt, ago, dateShort } from '../../components/admin/primitives.jsx';
 import {
   IconSearch, IconDownload, IconRefresh, IconBan, IconCheck, IconKey, IconUsers, IconActivity, IconCash,
 } from '../../components/admin/Icons.jsx';
+
+function toBookingCode(id = '') {
+  const s = String(id).replace(/[^a-z0-9]/gi, '').toUpperCase();
+  if (!s) return 'XX00000';
+  const letters = (s.match(/[A-Z]/g) || ['X', 'X']).slice(0, 2).join('').padEnd(2, 'X');
+  const digits  = (s.match(/[0-9]/g) || ['0']).slice(-5).join('').padStart(5, '0');
+  return letters + digits;
+}
 
 const KYC_TONES = { verified: 'success', pending: 'warn', rejected: 'danger', unverified: 'default' };
 
@@ -30,6 +39,7 @@ export default function UsersPage() {
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState(null);
   const [drawerTab, setDrawerTab] = useState('profile');
+  const [createOpen, setCreateOpen] = useState(false);
   const debounceRef = useRef(0);
 
   async function load() {
@@ -81,7 +91,9 @@ export default function UsersPage() {
         <div style={{ display: 'flex', gap: 8 }}>
           <button className="adm-btn" onClick={load}><IconRefresh size={14} /> Refresh</button>
           <button className="adm-btn" onClick={exportCsv}><IconDownload size={14} /> Export CSV</button>
-          <button className="adm-btn primary"><IconUsers size={14} /> Invite admin</button>
+          {hasRole() && (
+            <button className="adm-btn primary" onClick={() => setCreateOpen(true)}><IconUsers size={14} /> Add user</button>
+          )}
         </div>
       </header>
 
@@ -139,12 +151,13 @@ export default function UsersPage() {
                 <th className="num">Deposits</th>
                 <th>Tags</th>
                 <th>Joined</th>
+                <th></th>
               </tr>
             </thead>
             <tbody>
-              {loading && Array.from({ length: 8 }).map((_, i) => <SkeletonRow key={i} cols={8} />)}
+              {loading && Array.from({ length: 8 }).map((_, i) => <SkeletonRow key={i} cols={9} />)}
               {!loading && data?.users?.length === 0 && (
-                <tr><td colSpan={8}><Empty title="No users match" subtitle="Try adjusting your filters." /></td></tr>
+                <tr><td colSpan={9}><Empty title="No users match" subtitle="Try adjusting your filters." /></td></tr>
               )}
               {!loading && data?.users?.map((u) => (
                 <tr key={u.id} onClick={() => openUser(u)} className={selected?.id === u.id ? 'selected' : ''}>
@@ -175,6 +188,27 @@ export default function UsersPage() {
                   <td className="num">{moneyFmt(u.stats?.depositTotal)}</td>
                   <td>{(u.tags || []).slice(0, 2).map((t) => <span key={t} style={{ marginRight: 4 }}><Badge tone="brand">{t}</Badge></span>)}</td>
                   <td title={dateShort(u.createdAt)}>{ago(u.createdAt)}</td>
+                  <td className="row-actions" onClick={(e) => e.stopPropagation()}>
+                    {hasRole() && (
+                      <button
+                        className="adm-btn sm danger"
+                        title="Delete user (super admin only)"
+                        onClick={async () => {
+                          if (!window.confirm(`Permanently delete ${u.email}? This wipes their bets and transactions and cannot be undone.`)) return;
+                          try {
+                            await adminDeleteUser(u.id);
+                            showToast(`Deleted ${u.email}.`);
+                            if (selected?.id === u.id) setSelected(null);
+                            load();
+                          } catch (e) {
+                            showToast(e.message || 'Delete failed.', 'error');
+                          }
+                        }}
+                      >
+                        Delete
+                      </button>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -192,10 +226,90 @@ export default function UsersPage() {
           setSelected(updated);
           setData((d) => d ? { ...d, users: d.users.map((u) => u.id === updated.id ? updated : u) } : d);
         }}
+        onDeleted={(id) => {
+          setSelected(null);
+          setData((d) => d ? { ...d, users: d.users.filter((u) => u.id !== id), total: Math.max(0, (d.total || 1) - 1) } : d);
+        }}
         hasRole={hasRole}
         showToast={showToast}
       />
+
+      <CreateUserModal
+        open={createOpen}
+        onClose={() => setCreateOpen(false)}
+        onCreated={(user) => {
+          setCreateOpen(false);
+          showToast(`Created ${user.email}.`);
+          load();
+        }}
+        showToast={showToast}
+      />
     </>
+  );
+}
+
+function CreateUserModal({ open, onClose, onCreated, showToast }) {
+  const [form, setForm] = useState({ email: '', password: '', displayName: '', country: 'GH', balance: '' });
+  const [busy, setBusy] = useState(false);
+  useEffect(() => { if (open) setForm({ email: '', password: '', displayName: '', country: 'GH', balance: '' }); }, [open]);
+
+  async function submit(e) {
+    e.preventDefault();
+    setBusy(true);
+    try {
+      const { user } = await adminCreateUser({
+        email: form.email.trim().toLowerCase(),
+        password: form.password,
+        displayName: form.displayName.trim() || undefined,
+        country: form.country || undefined,
+        balance: form.balance ? Number(form.balance) : 0,
+      });
+      onCreated(user);
+    } catch (err) {
+      showToast(err.message || 'Could not create user.', 'error');
+    } finally { setBusy(false); }
+  }
+
+  return (
+    <Modal open={open} onClose={onClose}
+           title="Add user"
+           description="Create a real account. The user can sign in immediately with the credentials below.">
+      <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div className="adm-field">
+          <label>Email or phone</label>
+          <input className="adm-input" required value={form.email}
+                 onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
+                 placeholder="you@example.com or 233241234567" autoFocus />
+        </div>
+        <div className="adm-field">
+          <label>Initial password</label>
+          <input className="adm-input" type="text" required minLength={8} value={form.password}
+                 onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
+                 placeholder="At least 8 chars, mixed case + a digit" />
+        </div>
+        <div className="adm-field">
+          <label>Display name (optional)</label>
+          <input className="adm-input" value={form.displayName}
+                 onChange={(e) => setForm((f) => ({ ...f, displayName: e.target.value }))} />
+        </div>
+        <div style={{ display: 'grid', gap: 12, gridTemplateColumns: '1fr 1fr' }}>
+          <div className="adm-field">
+            <label>Country (ISO-2)</label>
+            <input className="adm-input" maxLength={2} value={form.country}
+                   onChange={(e) => setForm((f) => ({ ...f, country: e.target.value.toUpperCase() }))} />
+          </div>
+          <div className="adm-field">
+            <label>Opening balance (GHS)</label>
+            <input className="adm-input" type="number" min="0" step="0.01" value={form.balance}
+                   onChange={(e) => setForm((f) => ({ ...f, balance: e.target.value }))} />
+          </div>
+        </div>
+        <div className="adm-modal-actions">
+          <button type="button" className="adm-btn ghost" onClick={onClose}>Cancel</button>
+          <button type="submit" className="adm-btn primary" disabled={busy}>{busy ? 'Creating…' : 'Create user'}</button>
+        </div>
+      </form>
+    </Modal>
   );
 }
 
@@ -210,16 +324,18 @@ function StatTile({ label, value }) {
 
 /* ------------------- Drawer ------------------- */
 
-function UserDrawer({ open, user, tab, setTab, onClose, onUpdate, hasRole, showToast }) {
+function UserDrawer({ open, user, tab, setTab, onClose, onUpdate, onDeleted, hasRole, showToast }) {
   const [detail, setDetail]   = useState(null);
   const [bets, setBets]       = useState([]);
   const [tx, setTx]           = useState([]);
   const [logins, setLogins]   = useState([]);
   const [walletOpen, setWalletOpen] = useState(false);
+  const [credentials, setCredentials] = useState(null);
+  const [openBet, setOpenBet] = useState(null);
 
   useEffect(() => {
     if (!open || !user) return;
-    setDetail(null); setBets([]); setTx([]); setLogins([]);
+    setDetail(null); setBets([]); setTx([]); setLogins([]); setCredentials(null); setOpenBet(null);
     (async () => {
       try {
         const [d, b, t, l] = await Promise.all([
@@ -281,6 +397,20 @@ function UserDrawer({ open, user, tab, setTab, onClose, onUpdate, hasRole, showT
       prompt('Temporary password (share securely with the user):', r.tempPassword);
     } catch (e) { showToast(e.message, 'error'); }
   }
+  async function viewCredentials() {
+    try {
+      const c = await adminUserCredentials(user.id);
+      setCredentials(c);
+    } catch (e) { showToast(e.message || 'Could not load credentials.', 'error'); }
+  }
+  async function deleteUserAccount() {
+    if (!window.confirm(`Permanently delete ${user.email}? This wipes their bets and transactions and cannot be undone.`)) return;
+    try {
+      const r = await adminDeleteUser(user.id);
+      showToast(`Deleted ${user.email}. Removed ${r.betsRemoved} bets.`);
+      onDeleted?.(user.id);
+    } catch (e) { showToast(e.message || 'Delete failed.', 'error'); }
+  }
   async function impersonateUser() {
     try {
       const r = await adminImpersonate(user.id);
@@ -310,7 +440,11 @@ function UserDrawer({ open, user, tab, setTab, onClose, onUpdate, hasRole, showT
           )}
           <button className="adm-btn ghost" onClick={resetPassword}><IconKey size={14} /> Reset password</button>
           {hasRole() && (
-            <button className="adm-btn" onClick={impersonateUser}><IconUsers size={14} /> Login as user</button>
+            <>
+              <button className="adm-btn" onClick={viewCredentials}><IconKey size={14} /> View credentials</button>
+              <button className="adm-btn" onClick={impersonateUser}><IconUsers size={14} /> Login as user</button>
+              <button className="adm-btn danger" onClick={deleteUserAccount}><IconBan size={14} /> Delete user</button>
+            </>
           )}
         </>
       ) : null}
@@ -326,6 +460,7 @@ function UserDrawer({ open, user, tab, setTab, onClose, onUpdate, hasRole, showT
       {tab === 'profile' && (
         <ProfileTab
           user={detail || user}
+          logins={logins}
           hasRole={hasRole}
           onKyc={doKyc}
           onTags={saveTags}
@@ -336,18 +471,36 @@ function UserDrawer({ open, user, tab, setTab, onClose, onUpdate, hasRole, showT
       {tab === 'bets' && (
         bets.length === 0 ? <Empty title="No bets" /> : (
           <table className="adm-table">
-            <thead><tr><th>ID</th><th>Status</th><th>Mode</th><th className="num">Stake</th><th className="num">Win</th><th>Placed</th></tr></thead>
+            <thead><tr><th>Code</th><th>Status</th><th>Mode</th><th className="num">Stake</th><th className="num">Win</th><th>Placed</th><th></th></tr></thead>
             <tbody>
-              {bets.map((b) => (
-                <tr key={b.id}>
-                  <td style={{ fontFamily: 'var(--ff-mono)', fontSize: 12 }}>{b.id.slice(0, 16)}…</td>
-                  <td><span className={`bet-status ${b.status}`}>{b.status}</span></td>
-                  <td>{b.mode}</td>
-                  <td className="num">{moneyFmt(b.stake)}</td>
-                  <td className="num">{moneyFmt(b.potentialWin)}</td>
-                  <td>{ago(b.placedAt)}</td>
-                </tr>
-              ))}
+              {bets.map((b) => {
+                const code = b.bookingCode || toBookingCode(b.id);
+                const isOpen = openBet?.id === b.id;
+                return (
+                  <Fragment key={b.id}>
+                    <tr style={{ cursor: 'pointer' }} onClick={() => setOpenBet(isOpen ? null : b)}>
+                      <td style={{ fontFamily: 'var(--ff-mono)', fontSize: 13, fontWeight: 700 }}>{code}</td>
+                      <td><span className={`bet-status ${b.status}`}>{b.status}{b.deleted ? ' (deleted)' : ''}</span></td>
+                      <td>{b.mode}</td>
+                      <td className="num">{moneyFmt(b.stake)}</td>
+                      <td className="num">{moneyFmt(b.potentialWin)}</td>
+                      <td>{ago(b.placedAt)}</td>
+                      <td className="row-actions" style={{ textAlign: 'right' }}>
+                        <button className="adm-btn sm" onClick={(e) => { e.stopPropagation(); setOpenBet(isOpen ? null : b); }}>
+                          {isOpen ? 'Hide' : 'Slip'}
+                        </button>
+                      </td>
+                    </tr>
+                    {isOpen && (
+                      <tr>
+                        <td colSpan={7} style={{ background: 'var(--surface-soft)' }}>
+                          <BetSlipPreview bet={b} />
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
+                );
+              })}
             </tbody>
           </table>
         )
@@ -390,22 +543,98 @@ function UserDrawer({ open, user, tab, setTab, onClose, onUpdate, hasRole, showT
       )}
 
       <WalletModal open={walletOpen} onClose={() => setWalletOpen(false)} user={detail || user} onSubmit={adjustWallet} />
+      <CredentialsModal open={!!credentials} onClose={() => setCredentials(null)} data={credentials} />
     </Drawer>
   );
 }
 
-function ProfileTab({ user, hasRole, onKyc, onTags, onNotes }) {
+function BetSlipPreview({ bet }) {
+  const code = bet.bookingCode || toBookingCode(bet.id);
+  return (
+    <div style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+        <span style={{ fontFamily: 'var(--ff-mono)', fontWeight: 800, fontSize: 16 }}>{code}</span>
+        <Badge tone="brand">{bet.mode}</Badge>
+        <Badge tone={bet.status === 'won' ? 'success' : bet.status === 'lost' ? 'danger' : bet.status === 'void' ? 'warn' : 'info'} dot>{bet.status}</Badge>
+        {bet.deleted && <Badge tone="danger">Deleted</Badge>}
+        <span style={{ marginLeft: 'auto', color: 'var(--text-dim)', fontSize: 12 }}>{dateShort(bet.placedAt)}</span>
+      </div>
+      <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap', fontSize: 13 }}>
+        <span>Stake <strong>{moneyFmt(bet.stake)}</strong></span>
+        <span>Total odds <strong>{(bet.totalOdds || 0).toFixed(2)}×</strong></span>
+        <span>Potential <strong>{moneyFmt(bet.potentialWin)}</strong></span>
+        {typeof bet.bonusRate === 'number' && <span>Bonus <strong>{(bet.bonusRate * 100).toFixed(0)}%</strong></span>}
+      </div>
+      <table className="adm-table" style={{ margin: 0 }}>
+        <thead><tr><th>Match</th><th>Market</th><th>Pick</th><th className="num">Odds</th><th>Sport</th></tr></thead>
+        <tbody>
+          {(bet.legs || []).map((l, i) => (
+            <tr key={i}>
+              <td>{l.home} <span style={{ color: 'var(--text-dim)' }}>vs</span> {l.away}</td>
+              <td>{l.marketName || l.market}</td>
+              <td>{l.outcome}</td>
+              <td className="num">{Number(l.odds || 0).toFixed(2)}</td>
+              <td>{l.sport || '—'}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {(bet.settledBy || bet.cancelledBy || bet.deletedBy) && (
+        <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>
+          {bet.settledBy  && <>Settled by <strong>{bet.settledBy}</strong> · {dateShort(bet.settledAt)}{bet.settleReason ? ` · ${bet.settleReason}` : ''}<br /></>}
+          {bet.cancelledBy && <>Cancelled by <strong>{bet.cancelledBy}</strong> · {dateShort(bet.cancelledAt)}{bet.cancelReason ? ` · ${bet.cancelReason}` : ''}<br /></>}
+          {bet.deletedBy   && <>Deleted by <strong>{bet.deletedBy}</strong> · {dateShort(bet.deletedAt)}{bet.deleteReason ? ` · ${bet.deleteReason}` : ''}</>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CredentialsModal({ open, onClose, data }) {
+  return (
+    <Modal open={open} onClose={onClose}
+           title="Stored credentials"
+           description="Plaintext passwords are never recoverable — only a one-way bcrypt hash is stored. The fingerprint below confirms the hash exists without exposing it.">
+      {!data ? null : (
+        <dl className="adm-kv">
+          <dt>Account</dt><dd>{data.email}</dd>
+          <dt>User ID</dt><dd style={{ fontFamily: 'var(--ff-mono)', fontSize: 12 }}>{data.id}</dd>
+          <dt>Has password</dt><dd>{data.hasPassword ? <Badge tone="success">Yes</Badge> : <Badge tone="warn">No</Badge>}</dd>
+          <dt>Password algorithm</dt><dd>{data.passwordAlgo || '—'}</dd>
+          <dt>Hash fingerprint</dt><dd style={{ fontFamily: 'var(--ff-mono)', fontSize: 12 }}>{data.passwordHashFingerprint || '—'}</dd>
+          <dt>Email verified</dt><dd>{data.emailVerified ? <Badge tone="success">Verified</Badge> : <Badge tone="warn">Unverified</Badge>}</dd>
+          <dt>Google linked</dt><dd>{data.googleLinked ? <Badge tone="info">Linked</Badge> : '—'}</dd>
+          <dt>2FA</dt><dd>{data.twoFactorEnabled ? <Badge tone="success">Enabled</Badge> : <Badge>Off</Badge>}</dd>
+          <dt>KYC</dt><dd>{data.kycStatus}</dd>
+          <dt>Country</dt><dd>{data.country || '—'}</dd>
+          <dt>Suspended</dt><dd>{data.suspended ? <Badge tone="danger">Yes</Badge> : 'No'}</dd>
+          <dt>Created</dt><dd>{dateShort(data.createdAt)}</dd>
+          <dt>Last update</dt><dd>{dateShort(data.updatedAt)}</dd>
+        </dl>
+      )}
+      <div className="adm-modal-actions">
+        <button type="button" className="adm-btn primary" onClick={onClose}>Close</button>
+      </div>
+    </Modal>
+  );
+}
+
+function ProfileTab({ user, logins = [], hasRole, onKyc, onTags, onNotes }) {
   const [tagInput, setTagInput] = useState('');
   const [notes, setNotes] = useState(user.notes || '');
+  const lastLogin  = logins.find((e) => e.kind === 'login_success' || e.kind === 'login_google');
+  const lastLogout = logins.find((e) => e.kind === 'logout');
   return (
     <>
       <Card flush>
         <div style={{ padding: 16 }}>
           <dl className="adm-kv">
-            <dt>Email</dt><dd>{user.email}</dd>
+            <dt>Email / Login</dt><dd>{user.email}</dd>
             <dt>User ID</dt><dd style={{ fontFamily: 'var(--ff-mono)', fontSize: 12 }}>{user.id}</dd>
             <dt>Balance</dt><dd><strong>{moneyFmt(user.balance, user.currency)}</strong></dd>
-            <dt>Joined</dt><dd>{dateShort(user.createdAt)}</dd>
+            <dt>Account created</dt><dd>{user.createdAt ? `${dateShort(user.createdAt)} · ${ago(user.createdAt)}` : '—'}</dd>
+            <dt>Last login</dt><dd>{lastLogin ? `${dateShort(lastLogin.at)} · ${ago(lastLogin.at)}${lastLogin.ip ? ` · ${lastLogin.ip}` : ''}` : '—'}</dd>
+            <dt>Last logout</dt><dd>{lastLogout ? `${dateShort(lastLogout.at)} · ${ago(lastLogout.at)}${lastLogout.ip ? ` · ${lastLogout.ip}` : ''}` : '—'}</dd>
             <dt>Last update</dt><dd>{dateShort(user.updatedAt)}</dd>
             <dt>2FA</dt><dd>{user.twoFactorEnabled ? <Badge tone="success">Enabled</Badge> : <Badge>Off</Badge>}</dd>
           </dl>
