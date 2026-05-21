@@ -11,6 +11,9 @@ import WalletPage from './pages/WalletPage.jsx';
 import WithdrawPage from './pages/WithdrawPage.jsx';
 import BetHistoryPage from './pages/BetHistoryPage.jsx';
 import CasinoPage from './pages/CasinoPage.jsx';
+import DicePage from './pages/games/DicePage.jsx';
+import Spin2WinPage from './pages/games/Spin2WinPage.jsx';
+import RedBlackPage from './pages/games/RedBlackPage.jsx';
 import VirtualsPage from './pages/VirtualsPage.jsx';
 import JackpotPage from './pages/JackpotPage.jsx';
 import PromosPage from './pages/PromosPage.jsx';
@@ -78,7 +81,10 @@ export default function App() {
                 <Route path="/"          element={<Home />} />
                 <Route path="/live"      element={<Home initialChip="live" />} />
                 <Route path="/my-bets"   element={<BetHistoryPage />} />
-                <Route path="/casino"    element={<CasinoPage />} />
+                <Route path="/casino"             element={<CasinoPage />} />
+                <Route path="/casino/dice"        element={<DicePage />} />
+                <Route path="/casino/spin2win"    element={<Spin2WinPage />} />
+                <Route path="/casino/red-black"   element={<RedBlackPage />} />
                 <Route path="/virtuals"  element={<VirtualsPage />} />
                 <Route path="/jackpot"   element={<JackpotPage />} />
                 <Route path="/promos"    element={<PromosPage />} />

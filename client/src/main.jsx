@@ -6,6 +6,7 @@ import { ThemeProvider } from './providers/ThemeProvider.jsx';
 import './styles/app.css';
 import './styles/login.css';
 import './styles/admin.css';
+import './styles/games.css';
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
