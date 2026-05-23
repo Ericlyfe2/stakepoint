@@ -46,7 +46,7 @@ function computeOffer(b) {
 
 export default function BetHistoryPage() {
   const navigate = useNavigate();
-  const { account, adjustBalance } = useAccount();
+  const { account, adjustBalance, showWin } = useAccount();
   const { toast } = useToast();
   const [tab, setTab]         = useState('open');
   const [bets, setBets]       = useState([]);
@@ -144,6 +144,8 @@ export default function BetHistoryPage() {
       adjustBalance(cash, partial
         ? `Partial cash-out: GHS ${fmt(cash)}. Remainder still in play.`
         : `Cashed out: GHS ${fmt(cash)}.`);
+      // Trigger the celebration overlay (auto-dismisses after 45s).
+      showWin({ ...res.bet, status: 'cashed_out', settledAt: res.bet.settledAt || new Date().toISOString() });
       // Drop any auto-target for this ticket (the residual gets a fresh slate).
       setAutoTargets((prev) => {
         if (prev[id] == null) return prev;
@@ -155,7 +157,7 @@ export default function BetHistoryPage() {
     } catch (e) {
       toast(e.message || 'Cash-out unavailable.', 'error');
     }
-  }, [adjustBalance, refresh, toast]);
+  }, [adjustBalance, refresh, toast, showWin]);
 
   // Auto cash-out: whenever bets/targets change, check whether any open bet
   // has an offer that has reached its target and hasn't fired yet.

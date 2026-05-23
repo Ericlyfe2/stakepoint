@@ -45,10 +45,15 @@ export default function WithdrawPage() {
   const MAX_WITHDRAW = 95_000;
   const WITHDRAW_DEPOSIT_RATIO = 0.10;
 
-  // Stage gates withdrawal flow. New users default to 1 until an admin
-  // promotes them — see /admin/stages and the Verification stage card.
+  // Stage gates withdrawal flow. New users start at Stage 0 (see
+  // /admin/stages). Stage 0 → Stage 1 is automatic once lifetime deposits
+  // reach GHS 1,000; the rest are admin-controlled.
   // Stage 3 + blocked locks the account until an admin unblocks it.
-  const stage = Math.min(3, Math.max(1, Number(account?.stage) || 1));
+  const stage = (() => {
+    const n = Number(account?.stage);
+    if (!Number.isFinite(n)) return 0;
+    return Math.min(4, Math.max(0, n));
+  })();
   const isBlocked = !!account?.blocked;
 
   useEffect(() => {
@@ -105,7 +110,9 @@ export default function WithdrawPage() {
       setShowBlocked(true);
       return;
     }
-    if (stage === 1) {
+    if (stage === 0 || stage === 1) {
+      // Stage 0 = brand new; Stage 1 = registered but not yet manually
+      // verified by an admin. Both gate behind the deposit-requirement modal.
       setShowDepositReq(true);
       return;
     }

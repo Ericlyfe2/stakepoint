@@ -32,7 +32,7 @@ function expandUser(u) {
   return {
     ...safe,
     kycStatus: u.kycStatus || 'unverified',
-    stage: u.stage || 1,
+    stage: u.stage ?? 0,
     stageUpdatedAt: u.stageUpdatedAt || null,
     stageUpdatedBy: u.stageUpdatedBy || null,
     blocked: !!u.blocked,
@@ -131,13 +131,13 @@ router.patch('/:id/status',
 router.patch('/:id/stage',
   requireAdmin, requireRole('moderator', 'support'),
   validate(z.object({
-    stage: z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4)]),
+    stage: z.union([z.literal(0), z.literal(1), z.literal(2), z.literal(3), z.literal(4)]),
     note: z.string().max(500).optional(),
   })),
   (req, res, next) => {
     const u = getUserById(req.params.id);
     if (!u) return next(notFound('User not found'));
-    const prev = u.stage || 1;
+    const prev = u.stage ?? 0;
     const { stage, note } = req.body;
     if (Math.abs(stage - prev) > 1) {
       return next(badRequest(`Cannot jump from stage ${prev} to ${stage}. Move one stage at a time.`));

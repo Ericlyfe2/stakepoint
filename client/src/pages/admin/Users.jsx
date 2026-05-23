@@ -26,14 +26,19 @@ function toBookingCode(id = '') {
   return letters + digits;
 }
 
-const STAGE_LABELS = { 1: 'Registered', 2: 'Verified', 3: 'Approved', 4: 'VIP' };
+const STAGE_LABELS = { 0: 'New', 1: 'Registered', 2: 'Verified', 3: 'Approved', 4: 'VIP' };
 const STAGE_GRADIENTS = {
+  0: 'linear-gradient(135deg, #475569 0%, #94a3b8 100%)',
   1: 'linear-gradient(135deg, #7c5cff 0%, #22d3ee 100%)',
   2: 'linear-gradient(135deg, #f5a623 0%, #ff6b1a 100%)',
   3: 'linear-gradient(135deg, #18f0a1 0%, #1aa46a 100%)',
   4: 'linear-gradient(135deg, #ffd166 0%, #ff8a3d 100%)',
 };
-const stageOf = (u) => Math.min(4, Math.max(1, Number(u?.stage) || 1));
+const stageOf = (u) => {
+  const n = Number(u?.stage);
+  if (!Number.isFinite(n)) return 0;
+  return Math.min(4, Math.max(0, n));
+};
 import { Card, Badge, Drawer, Modal, Empty, SkeletonRow, moneyFmt, numFmt, ago, dateShort } from '../../components/admin/primitives.jsx';
 import {
   IconSearch, IconDownload, IconRefresh, IconBan, IconCheck, IconKey, IconUsers, IconActivity, IconCash,
@@ -504,7 +509,7 @@ function UserDrawer({ open, user, tab, setTab, onClose, onUpdate, onDeleted, has
   }
   async function doStage(direction) {
     const current = stageOf(detail || user);
-    const target = direction === 'up' ? Math.min(4, current + 1) : Math.max(1, current - 1);
+    const target = direction === 'up' ? Math.min(4, current + 1) : Math.max(0, current - 1);
     if (target === current) return;
     try {
       const { user: updated } = await adminUserStage(user.id, target);

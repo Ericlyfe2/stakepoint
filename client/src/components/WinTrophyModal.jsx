@@ -55,8 +55,11 @@ export default function WinTrophyModal({ wins = [], onClose, onViewSlip }) {
     };
   }, [wins.length, onClose]);
 
+  // Each entry's effective payout: cash-outs use `cashOut`, plain wins use
+  // `potentialWin`. Same logic feeds both the totals row and the focused tile.
+  const payoutOf = (b) => Number(b?.cashOut ?? b?.potentialWin ?? 0);
   const totalPayout = useMemo(
-    () => wins.reduce((s, b) => s + (Number(b.potentialWin) || 0), 0),
+    () => wins.reduce((s, b) => s + payoutOf(b), 0),
     [wins]
   );
 
@@ -64,13 +67,21 @@ export default function WinTrophyModal({ wins = [], onClose, onViewSlip }) {
 
   const focus    = wins[Math.min(index, wins.length - 1)];
   const single   = wins.length === 1;
-  const showPayout = single ? Number(focus.potentialWin || 0) : totalPayout;
+  const isCashOut = !!focus.cashOut || focus.status === 'cashed_out';
+  const showPayout = single ? payoutOf(focus) : totalPayout;
   const legs     = focus.legs?.length || 1;
   const modeLbl  = focus.mode === 'single' ? 'Single'
                  : focus.mode === 'multiple' ? 'Multiple'
                  : focus.mode === 'system' ? 'System' : (focus.mode || 'Bet');
   const slipCode = focus.bookingCode || toBookingCode(focus.id);
   const paidAt   = paidAtLabel(focus.settledAt || focus.placedAt);
+  const badgeLabel = isCashOut ? 'CASH-OUT CONFIRMED' : 'WIN CONFIRMED';
+  const subCopy = isCashOut
+    ? 'Your cash-out has been credited to your wallet.'
+    : 'Your winning bet has been paid successfully.';
+  const metaSingle = isCashOut
+    ? <>Cashed out · {legs} selection{legs > 1 ? 's' : ''}</>
+    : <>{modeLbl} · {legs} selection{legs > 1 ? 's' : ''}</>;
 
   const handleViewSlip = () => {
     onViewSlip?.(focus);
@@ -83,7 +94,7 @@ export default function WinTrophyModal({ wins = [], onClose, onViewSlip }) {
 
       <div className="bv-trophy-card" role="alertdialog" aria-labelledby="bv-trophy-title">
         <header className="bv-trophy-head">
-          <span className="bv-trophy-badge">WIN CONFIRMED</span>
+          <span className="bv-trophy-badge">{badgeLabel}</span>
           <button
             type="button"
             className="bv-trophy-x"
@@ -99,9 +110,7 @@ export default function WinTrophyModal({ wins = [], onClose, onViewSlip }) {
         </div>
 
         <h2 id="bv-trophy-title" className="bv-trophy-title">Congratulations!</h2>
-        <p className="bv-trophy-sub">
-          Your winning bet has been paid successfully.
-        </p>
+        <p className="bv-trophy-sub">{subCopy}</p>
 
         <div className="bv-trophy-amount">
           <span className="cur">GHS</span>
@@ -109,8 +118,8 @@ export default function WinTrophyModal({ wins = [], onClose, onViewSlip }) {
         </div>
         <div className="bv-trophy-meta">
           {single
-            ? <>{modeLbl} · {legs} selection{legs > 1 ? 's' : ''}</>
-            : <>{wins.length} winning tickets · combined payout</>}
+            ? metaSingle
+            : <>{wins.length} {isCashOut ? 'cash-outs · combined payout' : 'winning tickets · combined payout'}</>}
         </div>
 
         <div className="bv-trophy-grid">

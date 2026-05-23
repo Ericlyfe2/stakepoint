@@ -68,10 +68,37 @@ export default function WalletPage() {
   const totalDeposited = Number(account.totalDeposited || 0);
   const withdrawCap    = Math.floor(totalDeposited / 0.10);
 
+  const stage = (() => {
+    const n = Number(account?.stage);
+    if (!Number.isFinite(n)) return 0;
+    return Math.min(4, Math.max(0, n));
+  })();
+  const isUnverified = stage === 0;
+  const VERIFY_TARGET = 1000;
+
   return (
     <main className="wallet-page">
       <div className="wallet-shell">
         <PageBack />
+
+        {isUnverified && (
+          <div className="wallet-verify-banner" role="status" aria-live="polite">
+            <div className="wallet-verify-icon" aria-hidden>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                <path d="M12 2 4 6v6c0 5 3.4 8.9 8 10 4.6-1.1 8-5 8-10V6l-8-4z" fill="#facc15" opacity="0.92" />
+                <path d="M12 8v5M12 16v.01" stroke="#0f1d10" strokeWidth="2.2" strokeLinecap="round" />
+              </svg>
+            </div>
+            <div className="wallet-verify-text">
+              <div className="t">Account not verified</div>
+              <p>Make a <strong>single deposit of GHS {fmt(VERIFY_TARGET)}</strong> or more to verify your account. Multiple smaller deposits won't count.</p>
+            </div>
+            <button type="button" className="wallet-verify-cta" onClick={openDeposit}>
+              Deposit
+            </button>
+          </div>
+        )}
+
         <header className="wallet-hero fade-up">
           <div className="wallet-hero-grain" aria-hidden />
           <div className="wallet-hero-inner">
@@ -186,6 +213,75 @@ const WALLET_CSS = `
 .wallet-page {
   padding: 28px 0 60px;
   min-height: calc(100vh - 200px);
+}
+
+/* "Account not verified" banner — Stage 0 players only */
+.wallet-verify-banner {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  background:
+    linear-gradient(135deg, rgba(250, 204, 21, .14), rgba(250, 204, 21, .04));
+  border: 1px solid rgba(250, 204, 21, .35);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, .25);
+  color: var(--text);
+}
+.wallet-verify-icon {
+  flex-shrink: 0;
+  width: 38px; height: 38px;
+  border-radius: 12px;
+  background: rgba(250, 204, 21, .14);
+  display: grid; place-items: center;
+}
+.wallet-verify-text { flex: 1; min-width: 0; }
+.wallet-verify-text .t {
+  font-weight: 800;
+  font-size: 14.5px;
+  color: #facc15;
+  margin-bottom: 2px;
+}
+.wallet-verify-text p {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--text-soft);
+}
+.wallet-verify-text p strong {
+  color: var(--text);
+  font-weight: 700;
+}
+.wallet-verify-text p em {
+  font-style: normal;
+  color: #facc15;
+  font-weight: 700;
+}
+.wallet-verify-cta {
+  flex-shrink: 0;
+  padding: 10px 16px;
+  border-radius: 10px;
+  border: none;
+  background: linear-gradient(135deg, #facc15, #f59e0b);
+  color: #1a1500;
+  font-weight: 800;
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: transform .15s, box-shadow .15s;
+  font-family: inherit;
+  letter-spacing: .01em;
+}
+.wallet-verify-cta:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 18px rgba(245, 158, 11, .35);
+}
+@media (max-width: 480px) {
+  .wallet-verify-banner { padding: 12px; gap: 10px; }
+  .wallet-verify-icon { width: 32px; height: 32px; border-radius: 10px; }
+  .wallet-verify-text .t { font-size: 13.5px; }
+  .wallet-verify-text p { font-size: 12px; }
+  .wallet-verify-cta { padding: 9px 12px; font-size: 12px; }
 }
 .wallet-shell {
   max-width: 980px;

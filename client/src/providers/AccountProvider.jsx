@@ -19,7 +19,7 @@ const EMPTY_ACCOUNT = {
   account: null, loading: false,
   signIn: () => {}, signOut: () => {}, adjustBalance: () => {},
   setAccount: () => {}, openDeposit: () => {}, openWithdraw: () => {},
-  refresh: () => {},
+  refresh: () => {}, showWin: () => {},
 };
 const EMPTY_TOAST = { toast: () => {} };
 
@@ -88,7 +88,15 @@ export default function AppProviders({ children }) {
     const tick = async () => {
       try {
         const { bets } = await fetchUnacknowledgedWins();
-        if (alive && Array.isArray(bets) && bets.length) setWins(bets);
+        if (!alive || !Array.isArray(bets) || !bets.length) return;
+        // Merge instead of replace so a concurrent cash-out modal entry
+        // isn't clobbered by a polled win batch.
+        setWins((prev) => {
+          const seen = new Set(prev.map((b) => b.id));
+          const merged = [...prev];
+          for (const b of bets) if (!seen.has(b.id)) merged.push(b);
+          return merged;
+        });
       } catch { /* ignore */ }
     };
     tick();
@@ -170,11 +178,23 @@ export default function AppProviders({ children }) {
     } finally { setBusy(false); }
   };
 
+  // Public callback so cash-outs (and any other "instant payout" flow) can
+  // trigger the trophy modal without re-implementing the timer/animation.
+  const showWin = useCallback((bet) => {
+    if (!bet) return;
+    setWins((prev) => {
+      const id = bet.id || `synthetic-${Date.now()}`;
+      if (prev.some((b) => b.id === id)) return prev;
+      return [...prev, { ...bet, id }];
+    });
+  }, []);
+
   const accountValue = useMemo(() => ({
     account, loading,
     signIn, signOut, adjustBalance, setAccount,
     openDeposit, openWithdraw, refresh,
-  }), [account, loading, signIn, signOut, adjustBalance, openDeposit, openWithdraw, refresh]);
+    showWin,
+  }), [account, loading, signIn, signOut, adjustBalance, openDeposit, openWithdraw, refresh, showWin]);
 
   const balance = account?.balance ?? 0;
 
