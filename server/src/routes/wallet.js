@@ -90,6 +90,9 @@ router.post('/deposit', requireAuth, validate(depositSchema), asyncHandler(async
     patch.stage = target;
     patch.stageUpdatedAt = new Date().toISOString();
     patch.stageUpdatedBy = 'system:auto-deposit';
+    // Start the 4-minute "processing your upgrade" cool-down. The withdraw
+    // page reads this field and blocks Withdraw Now until it elapses.
+    patch.stageUpgradeAt = new Date().toISOString();
     // Entering Stage 3 auto-blocks the account (matches manual promote logic).
     if (target === 3) {
       patch.blocked = true;

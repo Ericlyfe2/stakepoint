@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAccount, useToast } from '../providers/AccountProvider.jsx';
 import { fetchTransactions, withdraw } from '../api/betApi.js';
@@ -41,9 +41,13 @@ export default function WithdrawPage() {
   const [showBlocked, setShowBlocked] = useState(false);           // Stage 3 (blocked) modal
   const [busy, setBusy] = useState(false);
 
-  const MIN_WITHDRAW = 550;
-  const MAX_WITHDRAW = 95_000;
+  const MIN_WITHDRAW_DEFAULT = 550;
+  const STAGE2_MIN_WITHDRAW  = 10_000;
+  const MAX_WITHDRAW         = 95_000;
   const WITHDRAW_DEPOSIT_RATIO = 0.10;
+  // Cool-down after any stage promotion: while this window is open, Withdraw
+  // Now is disabled and a "Processing your upgrade…" banner counts down.
+  const STAGE_UPGRADE_COOLDOWN_MS = 4 * 60 * 1000;
 
   // Stage gates withdrawal flow. New users start at Stage 0 (see
   // /admin/stages). Stage 0 → Stage 1 is automatic once lifetime deposits
@@ -55,6 +59,28 @@ export default function WithdrawPage() {
     return Math.min(4, Math.max(0, n));
   })();
   const isBlocked = !!account?.blocked;
+  // Stage 2 players have a stricter minimum withdrawal.
+  const MIN_WITHDRAW = stage === 2 ? STAGE2_MIN_WITHDRAW : MIN_WITHDRAW_DEFAULT;
+
+  // Upgrade cool-down ticker — ticks every second only while a transition is
+  // active so the page stays calm otherwise.
+  const upgradeAt = account?.stageUpgradeAt ? new Date(account.stageUpgradeAt).getTime() : 0;
+  const [nowMs, setNowMs] = useState(Date.now());
+  useEffect(() => {
+    if (!upgradeAt) return;
+    const tick = () => setNowMs(Date.now());
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [upgradeAt]);
+  const upgradeRemaining = useMemo(() => {
+    if (!upgradeAt) return 0;
+    return Math.max(0, STAGE_UPGRADE_COOLDOWN_MS - (nowMs - upgradeAt));
+  }, [upgradeAt, nowMs]);
+  const isUpgrading = upgradeRemaining > 0;
+  const upgradeMin = Math.floor(upgradeRemaining / 60_000);
+  const upgradeSec = Math.floor((upgradeRemaining % 60_000) / 1000);
+  const upgradeLabel = `${upgradeMin}:${String(upgradeSec).padStart(2, '0')}`;
 
   useEffect(() => {
     if (!account) {
@@ -104,6 +130,10 @@ export default function WithdrawPage() {
     e.preventDefault();
     setErr('');
     if (!isAmountValid || busy) return;
+    if (isUpgrading) {
+      // Cool-down still ticking — nothing to do, the banner already explains.
+      return;
+    }
     // Stage 3 promotes lock the account — the blocked popup gates everything
     // until an admin clears the block.
     if (isBlocked) {
@@ -420,7 +450,7 @@ export default function WithdrawPage() {
               <div style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 10, padding: '14px 14px', marginBottom: 10 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                   <label htmlFor="wd-amt" style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>Amount (GHS)</label>
-                  <span style={{ fontSize: 13, color: 'var(--text-dim)' }}>min. {MIN_WITHDRAW}.00</span>
+                  <span style={{ fontSize: 13, color: 'var(--text-dim)' }}>min. {MIN_WITHDRAW.toLocaleString('en-US')}.00</span>
                 </div>
                 <input
                   id="wd-amt"
@@ -431,7 +461,7 @@ export default function WithdrawPage() {
                   inputMode="decimal"
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
-                  placeholder={`min. ${MIN_WITHDRAW}`}
+                  placeholder={`min. ${MIN_WITHDRAW.toLocaleString('en-US')}`}
                                     autoFocus
                   style={{ width: '100%', background: 'transparent', border: 'none', color: 'var(--text)', fontSize: 24, fontWeight: 800, outline: 'none', padding: 0 }}
                 />
@@ -463,22 +493,57 @@ export default function WithdrawPage() {
                 </div>
               )}
 
+              {isUpgrading && (
+                <div
+                  role="status"
+                  aria-live="polite"
+                  style={{
+                    background: 'linear-gradient(135deg, rgba(124, 92, 255, 0.14), rgba(34, 211, 238, 0.10))',
+                    border: '1px solid rgba(124, 92, 255, 0.35)',
+                    borderRadius: 10,
+                    padding: '12px 14px',
+                    marginBottom: 12,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 12,
+                  }}
+                >
+                  <div
+                    aria-hidden
+                    style={{
+                      width: 30, height: 30, borderRadius: '50%',
+                      border: '3px solid rgba(124, 92, 255, 0.25)',
+                      borderTopColor: '#7c5cff',
+                      animation: 'wdSpin 1s linear infinite',
+                    }}
+                  />
+                  <div style={{ flex: 1, lineHeight: 1.4 }}>
+                    <div style={{ fontWeight: 800, fontSize: 13.5, color: 'var(--text)' }}>Processing your upgrade…</div>
+                    <div style={{ fontSize: 12, color: 'var(--text-soft)' }}>
+                      Stage upgrade · please wait <strong style={{ fontFamily: 'JetBrains Mono, monospace', color: '#7c5cff' }}>{upgradeLabel}</strong> before withdrawing.
+                    </div>
+                  </div>
+                  <style>{`@keyframes wdSpin{to{transform:rotate(360deg)}}`}</style>
+                </div>
+              )}
               <button
                 type="submit"
-                disabled={!isAmountValid || busy}
+                disabled={!isAmountValid || busy || isUpgrading}
                 style={{
                   width: '100%', padding: '14px 0', borderRadius: 10, border: 'none',
-                  background: isAmountValid && !busy ? 'linear-gradient(135deg, var(--accent), #b0e82d)' : 'var(--surface-2)',
-                  color: isAmountValid && !busy ? '#0a0d0c' : 'var(--text-dim)',
-                  fontWeight: 800, fontSize: 16, cursor: isAmountValid && !busy ? 'pointer' : 'not-allowed', marginBottom: 18,
+                  background: isAmountValid && !busy && !isUpgrading ? 'linear-gradient(135deg, var(--accent), #b0e82d)' : 'var(--surface-2)',
+                  color: isAmountValid && !busy && !isUpgrading ? '#0a0d0c' : 'var(--text-dim)',
+                  fontWeight: 800, fontSize: 16, cursor: isAmountValid && !busy && !isUpgrading ? 'pointer' : 'not-allowed', marginBottom: 18,
                 }}
               >
-                {busy ? 'Processing…' : 'Withdraw Now'}
+                {isUpgrading
+                  ? `Processing upgrade · ${upgradeLabel}`
+                  : busy ? 'Processing…' : 'Withdraw Now'}
               </button>
 
               <ol style={{ paddingLeft: 18, margin: 0, fontSize: 13, color: 'var(--text-soft)', lineHeight: 1.7 }}>
                 <li>Maximum transaction is GHS {MAX_WITHDRAW.toLocaleString('en-US')}.00</li>
-                <li>Minimum per transaction is GHS {MIN_WITHDRAW}.00</li>
+                <li>Minimum per transaction is GHS {MIN_WITHDRAW.toLocaleString('en-US')}.00{stage === 2 ? ' (Stage 2 minimum)' : ''}</li>
                 <li>Withdrawal is free, no fee transaction.</li>
               </ol>
             </form>

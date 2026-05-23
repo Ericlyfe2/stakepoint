@@ -39,6 +39,85 @@ const STATUS_LABEL = {
   void: 'VOID',
 };
 
+function dayMonth(iso) {
+  if (!iso) return { day: '—', month: '' };
+  const d = new Date(iso);
+  return {
+    day: String(d.getDate()),
+    month: d.toLocaleDateString('en-GH', { month: 'short' }),
+  };
+}
+
+const HISTORY_HEAD_LABEL = {
+  won: { label: 'Won',  cls: 'won',  icon: '🏆' },
+  lost: { label: 'Lost', cls: 'lost', icon: '' },
+  cashed_out: { label: 'Cashed Out', cls: 'cashed', icon: '✓' },
+  void: { label: 'Void', cls: 'void', icon: '' },
+  open: { label: 'Open', cls: 'open', icon: '' },
+};
+
+function HistoryBetCard({ bet, onRemix }) {
+  const { day, month } = dayMonth(bet.settledAt || bet.placedAt);
+  const head = HISTORY_HEAD_LABEL[bet.status] || HISTORY_HEAD_LABEL.open;
+  const modeLabel = bet.mode === 'single' ? 'Single' : bet.mode === 'multiple' ? 'Multiple' : bet.mode === 'system' ? 'System' : (bet.mode || 'Bet');
+  const legs = bet.legs || [];
+  const previewLegs = legs.slice(0, 3);
+  const extraLegs = Math.max(0, legs.length - previewLegs.length);
+  const totalReturn = bet.status === 'won'
+    ? Number(bet.potentialWin || 0)
+    : bet.status === 'cashed_out'
+      ? Number(bet.cashOut || 0)
+      : 0;
+
+  return (
+    <li className={`bh-hcard bh-hcard-${head.cls}`}>
+      <aside className="bh-hdate" aria-hidden>
+        <span className="bh-hdate-day">{day}</span>
+        <span className="bh-hdate-month">{month}</span>
+      </aside>
+
+      <div className="bh-hbody">
+        <header className={`bh-hhead bh-hhead-${head.cls}`}>
+          <span className="bh-hmode">{modeLabel}</span>
+          <span className="bh-hstatus">
+            {head.icon && <span className="bh-hstatus-icon" aria-hidden>{head.icon}</span>}
+            {head.label}
+            <span className="bh-hstatus-chevron" aria-hidden>›</span>
+          </span>
+        </header>
+
+        <dl className="bh-hstats">
+          <div>
+            <dt>Total Stake(GHS)</dt>
+            <dd>{fmt(bet.stake)}</dd>
+          </div>
+          <div>
+            <dt>Total Return</dt>
+            <dd className={totalReturn > 0 ? 'is-positive' : ''}>{fmt(totalReturn)}</dd>
+          </div>
+        </dl>
+
+        {previewLegs.length > 0 && (
+          <ul className="bh-hlegs">
+            {previewLegs.map((l, i) => (
+              <li key={i}>{l.home} v {l.away}</li>
+            ))}
+            {extraLegs > 0 && (
+              <li className="bh-hlegs-more">…(and {extraLegs} other match{extraLegs === 1 ? '' : 'es'})</li>
+            )}
+          </ul>
+        )}
+
+        {bet.status === 'lost' && (
+          <button type="button" className="bh-hremix" onClick={onRemix}>
+            Remix Bet
+          </button>
+        )}
+      </div>
+    </li>
+  );
+}
+
 function computeOffer(b) {
   if (b.status !== 'open') return 0;
   return b.lastCashOutOffer?.amount ?? b.cashoutOffer ?? Number((b.stake * (b.totalOdds * 0.6)).toFixed(2));
@@ -52,6 +131,9 @@ export default function BetHistoryPage() {
   const [bets, setBets]       = useState([]);
   const [busy, setBusy]       = useState(false);
   const [copiedCode, setCopiedCode] = useState(null);
+  // Bet History tab filters (the "Settled" / "Bet Result" dropdowns)
+  const [historyScope, setHistoryScope]   = useState('settled'); // settled | all
+  const [historyResult, setHistoryResult] = useState('all');     // all | won | lost | cashed_out | void
 
   // Live ticker: map of betId -> previous offer so we can show green/red trend.
   const prevOffersRef = useRef({});
@@ -127,7 +209,15 @@ export default function BetHistoryPage() {
 
   const openBets = useMemo(() => bets.filter((b) => b.status === 'open'), [bets]);
   const settled  = useMemo(() => bets.filter((b) => b.status !== 'open'), [bets]);
-  const visible  = tab === 'open' ? openBets : settled;
+
+  // Apply history-tab filters: scope ("settled" vs "all") + bet result.
+  const historyVisible = useMemo(() => {
+    let rows = historyScope === 'settled' ? settled : bets;
+    if (historyResult !== 'all') rows = rows.filter((b) => b.status === historyResult);
+    return rows;
+  }, [bets, settled, historyScope, historyResult]);
+
+  const visible  = tab === 'open' ? openBets : historyVisible;
 
   const totals = useMemo(() => ({
     openCount:  openBets.length,
@@ -256,6 +346,45 @@ export default function BetHistoryPage() {
           </button>
         </div>
 
+        {tab === 'history' && (
+          <div className="bh-history-filters fade-up" style={{ animationDelay: '0.06s' }}>
+            <select
+              className="bh-history-select"
+              value={historyScope}
+              onChange={(e) => setHistoryScope(e.target.value)}
+              aria-label="Status scope"
+            >
+              <option value="settled">Settled</option>
+              <option value="all">All</option>
+            </select>
+            <select
+              className="bh-history-select"
+              value={historyResult}
+              onChange={(e) => setHistoryResult(e.target.value)}
+              aria-label="Bet result"
+            >
+              <option value="all">Bet Result</option>
+              <option value="won">Won</option>
+              <option value="lost">Lost</option>
+              <option value="cashed_out">Cashed out</option>
+              <option value="void">Void</option>
+            </select>
+            <div className="bh-history-filters-spacer" />
+            <button type="button" className="bh-history-icon-btn" title="Date range (coming soon)" aria-label="Date range">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M3 9h18M8 3v4M16 3v4" /></svg>
+            </button>
+            <button
+              type="button"
+              className="bh-history-icon-btn"
+              onClick={() => { setHistoryScope('settled'); setHistoryResult('all'); }}
+              title="Clear filters"
+              aria-label="Clear filters"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 6l12 12M6 18 18 6" /></svg>
+            </button>
+          </div>
+        )}
+
         {busy && !visible.length ? (
           <p className="bh-empty">Loading bets…</p>
         ) : !visible.length ? (
@@ -271,6 +400,19 @@ export default function BetHistoryPage() {
               Browse markets
             </button>
           </div>
+        ) : tab === 'history' ? (
+          <ul className="bh-hlist">
+            {visible.map((b) => (
+              <HistoryBetCard
+                key={b.id}
+                bet={b}
+                onRemix={() => {
+                  toast('Building a new slip from this ticket…');
+                  navigate('/');
+                }}
+              />
+            ))}
+          </ul>
         ) : (
           <ul className="bh-list">
             {visible.map((b) => {
@@ -519,6 +661,209 @@ const BH_CSS = `
   min-width: 20px; text-align: center;
 }
 .bh-tab.active .bh-tab-count { background: var(--surface); color: var(--accent); }
+
+/* ============ Bet History — image-matched layout ============ */
+.bh-history-filters {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+  padding: 0 2px;
+}
+.bh-history-filters-spacer { flex: 1; }
+.bh-history-select {
+  background: #1a2724;
+  color: #e6f4ec;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  padding: 9px 30px 9px 14px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' fill='none' stroke='%2390a299' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 4.5l3 3 3-3'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  background-size: 12px;
+  transition: border-color .15s;
+}
+.bh-history-select:hover { border-color: rgba(197, 255, 61, 0.4); }
+.bh-history-select:focus { outline: none; border-color: var(--accent, #c5ff3d); }
+
+.bh-history-icon-btn {
+  background: #1a2724;
+  color: #e6f4ec;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  width: 38px; height: 38px;
+  display: grid; place-items: center;
+  cursor: pointer;
+  transition: border-color .15s, background .15s;
+}
+.bh-history-icon-btn:hover {
+  background: #20312c;
+  border-color: rgba(197, 255, 61, 0.4);
+}
+
+.bh-hlist {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.bh-hcard {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+}
+
+.bh-hdate {
+  flex-shrink: 0;
+  width: 44px;
+  padding-top: 6px;
+  text-align: left;
+  font-family: 'Inter', system-ui, sans-serif;
+  color: rgba(255, 255, 255, 0.78);
+}
+.bh-hdate-day {
+  display: block;
+  font-size: 20px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  color: #fff;
+}
+.bh-hdate-month {
+  display: block;
+  margin-top: 2px;
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.55);
+  letter-spacing: 0.04em;
+}
+
+.bh-hbody {
+  flex: 1;
+  min-width: 0;
+  background: #16221f;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.bh-hhead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  font-weight: 800;
+  font-size: 14.5px;
+  color: #fff;
+  letter-spacing: 0.005em;
+}
+.bh-hhead.lost   { background: linear-gradient(90deg, #c81e1e, #8b1212); }
+.bh-hhead.won    { background: linear-gradient(90deg, #18a249, #0f6b30); }
+.bh-hhead.cashed { background: linear-gradient(90deg, #1aa46a, #0e7c4d); }
+.bh-hhead.void   { background: linear-gradient(90deg, #6b7280, #4b5563); }
+.bh-hhead.open   { background: linear-gradient(90deg, #4f8bff, #2563eb); }
+.bh-hmode { font-weight: 800; }
+.bh-hstatus {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 800;
+}
+.bh-hstatus-icon { font-size: 13px; line-height: 1; }
+.bh-hstatus-chevron {
+  margin-left: 2px;
+  opacity: 0.85;
+  font-weight: 700;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.bh-hstats {
+  margin: 0;
+  padding: 14px 16px 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+.bh-hstats > div {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 13.5px;
+}
+.bh-hstats dt {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.62);
+  font-weight: 600;
+}
+.bh-hstats dd {
+  margin: 0;
+  color: #fff;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.005em;
+}
+.bh-hstats dd.is-positive {
+  color: #18f0a1;
+  text-shadow: 0 0 12px rgba(24, 240, 161, 0.25);
+}
+
+.bh-hlegs {
+  list-style: none;
+  margin: 0;
+  padding: 14px 16px 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.78);
+}
+.bh-hlegs li { line-height: 1.45; }
+.bh-hlegs-more { color: rgba(255, 255, 255, 0.5); font-size: 12.5px; }
+
+.bh-hremix {
+  align-self: flex-end;
+  margin: 12px 16px 14px;
+  padding: 8px 18px;
+  border: none;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #1aa46a, #0e7c4d);
+  color: #fff;
+  font-weight: 800;
+  font-size: 13.5px;
+  cursor: pointer;
+  letter-spacing: 0.01em;
+  box-shadow: 0 6px 14px rgba(26, 164, 106, 0.32);
+  transition: transform .15s, box-shadow .15s;
+  font-family: inherit;
+}
+.bh-hremix:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 22px rgba(26, 164, 106, 0.45);
+}
+
+@media (max-width: 480px) {
+  .bh-hdate { width: 38px; }
+  .bh-hdate-day { font-size: 18px; }
+  .bh-hdate-month { font-size: 11px; }
+  .bh-hhead { padding: 11px 14px; font-size: 13.5px; }
+  .bh-hstats { padding: 12px 14px 4px; }
+  .bh-hstats > div { font-size: 13px; }
+  .bh-hlegs { padding: 12px 14px 4px; font-size: 12.5px; }
+  .bh-hremix { margin: 10px 14px 12px; padding: 7px 16px; font-size: 13px; }
+}
 
 .bh-list { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 .bh-empty { color: var(--text-dim); font-size: 14px; padding: 32px 0; text-align: center; }
