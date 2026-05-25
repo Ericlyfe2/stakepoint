@@ -11,8 +11,6 @@ export default function DepositsPage() {
   const [err, setErr] = useState('');
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState(null);
-  const [rejectId, setRejectId] = useState(null);
-  const [rejectReason, setRejectReason] = useState('');
 
   const load = useCallback(async () => {
     try {
@@ -47,13 +45,15 @@ export default function DepositsPage() {
   };
 
   const handleReject = async (id) => {
-    if (!rejectReason.trim()) return;
+    // Single-click reject. The server still accepts an optional `reason`
+    // field, but the admin no longer has to fill it in to commit the action.
+    // Native confirm guards against accidental clicks; if you want to
+    // bypass it for a tighter workflow, drop this `if` block.
+    if (!window.confirm('Reject this deposit?')) return;
     setBusyId(id);
     try {
-      await adminRejectDeposit(id, { reason: rejectReason.trim() || undefined });
+      await adminRejectDeposit(id, {});
       show('Deposit rejected', 'success');
-      setRejectId(null);
-      setRejectReason('');
       load();
     } catch (e) {
       show(e.message || 'Rejection failed', 'error');
@@ -128,61 +128,28 @@ export default function DepositsPage() {
                   <td style={{ fontSize: 13, color: 'var(--text-dim)' }}>{(tx.method || 'momo').toUpperCase()}</td>
                   <td style={{ fontSize: 13, color: 'var(--text-dim)' }}>{ago(tx.at)}</td>
                   <td style={{ textAlign: 'right' }}>
-                    {rejectId === tx.id ? (
-                      <div style={{ display: 'flex', gap: 6, alignItems: 'center', justifyContent: 'flex-end' }}>
-                        <input
-                          type="text"
-                          placeholder="Reason (optional)"
-                          value={rejectReason}
-                          onChange={(e) => setRejectReason(e.target.value)}
-                          style={{
-                            padding: '6px 10px', borderRadius: 6, border: '1px solid var(--border)',
-                            background: 'var(--surface)', color: 'var(--text)', fontSize: 12, width: 160,
-                            outline: 'none',
-                          }}
-                          autoFocus
-                        />
-                        <button
-                          type="button"
-                          onClick={() => handleReject(tx.id)}
-                          disabled={busyId === tx.id}
-                          className="adm-btn adm-btn-sm"
-                          style={{ background: '#ef4444', color: '#fff', border: 'none' }}
-                        >
-                          {busyId === tx.id ? '…' : 'Confirm'}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => { setRejectId(null); setRejectReason(''); }}
-                          className="adm-btn adm-btn-sm"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    ) : (
-                      <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
-                        <button
-                          type="button"
-                          onClick={() => handleApprove(tx.id)}
-                          disabled={busyId === tx.id}
-                          className="adm-btn adm-btn-sm"
-                          style={{ background: '#22c55e', color: '#fff', border: 'none' }}
-                          title="Approve"
-                        >
-                          <IconCheck />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setRejectId(tx.id)}
-                          disabled={busyId === tx.id}
-                          className="adm-btn adm-btn-sm"
-                          style={{ background: '#ef4444', color: '#fff', border: 'none' }}
-                          title="Reject"
-                        >
-                          <IconClose />
-                        </button>
-                      </div>
-                    )}
+                    <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                      <button
+                        type="button"
+                        onClick={() => handleApprove(tx.id)}
+                        disabled={busyId === tx.id}
+                        className="adm-btn adm-btn-sm"
+                        style={{ background: '#22c55e', color: '#fff', border: 'none' }}
+                        title="Approve"
+                      >
+                        <IconCheck />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleReject(tx.id)}
+                        disabled={busyId === tx.id}
+                        className="adm-btn adm-btn-sm"
+                        style={{ background: '#ef4444', color: '#fff', border: 'none' }}
+                        title="Reject"
+                      >
+                        <IconClose />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}

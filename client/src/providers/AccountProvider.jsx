@@ -8,6 +8,7 @@ import {
 } from '../api/betApi.js';
 import { onLive, refreshAuth, disconnectSocket } from '../api/socketClient.js';
 import WinTrophyModal from '../components/WinTrophyModal.jsx';
+import DepositResultModal from '../components/DepositResultModal.jsx';
 import TxHeader from '../components/TxHeader.jsx';
 import PaybillInstructions from '../components/PaybillInstructions.jsx';
 import { appendTxCache } from '../lib/txCache.js';
@@ -48,6 +49,11 @@ export default function AppProviders({ children }) {
   const [busy, setBusy] = useState(false);
   const [err,  setErr]  = useState('');
   const [wins, setWins] = useState([]);
+  // Queue of deposit decisions still to show. Approve/reject events push into
+  // it; the modal pops the head when dismissed. A queue (not a single value)
+  // means a burst of admin decisions never silently overwrites an unread
+  // popup the user hasn't acknowledged yet.
+  const [depositResults, setDepositResults] = useState([]);
   const [notifications, setNotifications] = useState(() => {
     try {
       const stored = typeof localStorage !== 'undefined' ? localStorage.getItem('sp_notifications') : null;
@@ -165,13 +171,14 @@ export default function AppProviders({ children }) {
     });
     const offApproved = onLive('deposit:approved', ({ transaction, account: updatedAccount }) => {
       if (updatedAccount) setAccount(updatedAccount);
-      const amt = formatAmt(transaction?.amount);
+      const txId = transaction?.id;
+      const amt  = transaction?.amount;
       const title = 'Deposit approved';
-      const body  = `GHS ${amt} has been credited to your wallet.`;
-      toast(`Deposit approved! GHS ${amt} credited.`, 'success');
+      const body  = `GHS ${formatAmt(amt)} has been credited to your wallet.`;
+      toast(`Deposit approved! GHS ${formatAmt(amt)} credited.`, 'success');
       // Persistent inbox entry — survives reload, de-duped by tx id.
       addNotification({
-        id: `deposit-approved-${transaction?.id || Date.now()}`,
+        id: `deposit-approved-${txId || Date.now()}`,
         title,
         body,
         severity: 'info',
@@ -182,16 +189,22 @@ export default function AppProviders({ children }) {
       osNotify({
         title,
         body,
-        tag: `deposit-${transaction?.id || 'approved'}`,
+        tag: `deposit-${txId || 'approved'}`,
+      });
+      // In-app centered modal — guaranteed visible, no permission required.
+      setDepositResults((prev) => {
+        if (txId && prev.some((r) => r.txId === txId)) return prev;
+        return [...prev, { kind: 'approved', amount: amt, txId, at: Date.now() }];
       });
     });
     const offRejected = onLive('deposit:rejected', ({ transaction, reason }) => {
-      const amt = formatAmt(transaction?.amount);
+      const txId = transaction?.id;
+      const amt  = transaction?.amount;
       const title = 'Deposit rejected';
-      const body  = `Your GHS ${amt} deposit was rejected${reason ? ': ' + reason : '.'}`;
-      toast(`Deposit of GHS ${amt} rejected${reason ? ': ' + reason : ''}.`, 'warn');
+      const body  = `Your GHS ${formatAmt(amt)} deposit was rejected${reason ? ': ' + reason : '.'}`;
+      toast(`Deposit of GHS ${formatAmt(amt)} rejected${reason ? ': ' + reason : ''}.`, 'warn');
       addNotification({
-        id: `deposit-rejected-${transaction?.id || Date.now()}`,
+        id: `deposit-rejected-${txId || Date.now()}`,
         title,
         body,
         severity: 'critical',
@@ -200,7 +213,11 @@ export default function AppProviders({ children }) {
       osNotify({
         title,
         body,
-        tag: `deposit-${transaction?.id || 'rejected'}`,
+        tag: `deposit-${txId || 'rejected'}`,
+      });
+      setDepositResults((prev) => {
+        if (txId && prev.some((r) => r.txId === txId)) return prev;
+        return [...prev, { kind: 'rejected', amount: amt, reason, txId, at: Date.now() }];
       });
     });
     const offWin = onLive('bet:won', async () => { try { await tick(); } catch {} });
@@ -318,6 +335,11 @@ export default function AppProviders({ children }) {
           wins={wins}
           onClose={dismissWins}
           onViewSlip={() => navigate('/my-bets')}
+        />
+
+        <DepositResultModal
+          result={depositResults[0] || null}
+          onClose={() => setDepositResults((prev) => prev.slice(1))}
         />
 
         <div className="toast-stack" role="status" aria-live="polite">
