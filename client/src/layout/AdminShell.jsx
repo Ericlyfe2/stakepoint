@@ -28,6 +28,7 @@ const NAV = [
     { to: '/admin/sports',     label: 'Sports & odds', icon: <IconBook />,    roles: ['odds_manager'] },
     { to: '/admin/promotions', label: 'Promotions',    icon: <IconSparkles /> },
     { to: '/admin/finance',    label: 'Finance',       icon: <IconCash />,    roles: ['finance_admin'] },
+    { to: '/admin/deposits',   label: 'Deposits',      icon: <IconCash />,    roles: ['finance_admin'] },
   ]},
   { section: 'Trust & safety', items: [
     { to: '/admin/fraud',      label: 'Fraud & AI',    icon: <IconBot />,    roles: ['moderator'] },

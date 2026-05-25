@@ -33,7 +33,9 @@ async function rawFetch(path, opts = {}, retry = true) {
   const res = await fetch(`${API_BASE}${path}`, { ...opts, headers });
   if (res.status !== 401 || !retry) return res;
 
-  // Try silent refresh exactly once.
+  // Try silent refresh exactly once. Only sign the user out when the refresh
+  // endpoint explicitly rejects the token (401/403). Network blips and 5xx
+  // responses leave the tokens intact so the next request can retry.
   const refresh = getRefresh();
   if (!refresh) return res;
   try {
@@ -43,14 +45,18 @@ async function rawFetch(path, opts = {}, retry = true) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ refreshToken: refresh }),
       });
-      if (!r.ok) throw new Error('refresh failed');
+      if (!r.ok) {
+        const err = new Error('refresh failed');
+        err.status = r.status;
+        throw err;
+      }
       const j = await r.json();
       setTokens(j.accessToken, j.refreshToken);
       return j.accessToken;
     })();
     await refreshInflight;
-  } catch {
-    clearTokens();
+  } catch (e) {
+    if (e?.status === 401 || e?.status === 403) clearTokens();
     return res;
   } finally {
     refreshInflight = null;

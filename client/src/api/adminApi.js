@@ -211,6 +211,11 @@ export const adminBulkFixtures   = (body) => post('/sports/fixtures/bulk', body)
 /* impersonation */
 export const adminImpersonate    = (id)   => post(`/users/${encodeURIComponent(id)}/impersonate`);
 
+/* deposits */
+export const adminListPendingDeposits = ()    => get('/deposits/pending');
+export const adminApproveDeposit     = (id)  => post(`/deposits/${encodeURIComponent(id)}/approve`);
+export const adminRejectDeposit      = (id, body) => post(`/deposits/${encodeURIComponent(id)}/reject`, body);
+
 /* platform settings */
 export const adminGetSettings    = ()     => get('/settings');
 export const adminUpdateSettings = (body) => put_('/settings', body);

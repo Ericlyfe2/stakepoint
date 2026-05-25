@@ -70,7 +70,12 @@ export const LIVE_BETTING = {
 };
 
 if (!LIVE_BETTING.apiFootballKey) {
-  console.warn('[env] APIFOOTBALL_KEY not set — live betting track will no-op (pre-match unaffected).');
+  // Informational, not blocking — the live track now activates against any
+  // enabled football provider (see services/oddsAggregator.js startLiveTrack).
+  // APIFOOTBALL provides the richest live data (minute counter, red-card
+  // counts) so we still call it out, but the loop will run with whatever
+  // provider is available.
+  console.warn('[env] APIFOOTBALL_KEY not set — live track will run via other providers (no live minute/cards if they don\'t expose them).');
 }
 
 if (isProd && (!JWT.secret || JWT.secret === 'dev-only-secret-change-me' || JWT.secret.length < 32)) {

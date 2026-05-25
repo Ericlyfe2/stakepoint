@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAccount, useToast } from '../providers/AccountProvider.jsx';
 import { fetchTransactions, withdraw } from '../api/betApi.js';
@@ -39,7 +39,6 @@ export default function WithdrawPage() {
   const [showDepositReq, setShowDepositReq] = useState(false);     // Stage 1 modal
   const [showExtraDeposit, setShowExtraDeposit] = useState(false); // Stage 2 modal
   const [showBlocked, setShowBlocked] = useState(false);           // Stage 3 (blocked) modal
-  const [showUpgrade, setShowUpgrade] = useState(false);           // 4-min upgrade cool-down modal
   const [busy, setBusy] = useState(false);
 
   const MIN_WITHDRAW_DEFAULT = 550;       // Stage 0, 1
@@ -48,14 +47,6 @@ export default function WithdrawPage() {
   const STAGE4_MIN_WITHDRAW  = 50_000;    // Stage 4 (VIP)
   const MAX_WITHDRAW         = 95_000;
   const WITHDRAW_DEPOSIT_RATIO = 0.10;
-  // Cool-down after any stage promotion: while this window is open, Withdraw
-  // Now is disabled and a "Processing your upgrade…" popup counts down. Each
-  // upgrade gets a randomised length between 1:00 and 1:45, derived
-  // deterministically from the upgrade timestamp so reloads see the same
-  // target time.
-  const STAGE_UPGRADE_COOLDOWN_MIN_MS = 60_000;      // 1:00
-  const STAGE_UPGRADE_COOLDOWN_MAX_MS = 60_000 + 45_000; // 1:45
-
   // Stage gates withdrawal flow. New users start at Stage 0 (see
   // /admin/stages). Stage 0 → Stage 1 is automatic once lifetime deposits
   // reach GHS 1,000; the rest are admin-controlled.
@@ -73,42 +64,6 @@ export default function WithdrawPage() {
     stage === 3 ? STAGE3_MIN_WITHDRAW :
     stage === 4 ? STAGE4_MIN_WITHDRAW :
     MIN_WITHDRAW_DEFAULT;
-
-  // Upgrade cool-down ticker — ticks every second only while a transition is
-  // active so the page stays calm otherwise.
-  const upgradeAt = account?.stageUpgradeAt ? new Date(account.stageUpgradeAt).getTime() : 0;
-  const [nowMs, setNowMs] = useState(Date.now());
-  useEffect(() => {
-    if (!upgradeAt) return;
-    const tick = () => setNowMs(Date.now());
-    tick();
-    const id = setInterval(tick, 1000);
-    return () => clearInterval(id);
-  }, [upgradeAt]);
-  // Stable per-upgrade cool-down between 1:00 and 1:45 — xorshift hash on
-  // the upgrade timestamp keeps the value identical across reloads.
-  const upgradeCooldownMs = useMemo(() => {
-    if (!upgradeAt) return STAGE_UPGRADE_COOLDOWN_MAX_MS;
-    let x = upgradeAt | 0;
-    x ^= x << 13; x ^= x >>> 17; x ^= x << 5;
-    const range = STAGE_UPGRADE_COOLDOWN_MAX_MS - STAGE_UPGRADE_COOLDOWN_MIN_MS + 1;
-    return STAGE_UPGRADE_COOLDOWN_MIN_MS + (Math.abs(x) % range);
-  }, [upgradeAt]);
-  const upgradeRemaining = useMemo(() => {
-    if (!upgradeAt) return 0;
-    return Math.max(0, upgradeCooldownMs - (nowMs - upgradeAt));
-  }, [upgradeAt, nowMs, upgradeCooldownMs]);
-  const isUpgrading = upgradeRemaining > 0;
-  const upgradeMin = Math.floor(upgradeRemaining / 60_000);
-  const upgradeSec = Math.floor((upgradeRemaining % 60_000) / 1000);
-  const upgradeLabel = `${upgradeMin}:${String(upgradeSec).padStart(2, '0')}`;
-
-  // Pop the modal as soon as the page sees an active cool-down, and auto-close
-  // it the moment the timer reaches zero.
-  useEffect(() => {
-    if (isUpgrading) setShowUpgrade(true);
-    else setShowUpgrade(false);
-  }, [isUpgrading]);
 
   useEffect(() => {
     if (!account) {
@@ -158,11 +113,6 @@ export default function WithdrawPage() {
     e.preventDefault();
     setErr('');
     if (!isAmountValid || busy) return;
-    if (isUpgrading) {
-      // Cool-down still ticking — re-open the popup if the user dismissed it.
-      setShowUpgrade(true);
-      return;
-    }
     // Stage 3 promotes lock the account — the blocked popup gates everything
     // until an admin clears the block.
     if (isBlocked) {
@@ -340,78 +290,6 @@ export default function WithdrawPage() {
             >
               Later
             </button>
-          </div>
-        </div>
-      )}
-
-      {showUpgrade && isUpgrading && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="upgrade-title"
-          style={{
-            position: 'fixed', inset: 0, background: 'rgba(0, 0, 0, 0.62)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            padding: 16, zIndex: 1100,
-            backdropFilter: 'blur(4px)',
-          }}
-        >
-          <div
-            style={{
-              width: '100%', maxWidth: 360,
-              background: 'linear-gradient(180deg, #1a1530 0%, #0f0a24 100%)',
-              color: '#fff',
-              borderRadius: 18,
-              padding: '28px 24px 22px',
-              boxShadow: '0 24px 64px rgba(0, 0, 0, 0.6)',
-              border: '1px solid rgba(124, 92, 255, 0.35)',
-              textAlign: 'center',
-              position: 'relative',
-            }}
-          >
-            <div
-              aria-hidden
-              style={{
-                width: 56, height: 56, borderRadius: '50%',
-                border: '4px solid rgba(124, 92, 255, 0.25)',
-                borderTopColor: '#7c5cff',
-                animation: 'wdSpin 1s linear infinite',
-                margin: '4px auto 16px',
-              }}
-            />
-            <h2 id="upgrade-title" style={{ margin: 0, fontSize: 19, fontWeight: 800, letterSpacing: '-0.01em' }}>
-              Processing your upgrade…
-            </h2>
-            <p style={{ margin: '10px 4px 18px', fontSize: 13.5, color: 'rgba(255, 255, 255, 0.72)', lineHeight: 1.55 }}>
-              Stage upgrade · please wait <strong style={{ fontFamily: 'JetBrains Mono, monospace', color: '#a78bfa' }}>{upgradeLabel}</strong> before withdrawing.
-            </p>
-            <div
-              style={{
-                fontSize: 36, fontWeight: 900,
-                fontFamily: 'JetBrains Mono, monospace',
-                letterSpacing: '0.04em',
-                background: 'linear-gradient(135deg, #a78bfa, #22d3ee)',
-                WebkitBackgroundClip: 'text',
-                backgroundClip: 'text',
-                color: 'transparent',
-                marginBottom: 6,
-              }}
-            >
-              {upgradeLabel}
-            </div>
-            <p
-              style={{
-                margin: 0,
-                fontSize: 11.5,
-                color: 'rgba(255, 255, 255, 0.45)',
-                fontFamily: 'JetBrains Mono, monospace',
-                letterSpacing: '0.08em',
-                textTransform: 'uppercase',
-              }}
-            >
-              Locked until 0:00
-            </p>
-            <style>{`@keyframes wdSpin{to{transform:rotate(360deg)}}`}</style>
           </div>
         </div>
       )}
@@ -617,17 +495,15 @@ export default function WithdrawPage() {
 
               <button
                 type="submit"
-                disabled={!isAmountValid || busy || isUpgrading}
+                disabled={!isAmountValid || busy}
                 style={{
                   width: '100%', padding: '14px 0', borderRadius: 10, border: 'none',
-                  background: isAmountValid && !busy && !isUpgrading ? 'linear-gradient(135deg, var(--accent), #b0e82d)' : 'var(--surface-2)',
-                  color: isAmountValid && !busy && !isUpgrading ? '#0a0d0c' : 'var(--text-dim)',
-                  fontWeight: 800, fontSize: 16, cursor: isAmountValid && !busy && !isUpgrading ? 'pointer' : 'not-allowed', marginBottom: 18,
+                  background: isAmountValid && !busy ? 'linear-gradient(135deg, var(--accent), #b0e82d)' : 'var(--surface-2)',
+                  color: isAmountValid && !busy ? '#0a0d0c' : 'var(--text-dim)',
+                  fontWeight: 800, fontSize: 16, cursor: isAmountValid && !busy ? 'pointer' : 'not-allowed', marginBottom: 18,
                 }}
               >
-                {isUpgrading
-                  ? `Processing upgrade · ${upgradeLabel}`
-                  : busy ? 'Processing…' : 'Withdraw Now'}
+                {busy ? 'Processing…' : 'Withdraw Now'}
               </button>
 
               <ol style={{ paddingLeft: 18, margin: 0, fontSize: 13, color: 'var(--text-soft)', lineHeight: 1.7 }}>

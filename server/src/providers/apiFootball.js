@@ -1,7 +1,15 @@
 /**
  * API Football (api-football.com / RapidAPI).
  * Provides fixtures, live scores, stats, standings, predictions.
- * Activate with APIFOOTBALL_KEY (use the v3.football.api-sports.io host).
+ *
+ * Two host modes — same JSON shape, different URL layout:
+ *   - Direct API-Sports:  host = v3.football.api-sports.io   (paths: /fixtures, /odds, …)
+ *   - RapidAPI gateway:   host = api-football-v1.p.rapidapi.com (paths: /v3/fixtures, /v3/odds, …)
+ * Both accept the same x-rapidapi-key / x-rapidapi-host header pair, so the
+ * only thing that differs is the base path. We detect the gateway by suffix
+ * and prepend /v3 automatically — callers below stay path-agnostic.
+ *
+ * Activate with APIFOOTBALL_KEY. Override the host with APIFOOTBALL_HOST.
  */
 import { Provider, fixtureKey } from './base.js';
 
@@ -15,6 +23,9 @@ export class ApiFootballProvider extends Provider {
     });
     this.apiKey = apiKey;
     this.host = host;
+    // RapidAPI gateway mounts the v3 namespace one level deeper than the
+    // direct host does, so paths like /fixtures must become /v3/fixtures.
+    this.basePath = host.endsWith('.rapidapi.com') ? '/v3' : '';
   }
 
   headers() {
@@ -24,18 +35,20 @@ export class ApiFootballProvider extends Provider {
     };
   }
 
+  url(path) {
+    return `https://${this.host}${this.basePath}${path}`;
+  }
+
   async fetchFixtures(sport = 'football') {
     if (!this.enabled || sport !== 'football') return [];
     const today = new Date().toISOString().slice(0, 10);
-    const url = `https://${this.host}/fixtures?date=${today}`;
-    const json = await this.http(url, { headers: this.headers() });
+    const json = await this.http(this.url(`/fixtures?date=${today}`), { headers: this.headers() });
     return (json?.response || []).map((r) => normaliseFixture(r, this.id));
   }
 
   async fetchScores(sport = 'football') {
     if (!this.enabled || sport !== 'football') return [];
-    const url = `https://${this.host}/fixtures?live=all`;
-    const json = await this.http(url, { headers: this.headers() });
+    const json = await this.http(this.url('/fixtures?live=all'), { headers: this.headers() });
     return (json?.response || []).map((r) => {
       const fx = normaliseFixture(r, this.id);
       const reds = (r.events || []).filter((e) => e.type === 'Card' && e.detail === 'Red Card');
@@ -48,10 +61,10 @@ export class ApiFootballProvider extends Provider {
 
   async fetchOdds(sport = 'football', opts = {}) {
     if (!this.enabled || sport !== 'football') return [];
-    const url = opts.live
-      ? `https://${this.host}/odds/live`
-      : `https://${this.host}/odds?date=${new Date().toISOString().slice(0, 10)}`;
-    const json = await this.http(url, { headers: this.headers() });
+    const path = opts.live
+      ? '/odds/live'
+      : `/odds?date=${new Date().toISOString().slice(0, 10)}`;
+    const json = await this.http(this.url(path), { headers: this.headers() });
     return (json?.response || []).map((r) => normaliseOdds(r, this.id));
   }
 }

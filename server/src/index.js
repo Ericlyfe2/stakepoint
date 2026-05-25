@@ -25,6 +25,7 @@ import adminPromosRouter    from './routes/admin/promotions.js';
 import adminStatsRouter     from './routes/admin/stats.js';
 import adminProvidersRouter from './routes/admin/providers.js';
 import adminNotificationsRouter from './routes/admin/notifications.js';
+import adminDepositsRouter  from './routes/admin/deposits.js';
 import adminSettingsRouter  from './routes/admin/settings.js';
 import adminSupportRouter   from './routes/admin/support.js';
 import { seedAdmins } from './db/seedAdmins.js';
@@ -103,6 +104,7 @@ app.use('/api/admin/promotions',    adminPromosRouter);
 app.use('/api/admin/stats',         adminStatsRouter);
 app.use('/api/admin/providers',     adminProvidersRouter);
 app.use('/api/admin/notifications', adminNotificationsRouter);
+app.use('/api/admin/deposits',      adminDepositsRouter);
 app.use('/api/admin/settings',      adminSettingsRouter);
 app.use('/api/admin/support',       adminSupportRouter);
 

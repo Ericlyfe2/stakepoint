@@ -3,6 +3,7 @@ import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAccount } from '../providers/AccountProvider.jsx';
 import { useTheme } from '../providers/ThemeProvider.jsx';
 import { fetchMatches } from '../api/betApi.js';
+import NotificationBell from '../components/NotificationBell.jsx';
 export { useAccount, useToast } from '../providers/AccountProvider.jsx';
 
 function formatAmt(n) {
@@ -50,6 +51,8 @@ function MobileHeader({ account, onSignIn, onSignUp, onAvatar, onSearch, onBalan
           <path d="M21 21l-4.3-4.3" />
         </svg>
       </button>
+
+      {authed && <NotificationBell />}
 
       <button
         type="button"
@@ -315,6 +318,7 @@ export default function AppShell() {
               <span className="balance-amt">{formatAmt(balance)}</span>
             </button>
             <ThemeToggle />
+            {authed && <NotificationBell />}
             <button type="button" className="btn btn-ghost" onClick={openDeposit}>Deposit</button>
             {authed && <button type="button" className="btn btn-ghost" onClick={openWithdraw}>Withdraw</button>}
             {authed && <button type="button" className="btn btn-ghost" onClick={() => navigate('/profile')} title="Account">

@@ -20,6 +20,7 @@ const EMPTY_ACCOUNT = {
   signIn: () => {}, signOut: () => {}, adjustBalance: () => {},
   setAccount: () => {}, openDeposit: () => {}, openWithdraw: () => {},
   refresh: () => {}, showWin: () => {},
+  notifications: [], unreadCount: 0, clearNotifications: () => {}, markNotificationRead: () => {},
 };
 const EMPTY_TOAST = { toast: () => {} };
 
@@ -46,6 +47,40 @@ export default function AppProviders({ children }) {
   const [busy, setBusy] = useState(false);
   const [err,  setErr]  = useState('');
   const [wins, setWins] = useState([]);
+  const [notifications, setNotifications] = useState(() => {
+    try {
+      const stored = typeof localStorage !== 'undefined' ? localStorage.getItem('sp_notifications') : null;
+      return stored ? JSON.parse(stored) : [];
+    } catch { return []; }
+  });
+  const unreadCount = notifications.filter((n) => !n.read).length;
+
+  // Functional updaters so concurrent socket pushes never lose entries to a
+  // stale closure (live + poll + websocket can all arrive within one tick).
+  const updateNotifications = useCallback((updater) => {
+    setNotifications((prev) => {
+      const next = typeof updater === 'function' ? updater(prev) : updater;
+      try { localStorage.setItem('sp_notifications', JSON.stringify(next.slice(0, 200))); } catch {}
+      return next;
+    });
+  }, []);
+
+  const addNotification = useCallback((n) => {
+    updateNotifications((prev) => {
+      const entry = { ...n, read: false, receivedAt: new Date().toISOString() };
+      // De-dupe by id so a poll arriving after a socket push doesn't double-list.
+      if (n.id && prev.some((x) => x.id === n.id)) return prev;
+      return [entry, ...prev].slice(0, 200);
+    });
+  }, [updateNotifications]);
+
+  const clearNotifications = useCallback(() => {
+    updateNotifications([]);
+  }, [updateNotifications]);
+
+  const markNotificationRead = useCallback((id) => {
+    updateNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
+  }, [updateNotifications]);
 
   const dismissToast = useCallback((id) => {
     setToasts((cur) => cur.filter((t) => t.id !== id));
@@ -66,9 +101,14 @@ export default function AppProviders({ children }) {
       const data = await fetchMe();
       setAccount(data.account);
       return data.account;
-    } catch {
-      clearTokens();
-      setAccount(null);
+    } catch (err) {
+      // Only sign the user out when the server actually rejects the token.
+      // Network glitches / 5xx leave the existing account state in place so
+      // the next tick (or the visibilitychange rehydrate below) can retry.
+      if (err?.status === 401 || err?.status === 403) {
+        clearTokens();
+        setAccount(null);
+      }
       return null;
     } finally {
       setLoading(false);
@@ -76,6 +116,16 @@ export default function AppProviders({ children }) {
   }, []);
 
   useEffect(() => { refresh(); }, [refresh]);
+
+  // Re-hydrate when the tab returns from being hidden (laptop wake, mobile
+  // app switch). The access token may have expired silently while we were
+  // backgrounded; this fetch will trigger the refresh dance in betApi.
+  useEffect(() => {
+    if (typeof document === 'undefined') return undefined;
+    const onVisible = () => { if (document.visibilityState === 'visible' && getAccess()) refresh(); };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, [refresh]);
 
   // Poll for freshly-settled wins the user hasn't seen.
   // (Realtime socket also pushes bet:won — poll is the safety net.)
@@ -108,13 +158,30 @@ export default function AppProviders({ children }) {
         setAccount((prev) => prev ? { ...prev, balance } : prev);
       }
     });
+    const offPending = onLive('wallet:pending', ({ transaction, amount }) => {
+      toast(`Deposit of GHS ${formatAmt(amount)} is pending admin approval.`, 'info', { ttl: 5000 });
+      if (account?.id && transaction) appendTxCache(account.id, transaction);
+    });
+    const offApproved = onLive('deposit:approved', ({ transaction, account: updatedAccount }) => {
+      if (updatedAccount) setAccount(updatedAccount);
+      toast(`Deposit approved! GHS ${formatAmt(transaction?.amount)} credited.`, 'success');
+    });
+    const offRejected = onLive('deposit:rejected', ({ transaction, reason }) => {
+      toast(`Deposit of GHS ${formatAmt(transaction?.amount)} rejected${reason ? ': ' + reason : ''}.`, 'warn');
+    });
     const offWin = onLive('bet:won', async () => { try { await tick(); } catch {} });
+    const offNotif = onLive('notification:new', (payload) => {
+      if (payload?.title) {
+        addNotification(payload);
+        toast(`${payload.title}${payload.body ? ': ' + payload.body : ''}`, payload.severity === 'critical' ? 'warn' : 'info', { ttl: 6000 });
+      }
+    });
     const offSettled = onLive('bet:settled', async () => { try { await tick(); } catch {} });
 
     return () => {
       alive = false;
       clearInterval(id);
-      offWallet?.(); offWin?.(); offSettled?.();
+      offWallet?.(); offPending?.(); offApproved?.(); offRejected?.(); offNotif?.(); offWin?.(); offSettled?.();
     };
   }, [account]);
 
@@ -168,11 +235,12 @@ export default function AppProviders({ children }) {
     try {
       setBusy(true);
       const data = await apiDeposit(amt, depositMethod);
-      setAccount(data.account);
-      if (data.account?.id && data.transaction) appendTxCache(data.account.id, data.transaction);
+      if (data?.transaction) {
+        if (account?.id) appendTxCache(account.id, data.transaction);
+      }
       depositDlg.current?.close();
       const labels = { momo: 'MoMo', vodafone: 'Vodafone Cash', airteltigo: 'AirtelTigo Money', card: 'Card' };
-      toast(`Deposited GHS ${formatAmt(amt)} via ${labels[depositMethod] || depositMethod}.`);
+      toast(`Deposit of GHS ${formatAmt(amt)} via ${labels[depositMethod] || depositMethod} submitted for admin approval.`, 'info');
     } catch (e) {
       setErr(e.message || 'Deposit failed.');
     } finally { setBusy(false); }
@@ -194,7 +262,8 @@ export default function AppProviders({ children }) {
     signIn, signOut, adjustBalance, setAccount,
     openDeposit, openWithdraw, refresh,
     showWin,
-  }), [account, loading, signIn, signOut, adjustBalance, openDeposit, openWithdraw, refresh, showWin]);
+    notifications, unreadCount, clearNotifications, markNotificationRead,
+  }), [account, loading, signIn, signOut, adjustBalance, openDeposit, openWithdraw, refresh, showWin, notifications, unreadCount, clearNotifications, markNotificationRead]);
 
   const balance = account?.balance ?? 0;
 

@@ -325,13 +325,22 @@ async function liveLoop() {
 export async function startLiveTrack() {
   const { LIVE_BETTING } = await import('../config/env.js');
   if (liveTimer) return;
-  if (!LIVE_BETTING.apiFootballKey) {
-    log.info('Live track disabled — APIFOOTBALL_KEY not set.');
+  // Gate on "is there any football-capable provider enabled?" rather than a
+  // specific env var. The previous check tied us to APIFOOTBALL_KEY, which
+  // blocked the loop even when other providers (football-data.org, sportMonks,
+  // theOddsApi, …) were configured. With this change the live track activates
+  // as soon as at least one provider can fetch football scores or odds; if
+  // none expose a live minute/cards (e.g. football-data.org's free tier),
+  // those fields surface as null but score updates and cash-out math still run.
+  const { enabledProviders } = await import('./providerRegistry.js');
+  const liveCapable = enabledProviders().filter((p) => p.sports?.includes('football'));
+  if (liveCapable.length === 0) {
+    log.info('Live track disabled — no football-capable providers configured.');
     return;
   }
   liveTimer = setInterval(() => { liveLoop().catch(() => {}); }, LIVE_BETTING.pollMs);
   liveLoop().catch(() => {});
-  log.info(`Live track started, polling every ${LIVE_BETTING.pollMs}ms.`);
+  log.info(`Live track started (${liveCapable.length} provider${liveCapable.length === 1 ? '' : 's'}: ${liveCapable.map((p) => p.id).join(', ')}), polling every ${LIVE_BETTING.pollMs}ms.`);
 }
 
 export function stopLiveTrack() {

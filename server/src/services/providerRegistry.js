@@ -5,20 +5,25 @@
  *
  * Adding a new provider is one import + one entry below.
  */
-import { TheOddsApiProvider }     from '../providers/theOddsApi.js';
-import { ApiFootballProvider }    from '../providers/apiFootball.js';
-import { SportMonksProvider }     from '../providers/sportMonks.js';
-import { SharpApiProvider }       from '../providers/sharpApi.js';
-import { SportsGameOddsProvider } from '../providers/sportsGameOdds.js';
+import { TheOddsApiProvider }      from '../providers/theOddsApi.js';
+import { ApiFootballProvider }     from '../providers/apiFootball.js';
+import { SportMonksProvider }      from '../providers/sportMonks.js';
+import { SharpApiProvider }        from '../providers/sharpApi.js';
+import { SportsGameOddsProvider }  from '../providers/sportsGameOdds.js';
+import { FootballDataOrgProvider } from '../providers/footballDataOrg.js';
 
 const env = process.env;
 
 const _providers = [
   new TheOddsApiProvider(env.ODDS_API_KEY || ''),
-  new ApiFootballProvider(env.APIFOOTBALL_KEY || env.APIFOOTBALL_TOKEN || ''),
+  new ApiFootballProvider(
+    env.APIFOOTBALL_KEY || env.APIFOOTBALL_TOKEN || '',
+    env.APIFOOTBALL_HOST || 'v3.football.api-sports.io',
+  ),
   new SportMonksProvider(env.SPORTMONKS_TOKEN || env.SPORTMONKS_KEY || ''),
   new SharpApiProvider(env.SHARPAPI_KEY || ''),
   new SportsGameOddsProvider(env.SPORTSGAMEODDS_KEY || ''),
+  new FootballDataOrgProvider(env.FOOTBALL_DATA_TOKEN || ''),
 ];
 
 export function listProviders() { return _providers; }

@@ -194,13 +194,17 @@ export default function WalletPage() {
               {txs.slice(0, 20).map((t) => {
                 const isCredit = (t.amount ?? 0) > 0;
                 return (
-                  <li key={t.id} className="wallet-tx">
+                    <li key={t.id} className="wallet-tx">
                     <div className={`wallet-tx-icon ${isCredit ? 'credit' : 'debit'}`} aria-hidden>
                       {isCredit ? '↓' : '↑'}
                     </div>
                     <div className="wallet-tx-body">
                       <div className="wallet-tx-title">{txLabel[t.kind] || t.kind}</div>
-                      <div className="wallet-tx-meta">{relTime(t.at || t.createdAt)} · {t.status || 'completed'}</div>
+                      <div className="wallet-tx-meta">
+                        {relTime(t.at || t.createdAt)}
+                        {t.status === 'pending' && <span className="wallet-tx-pill pending">Pending</span>}
+                        {t.status === 'rejected' && <span className="wallet-tx-pill rejected">Rejected</span>}
+                      </div>
                     </div>
                     <div className={`wallet-tx-amt ${isCredit ? 'credit' : 'debit'}`}>
                       {isCredit ? '+' : ''}{fmt(t.amount)} <em>GHS</em>
@@ -508,6 +512,9 @@ const WALLET_CSS = `
 .wallet-tx-amt em { font-style: normal; font-size: 11px; color: var(--text-dim); margin-left: 2px; }
 .wallet-tx-amt.credit { color: var(--accent); }
 .wallet-tx-amt.debit  { color: var(--accent-hot); }
+.wallet-tx-pill { display: inline-block; font-size: 9px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; padding: 2px 7px; border-radius: 999px; margin-left: 6px; }
+.wallet-tx-pill.pending { background: rgba(245,158,11,0.15); color: #f59e0b; }
+.wallet-tx-pill.rejected { background: rgba(239,68,68,0.15); color: #ef4444; }
 
 .fade-up {
   animation: walletFadeUp .45s ease both;

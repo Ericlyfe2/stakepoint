@@ -8,6 +8,7 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { fetchTransactions, updateProfile, changePassword } from '../api/betApi.js';
 import { useAccount, useToast } from '../providers/AccountProvider.jsx';
+import NotificationBell from '../components/NotificationBell.jsx';
 
 function fmtMoney(n) {
   return Number(n || 0).toLocaleString('en-GH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -40,7 +41,7 @@ export default function ProfilePage() {
   const { account, refresh, signOut, openDeposit, openWithdraw } = useAccount();
   const { toast } = useToast();
 
-  const [sheet, setSheet] = useState(null); // 'profile' | 'security' | 'transactions' | null
+  const [sheet, setSheet] = useState(null); // 'profile' | 'security' | 'transactions' | 'notifications' | null
 
   if (!account) {
     return (
@@ -73,7 +74,7 @@ export default function ProfilePage() {
     { icon: I.receipt,  label: 'Sports Bet History', onClick: () => navigate('/my-bets') },
     { icon: I.swap,     label: 'Transactions',       onClick: () => setSheet('transactions') },
     { icon: I.gift,     label: 'Referral',           onClick: () => navigate('/promos') },
-    { icon: I.bell,     label: 'Notification Center', onClick: () => toast('You have no new notifications.') },
+    { icon: I.bell,     label: 'Notification Center', onClick: () => setSheet('notifications') },
     { icon: I.headset,  label: 'Customer Service',   onClick: () => navigate('/help') },
     { icon: I.settings, label: 'Account Settings',   onClick: () => setSheet('profile') },
     { icon: I.lock,     label: 'Change Password',    onClick: () => setSheet('security') },
@@ -161,6 +162,9 @@ export default function ProfilePage() {
       )}
       {sheet === 'transactions' && (
         <TransactionsSheet onClose={() => setSheet(null)} />
+      )}
+      {sheet === 'notifications' && (
+        <NotificationsSheet onClose={() => setSheet(null)} />
       )}
 
       <style>{ACCT_CSS}</style>
@@ -315,6 +319,51 @@ function TransactionsSheet({ onClose }) {
             );
           })}
         </ul>
+      )}
+    </Sheet>
+  );
+}
+
+function NotificationsSheet({ onClose }) {
+  const { notifications, unreadCount, clearNotifications, markNotificationRead } = useAccount();
+
+  const severityColor = {
+    info: '#3b82f6', success: '#22c55e', warning: '#f59e0b', critical: '#ef4444',
+  };
+
+  return (
+    <Sheet title={`Notifications${unreadCount > 0 ? ` (${unreadCount})` : ''}`} onClose={onClose}>
+      {notifications.length === 0 ? (
+        <p className="acct-empty-state">No notifications yet.</p>
+      ) : (
+        <>
+          {unreadCount > 0 && (
+            <div style={{ padding: '8px 16px', borderBottom: '1px solid var(--line)' }}>
+              <button type="button" onClick={clearNotifications}
+                style={{ fontSize: 12, fontWeight: 700, color: 'var(--accent)', background: 'transparent', border: 'none', cursor: 'pointer', font: 'inherit' }}>
+                Mark all as read
+              </button>
+            </div>
+          )}
+          <ul className="acct-tx">
+            {notifications.map((n) => (
+              <li key={n.id} className="acct-tx-item"
+                onClick={() => markNotificationRead(n.id)}
+                style={{ cursor: 'pointer', opacity: n.read ? 0.7 : 1 }}>
+                <div className="acct-tx-meta">
+                  <strong>
+                    <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: severityColor[n.severity] || '#3b82f6', marginRight: 8, verticalAlign: 'middle' }} />
+                    {n.title}
+                  </strong>
+                  <span>{n.body || ''}</span>
+                  <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>
+                    {n.receivedAt ? new Date(n.receivedAt).toLocaleString() : ''}
+                  </span>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </>
       )}
     </Sheet>
   );

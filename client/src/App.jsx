@@ -33,6 +33,7 @@ import AdminPromotions from './pages/admin/Promotions.jsx';
 import AdminStats from './pages/admin/Stats.jsx';
 import AdminProviders from './pages/admin/Providers.jsx';
 import AdminHealth from './pages/admin/Health.jsx';
+import AdminDeposits from './pages/admin/Deposits.jsx';
 import {
   LiveBettingPage, AuditLogsPage, SettingsPage,
   FinancePage, NotificationsPage, SupportPage, FraudPage,
@@ -54,6 +55,7 @@ function AdminApp() {
           <Route path="sports"       element={<AdminSports />} />
           <Route path="promotions"   element={<AdminPromotions />} />
           <Route path="finance"      element={<FinancePage />} />
+          <Route path="deposits"     element={<AdminDeposits />} />
           <Route path="notifications" element={<NotificationsPage />} />
           <Route path="support"      element={<SupportPage />} />
           <Route path="analytics"    element={<AdminStats />} />

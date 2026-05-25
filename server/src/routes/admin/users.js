@@ -35,7 +35,6 @@ function expandUser(u) {
     stage: u.stage ?? 0,
     stageUpdatedAt: u.stageUpdatedAt || null,
     stageUpdatedBy: u.stageUpdatedBy || null,
-    stageUpgradeAt: u.stageUpgradeAt || null,
     blocked: !!u.blocked,
     blockedAt: u.blockedAt || null,
     blockedBy: u.blockedBy || null,
@@ -154,10 +153,6 @@ router.patch('/:id/stage',
       stage,
       stageUpdatedAt: new Date().toISOString(),
       stageUpdatedBy: req.admin?.email || req.admin?.id || 'admin',
-      // Start the 4-minute "processing your upgrade" cool-down on promotion;
-      // clear it on demotion so an old timer doesn't keep ticking after the
-      // admin walks the player back.
-      stageUpgradeAt: stage > prev ? new Date().toISOString() : null,
     };
     if (stage === 3 && prev !== 3) {
       patch.blocked = true;
