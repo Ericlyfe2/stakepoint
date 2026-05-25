@@ -12,8 +12,13 @@ export const PORT = Number(env.PORT) || 4000;
 
 export const JWT = {
   secret:    env.JWT_SECRET || 'dev-only-secret-change-me',
-  accessTtl: env.JWT_ACCESS_TTL  || '15m',
-  refreshTtl:env.JWT_REFRESH_TTL || '30d',
+  // Long-lived "always logged in" session by default. The refresh token is
+  // rotated on every /api/auth/refresh call (see services/token.js), so an
+  // active user effectively never has to re-authenticate. Override via env
+  // (e.g. JWT_REFRESH_TTL=30d) if you need shorter sessions for staff or
+  // shared devices.
+  accessTtl: env.JWT_ACCESS_TTL  || '7d',
+  refreshTtl:env.JWT_REFRESH_TTL || '3650d',
   issuer:    'xenbet',
 };
 

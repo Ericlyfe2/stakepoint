@@ -11,6 +11,7 @@ import WinTrophyModal from '../components/WinTrophyModal.jsx';
 import TxHeader from '../components/TxHeader.jsx';
 import PaybillInstructions from '../components/PaybillInstructions.jsx';
 import { appendTxCache } from '../lib/txCache.js';
+import { requestNotificationPermission, notify as osNotify } from '../lib/browserNotify.js';
 
 export const AccountCtx = React.createContext(null);
 export const ToastCtx   = React.createContext(null);
@@ -164,10 +165,43 @@ export default function AppProviders({ children }) {
     });
     const offApproved = onLive('deposit:approved', ({ transaction, account: updatedAccount }) => {
       if (updatedAccount) setAccount(updatedAccount);
-      toast(`Deposit approved! GHS ${formatAmt(transaction?.amount)} credited.`, 'success');
+      const amt = formatAmt(transaction?.amount);
+      const title = 'Deposit approved';
+      const body  = `GHS ${amt} has been credited to your wallet.`;
+      toast(`Deposit approved! GHS ${amt} credited.`, 'success');
+      // Persistent inbox entry — survives reload, de-duped by tx id.
+      addNotification({
+        id: `deposit-approved-${transaction?.id || Date.now()}`,
+        title,
+        body,
+        severity: 'info',
+        kind: 'deposit_approved',
+      });
+      // OS-level push — fires even when the tab is hidden / app is in the
+      // background. No-ops when permission isn't granted.
+      osNotify({
+        title,
+        body,
+        tag: `deposit-${transaction?.id || 'approved'}`,
+      });
     });
     const offRejected = onLive('deposit:rejected', ({ transaction, reason }) => {
-      toast(`Deposit of GHS ${formatAmt(transaction?.amount)} rejected${reason ? ': ' + reason : ''}.`, 'warn');
+      const amt = formatAmt(transaction?.amount);
+      const title = 'Deposit rejected';
+      const body  = `Your GHS ${amt} deposit was rejected${reason ? ': ' + reason : '.'}`;
+      toast(`Deposit of GHS ${amt} rejected${reason ? ': ' + reason : ''}.`, 'warn');
+      addNotification({
+        id: `deposit-rejected-${transaction?.id || Date.now()}`,
+        title,
+        body,
+        severity: 'critical',
+        kind: 'deposit_rejected',
+      });
+      osNotify({
+        title,
+        body,
+        tag: `deposit-${transaction?.id || 'rejected'}`,
+      });
     });
     const offWin = onLive('bet:won', async () => { try { await tick(); } catch {} });
     const offNotif = onLive('notification:new', (payload) => {
@@ -200,6 +234,10 @@ export default function AppProviders({ children }) {
     if (authResponse?.accessToken) setTokens(authResponse.accessToken, authResponse.refreshToken);
     if (authResponse?.account) setAccount(authResponse.account);
     if (authResponse?.account) toast(`Signed in as ${authResponse.account.displayName || authResponse.account.email}`);
+    // Sign-in is a user gesture, so this is a good moment to ask for browser
+    // notification permission. Fire-and-forget — the helper no-ops on refusal
+    // or unsupported platforms, and never re-prompts once decided.
+    requestNotificationPermission().catch(() => {});
   }, [toast]);
 
   const signOut = useCallback(async () => {
@@ -232,6 +270,10 @@ export default function AppProviders({ children }) {
     const amt = parseFloat(String(depositAmt).replace(/,/g, ''));
     if (!Number.isFinite(amt) || amt <= 0) { setErr('Enter a valid amount.'); return; }
     if (amt < MIN_DEPOSIT) { setErr(`Minimum deposit is GHS ${MIN_DEPOSIT}.`); return; }
+    // Submitting a deposit is the moment the user most wants notified about
+    // its outcome — request browser permission here so the approve/reject
+    // socket event can surface even when the tab is backgrounded.
+    requestNotificationPermission().catch(() => {});
     try {
       setBusy(true);
       const data = await apiDeposit(amt, depositMethod);
