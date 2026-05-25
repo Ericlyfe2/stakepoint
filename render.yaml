@@ -12,7 +12,11 @@ services:
       - key: JWT_SECRET
         generateValue: true
       - key: CORS_ORIGIN
-        value: https://stakepoint-client.vercel.app
+        # Comma-separated list of allowed frontend origins. Add every domain
+        # the site is served from (the Vercel project URL, custom domains,
+        # any branch alias you still rely on). The server parses on commas
+        # and trims whitespace.
+        value: https://xenbet.vercel.app,https://stakepoint-client.vercel.app
       - key: ODDS_API_KEY
         sync: false
       - key: SMTP_HOST
