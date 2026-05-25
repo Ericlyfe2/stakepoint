@@ -136,8 +136,16 @@ export default function AppProviders({ children }) {
 
   // Poll for freshly-settled wins the user hasn't seen.
   // (Realtime socket also pushes bet:won — poll is the safety net.)
+  //
+  // IMPORTANT: depend on `account?.id` (user identity), NOT on the whole
+  // `account` object. Every deposit approval / balance update produces a new
+  // account reference; if we depended on `account` we'd tear down and
+  // re-handshake the socket on every wallet change, racing the very modal
+  // we just queued. Identity-only deps mean the socket stays connected for
+  // the entire session.
+  const accountId = account?.id;
   useEffect(() => {
-    if (!account) { setWins([]); disconnectSocket(); return; }
+    if (!accountId) { setWins([]); disconnectSocket(); return; }
     let alive = true;
 
     refreshAuth(); // re-handshake the socket with the now-current access token
@@ -167,7 +175,7 @@ export default function AppProviders({ children }) {
     });
     const offPending = onLive('wallet:pending', ({ transaction, amount }) => {
       toast(`Deposit of GHS ${formatAmt(amount)} is pending admin approval.`, 'info', { ttl: 5000 });
-      if (account?.id && transaction) appendTxCache(account.id, transaction);
+      if (accountId && transaction) appendTxCache(accountId, transaction);
     });
     const offApproved = onLive('deposit:approved', ({ transaction, account: updatedAccount }) => {
       if (updatedAccount) setAccount(updatedAccount);
@@ -234,7 +242,7 @@ export default function AppProviders({ children }) {
       clearInterval(id);
       offWallet?.(); offPending?.(); offApproved?.(); offRejected?.(); offNotif?.(); offWin?.(); offSettled?.();
     };
-  }, [account]);
+  }, [accountId]);
 
   const dismissWins = useCallback(async () => {
     const toAck = [...wins];
