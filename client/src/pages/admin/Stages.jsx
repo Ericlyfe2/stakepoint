@@ -316,9 +316,14 @@ export default function StagesPage() {
               </header>
 
               <div className="stage-card-badges">
-                <span className="stage-pill" style={{ background: STAGES[stageOf(u) - 1].gradient }}>
-                  Stage {stageOf(u)} · {STAGES[stageOf(u) - 1].name}
-                </span>
+                {(() => {
+                  const meta = STAGES.find((s) => s.id === stageOf(u)) || STAGES[0];
+                  return (
+                    <span className="stage-pill" style={{ background: meta.gradient }}>
+                      Stage {stageOf(u)} · {meta.name}
+                    </span>
+                  );
+                })()}
                 {u.suspended
                   ? <Badge tone="danger">Suspended</Badge>
                   : u.emailVerified

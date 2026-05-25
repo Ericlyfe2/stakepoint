@@ -74,7 +74,16 @@ export default function WalletPage() {
     return Math.min(4, Math.max(0, n));
   })();
   const isUnverified = stage === 0;
-  const VERIFY_TARGET = 1000;
+  // Per-stage minimum withdrawal — keep in sync with WithdrawPage.jsx.
+  //   Stage 0/1 → GHS 550 (default)
+  //   Stage 2   → GHS 10,000 (+ 10% extra-deposit credit rule)
+  //   Stage 3   → GHS 40,000
+  //   Stage 4   → GHS 50,000 (VIP)
+  const stageMinWithdraw =
+    stage === 2 ? 10000 :
+    stage === 3 ? 40000 :
+    stage === 4 ? 50000 :
+    550;
 
   return (
     <main className="wallet-page">
@@ -91,7 +100,7 @@ export default function WalletPage() {
             </div>
             <div className="wallet-verify-text">
               <div className="t">Account not verified</div>
-              <p>Make a <strong>single deposit of GHS {fmt(VERIFY_TARGET)}</strong> or more to verify your account. Multiple smaller deposits won't count.</p>
+              <p>Complete deposit to unlock premium</p>
             </div>
             <button type="button" className="wallet-verify-cta" onClick={openDeposit}>
               Deposit
@@ -153,7 +162,7 @@ export default function WalletPage() {
               </header>
               <p className="wallet-split-desc">Cash out your winnings directly to your mobile money.</p>
               <ul className="wallet-list">
-                <li><span>Minimum withdrawal</span><strong>GHS 550</strong></li>
+                <li><span>Minimum withdrawal</span><strong>GHS {fmt(stageMinWithdraw)}</strong></li>
                 <li><span>Processing</span><strong>Within 24 hours</strong></li>
                 <li><span>Methods</span><strong>MoMo to phone on file</strong></li>
               </ul>
@@ -163,7 +172,7 @@ export default function WalletPage() {
               </button>
               <ol className="wallet-withdraw-rules">
                 <li>Maximum per transaction is GHS 95,000.00</li>
-                <li>Minimum per transaction is GHS 550.00</li>
+                <li>Minimum per transaction is GHS {fmt(stageMinWithdraw)}</li>
                 <li>Withdrawal is free, no fee transaction.</li>
               </ol>
             </div>

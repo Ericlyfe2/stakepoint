@@ -1927,6 +1927,23 @@ nav a:active { transform: scale(.96); }
   border: 1px solid var(--line);
   color: var(--text-soft);
 }
+.sb-theme-btn {
+  width: 36px; height: 36px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 999px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  color: var(--text-soft);
+  cursor: pointer;
+  transition: color .2s, background .2s, border-color .2s, transform .2s;
+  font: inherit;
+}
+.sb-theme-btn:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+  transform: rotate(15deg);
+}
+.sb-theme-btn:active { transform: rotate(15deg) scale(0.95); }
 .sb-cta-join, .sb-cta-login {
   height: 32px; padding: 0 12px;
   border-radius: 999px;

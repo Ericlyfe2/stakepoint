@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { fetchBetHistory, cashOutBet } from '../api/betApi.js';
 import { useAccount, useToast } from '../providers/AccountProvider.jsx';
 import { toBookingCode } from '../components/BetSuccessModal.jsx';
-import PageBack from '../components/PageBack.jsx';
 
 const AUTO_TARGETS_KEY = 'bv_auto_cashout_targets';
 
@@ -307,7 +306,6 @@ export default function BetHistoryPage() {
   return (
     <main className="bh-page">
       <div className="bh-shell">
-        <PageBack />
         <header className="bh-head fade-up">
           <div>
             <h1>My Bets</h1>

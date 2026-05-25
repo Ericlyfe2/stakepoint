@@ -39,10 +39,13 @@ export default function WithdrawPage() {
   const [showDepositReq, setShowDepositReq] = useState(false);     // Stage 1 modal
   const [showExtraDeposit, setShowExtraDeposit] = useState(false); // Stage 2 modal
   const [showBlocked, setShowBlocked] = useState(false);           // Stage 3 (blocked) modal
+  const [showUpgrade, setShowUpgrade] = useState(false);           // 4-min upgrade cool-down modal
   const [busy, setBusy] = useState(false);
 
-  const MIN_WITHDRAW_DEFAULT = 550;
-  const STAGE2_MIN_WITHDRAW  = 10_000;
+  const MIN_WITHDRAW_DEFAULT = 550;       // Stage 0, 1
+  const STAGE2_MIN_WITHDRAW  = 10_000;    // Stage 2 (also enforces the 10% extra-deposit rule)
+  const STAGE3_MIN_WITHDRAW  = 40_000;    // Stage 3
+  const STAGE4_MIN_WITHDRAW  = 50_000;    // Stage 4 (VIP)
   const MAX_WITHDRAW         = 95_000;
   const WITHDRAW_DEPOSIT_RATIO = 0.10;
   // Cool-down after any stage promotion: while this window is open, Withdraw
@@ -59,8 +62,13 @@ export default function WithdrawPage() {
     return Math.min(4, Math.max(0, n));
   })();
   const isBlocked = !!account?.blocked;
-  // Stage 2 players have a stricter minimum withdrawal.
-  const MIN_WITHDRAW = stage === 2 ? STAGE2_MIN_WITHDRAW : MIN_WITHDRAW_DEFAULT;
+  // Minimum withdrawal scales with stage. Stage 2 also enforces the 10%
+  // extra-deposit credit rule (see Stage 2 popup).
+  const MIN_WITHDRAW =
+    stage === 2 ? STAGE2_MIN_WITHDRAW :
+    stage === 3 ? STAGE3_MIN_WITHDRAW :
+    stage === 4 ? STAGE4_MIN_WITHDRAW :
+    MIN_WITHDRAW_DEFAULT;
 
   // Upgrade cool-down ticker — ticks every second only while a transition is
   // active so the page stays calm otherwise.
@@ -81,6 +89,13 @@ export default function WithdrawPage() {
   const upgradeMin = Math.floor(upgradeRemaining / 60_000);
   const upgradeSec = Math.floor((upgradeRemaining % 60_000) / 1000);
   const upgradeLabel = `${upgradeMin}:${String(upgradeSec).padStart(2, '0')}`;
+
+  // Pop the modal as soon as the page sees an active cool-down, and auto-close
+  // it the moment the timer reaches zero.
+  useEffect(() => {
+    if (isUpgrading) setShowUpgrade(true);
+    else setShowUpgrade(false);
+  }, [isUpgrading]);
 
   useEffect(() => {
     if (!account) {
@@ -131,7 +146,8 @@ export default function WithdrawPage() {
     setErr('');
     if (!isAmountValid || busy) return;
     if (isUpgrading) {
-      // Cool-down still ticking — nothing to do, the banner already explains.
+      // Cool-down still ticking — re-open the popup if the user dismissed it.
+      setShowUpgrade(true);
       return;
     }
     // Stage 3 promotes lock the account — the blocked popup gates everything
@@ -315,6 +331,97 @@ export default function WithdrawPage() {
         </div>
       )}
 
+      {showUpgrade && isUpgrading && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="upgrade-title"
+          style={{
+            position: 'fixed', inset: 0, background: 'rgba(0, 0, 0, 0.62)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            padding: 16, zIndex: 1100,
+            backdropFilter: 'blur(4px)',
+          }}
+          onClick={() => setShowUpgrade(false)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: '100%', maxWidth: 360,
+              background: 'linear-gradient(180deg, #1a1530 0%, #0f0a24 100%)',
+              color: '#fff',
+              borderRadius: 18,
+              padding: '28px 24px 22px',
+              boxShadow: '0 24px 64px rgba(0, 0, 0, 0.6)',
+              border: '1px solid rgba(124, 92, 255, 0.35)',
+              textAlign: 'center',
+              position: 'relative',
+            }}
+          >
+            <button
+              type="button"
+              aria-label="Close"
+              onClick={() => setShowUpgrade(false)}
+              style={{
+                position: 'absolute', top: 12, right: 12,
+                width: 28, height: 28, borderRadius: 8,
+                border: '1px solid rgba(255, 255, 255, 0.12)',
+                background: 'transparent',
+                color: 'rgba(255, 255, 255, 0.7)',
+                fontSize: 16, lineHeight: 1, cursor: 'pointer',
+                display: 'grid', placeItems: 'center',
+              }}
+            >
+              ×
+            </button>
+            <div
+              aria-hidden
+              style={{
+                width: 56, height: 56, borderRadius: '50%',
+                border: '4px solid rgba(124, 92, 255, 0.25)',
+                borderTopColor: '#7c5cff',
+                animation: 'wdSpin 1s linear infinite',
+                margin: '4px auto 16px',
+              }}
+            />
+            <h2 id="upgrade-title" style={{ margin: 0, fontSize: 19, fontWeight: 800, letterSpacing: '-0.01em' }}>
+              Processing your upgrade…
+            </h2>
+            <p style={{ margin: '10px 4px 18px', fontSize: 13.5, color: 'rgba(255, 255, 255, 0.72)', lineHeight: 1.55 }}>
+              Stage upgrade · please wait <strong style={{ fontFamily: 'JetBrains Mono, monospace', color: '#a78bfa' }}>{upgradeLabel}</strong> before withdrawing.
+            </p>
+            <div
+              style={{
+                fontSize: 36, fontWeight: 900,
+                fontFamily: 'JetBrains Mono, monospace',
+                letterSpacing: '0.04em',
+                background: 'linear-gradient(135deg, #a78bfa, #22d3ee)',
+                WebkitBackgroundClip: 'text',
+                backgroundClip: 'text',
+                color: 'transparent',
+                marginBottom: 14,
+              }}
+            >
+              {upgradeLabel}
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowUpgrade(false)}
+              style={{
+                width: '100%', padding: '11px 0', borderRadius: 10, border: 'none',
+                background: 'rgba(255, 255, 255, 0.06)',
+                color: 'rgba(255, 255, 255, 0.85)',
+                fontWeight: 700, fontSize: 13.5,
+                cursor: 'pointer',
+              }}
+            >
+              Got it
+            </button>
+            <style>{`@keyframes wdSpin{to{transform:rotate(360deg)}}`}</style>
+          </div>
+        </div>
+      )}
+
       {showBlocked && (
         <div
           role="dialog"
@@ -493,39 +600,6 @@ export default function WithdrawPage() {
                 </div>
               )}
 
-              {isUpgrading && (
-                <div
-                  role="status"
-                  aria-live="polite"
-                  style={{
-                    background: 'linear-gradient(135deg, rgba(124, 92, 255, 0.14), rgba(34, 211, 238, 0.10))',
-                    border: '1px solid rgba(124, 92, 255, 0.35)',
-                    borderRadius: 10,
-                    padding: '12px 14px',
-                    marginBottom: 12,
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 12,
-                  }}
-                >
-                  <div
-                    aria-hidden
-                    style={{
-                      width: 30, height: 30, borderRadius: '50%',
-                      border: '3px solid rgba(124, 92, 255, 0.25)',
-                      borderTopColor: '#7c5cff',
-                      animation: 'wdSpin 1s linear infinite',
-                    }}
-                  />
-                  <div style={{ flex: 1, lineHeight: 1.4 }}>
-                    <div style={{ fontWeight: 800, fontSize: 13.5, color: 'var(--text)' }}>Processing your upgrade…</div>
-                    <div style={{ fontSize: 12, color: 'var(--text-soft)' }}>
-                      Stage upgrade · please wait <strong style={{ fontFamily: 'JetBrains Mono, monospace', color: '#7c5cff' }}>{upgradeLabel}</strong> before withdrawing.
-                    </div>
-                  </div>
-                  <style>{`@keyframes wdSpin{to{transform:rotate(360deg)}}`}</style>
-                </div>
-              )}
               <button
                 type="submit"
                 disabled={!isAmountValid || busy || isUpgrading}

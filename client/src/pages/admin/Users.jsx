@@ -919,7 +919,7 @@ function ProfileTab({ user, logins = [], hasRole, onKyc, onStage, onBlocked, onT
               <IconCheck size={14} /> VIP · Free withdrawals · No popups
             </div>
           )}
-          {current > 1 && (
+          {current > 0 && (
             <button
               type="button"
               className="adm-btn ghost"
