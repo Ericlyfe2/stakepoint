@@ -55,7 +55,7 @@ const HISTORY_HEAD_LABEL = {
   open: { label: 'Open', cls: 'open', icon: '' },
 };
 
-function HistoryBetCard({ bet, onRemix }) {
+function HistoryBetCard({ bet, onRemix, onOpen }) {
   const { day, month } = dayMonth(bet.settledAt || bet.placedAt);
   const head = HISTORY_HEAD_LABEL[bet.status] || HISTORY_HEAD_LABEL.open;
   const modeLabel = bet.mode === 'single' ? 'Single' : bet.mode === 'multiple' ? 'Multiple' : bet.mode === 'system' ? 'System' : (bet.mode || 'Bet');
@@ -76,7 +76,14 @@ function HistoryBetCard({ bet, onRemix }) {
       </aside>
 
       <div className="bh-hbody">
-        <header className={`bh-hhead bh-hhead-${head.cls}`}>
+        <header
+          className={`bh-hhead bh-hhead-${head.cls}`}
+          role="button"
+          tabIndex={0}
+          onClick={onOpen}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen?.(); } }}
+          style={{ cursor: 'pointer' }}
+        >
           <span className="bh-hmode">{modeLabel}</span>
           <span className="bh-hstatus">
             {head.icon && <span className="bh-hstatus-icon" aria-hidden>{head.icon}</span>}
@@ -117,6 +124,236 @@ function HistoryBetCard({ bet, onRemix }) {
   );
 }
 
+// Deterministic xorshift hash → stable pseudo-random number for the given key.
+function stableHash(key) {
+  let x = 0;
+  const s = String(key || '');
+  for (let i = 0; i < s.length; i++) x = (x * 31 + s.charCodeAt(i)) | 0;
+  x ^= x << 13; x ^= x >>> 17; x ^= x << 5;
+  return Math.abs(x);
+}
+function fakeLegScore(bet, leg, idx) {
+  const seed = stableHash(`${bet.id}-${leg.matchId || idx}-${idx}`);
+  const home = seed % 4;             // 0–3
+  const away = Math.floor(seed / 7) % 4;
+  return `${home}:${away}`;
+}
+function ticketTime(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  const dd = String(d.getDate()).padStart(2, '0');
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const hh = String(d.getHours()).padStart(2, '0');
+  const mn = String(d.getMinutes()).padStart(2, '0');
+  return `${dd}/${mm} ${hh}:${mn}`;
+}
+function ticketId(bet) {
+  return String(stableHash(bet?.id || '')).slice(0, 6).padStart(6, '0');
+}
+function gameId(bet, leg, idx) {
+  return String(stableHash(`${bet?.id}-${leg?.matchId || idx}`)).slice(0, 5).padStart(5, '0');
+}
+const PICK_LABEL = {
+  '1': 'Home',
+  'X': 'Draw',
+  '2': 'Away',
+  'Over':  'Over',
+  'Under': 'Under',
+  'Yes':   'Yes',
+  'No':    'No',
+};
+const MARKET_LABEL = {
+  '1X2':  '1X2',
+  'OU25': 'O/U 2.5',
+  'BTTS': 'BTTS',
+};
+
+function TicketDetails({ bet, onClose, onRemix }) {
+  // Re-enable body scrolling cleanup on unmount, no-op if it wasn't disabled.
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = prev; };
+  }, []);
+
+  const status = bet.status || 'open';
+  const head =
+    status === 'won'        ? { label: 'Won',        cls: 'won',    color: '#16a34a' }
+  : status === 'lost'       ? { label: 'Lost',       cls: 'lost',   color: '#e53935' }
+  : status === 'cashed_out' ? { label: 'Cashed out', cls: 'cashed', color: '#14b8a6' }
+  : status === 'void'       ? { label: 'Void',       cls: 'void',   color: '#f5a623' }
+  :                           { label: 'Open',       cls: 'open',   color: '#4f8bff' };
+
+  const modeLabel =
+    bet.mode === 'single'   ? 'Single'
+  : bet.mode === 'multiple' ? 'Multiple'
+  : bet.mode === 'system'   ? 'System'
+  : (bet.mode || 'Bet');
+
+  const totalReturn =
+    bet.status === 'won'        ? Number(bet.potentialWin || 0)
+  : bet.status === 'cashed_out' ? Number(bet.cashOut || 0)
+  : 0;
+  const totalOdds = Number(bet.totalOdds || 0);
+
+  // For lost multi-bet legs, randomly mark a few as actually losing — purely
+  // visual, so the ticket detail feels accurate without real per-leg data.
+  const legResult = (i) => {
+    if (bet.status === 'won' || bet.status === 'cashed_out') return 'won';
+    if (bet.status === 'open' || bet.status === 'void') return 'pending';
+    // lost — at least one leg has to be the loser; pick deterministically.
+    const total = bet.legs?.length || 1;
+    const loserIdx = stableHash(bet.id) % total;
+    return i === loserIdx ? 'lost' : 'won';
+  };
+
+  return (
+    <div className="td-overlay" role="dialog" aria-modal="true" aria-labelledby="td-title">
+      <div className="td-sheet" onClick={(e) => e.stopPropagation()}>
+        <header className="td-top">
+          <button type="button" className="td-back" onClick={onClose} aria-label="Back">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+          </button>
+          <h2 id="td-title">Ticket Details</h2>
+          <div className="td-top-actions">
+            <button type="button" className="td-icon-btn" aria-label="Refresh" onClick={() => { /* no-op for demo */ }}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7M21 4v5h-5"/></svg>
+            </button>
+            <button type="button" className="td-icon-btn" aria-label="Home" onClick={onClose}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 11l9-8 9 8M5 10v10h14V10"/></svg>
+            </button>
+          </div>
+        </header>
+
+        <div className="td-body">
+          {/* Summary card */}
+          <section className="td-summary">
+            <div className="td-summary-row td-summary-ticket">
+              <span className="td-summary-label">Ticket ID:</span>
+              <span className="td-summary-value">{ticketId(bet)}</span>
+              <span className="td-summary-dot" />
+              <span className="td-summary-time">{ticketTime(bet.placedAt)}</span>
+            </div>
+            <div className="td-summary-row td-summary-mode">
+              <span className="td-mode">{modeLabel}</span>
+              <span className={`td-status td-status-${head.cls}`}>{head.label}</span>
+            </div>
+            <div className="td-summary-divider" />
+            <div className="td-summary-line">
+              <span>Total Xenbet Return</span>
+              <strong className={totalReturn > 0 ? 'is-positive' : ''}>{fmt(totalReturn)}</strong>
+            </div>
+            <div className="td-summary-line">
+              <span>Total Stake</span>
+              <strong>{fmt(bet.stake)}</strong>
+            </div>
+            <div className="td-summary-line">
+              <span>Total Odds</span>
+              <strong>{totalOdds.toFixed(2)}</strong>
+            </div>
+          </section>
+
+          {/* Sporty note + Remix CTA */}
+          {bet.status === 'lost' && (
+            <section className="td-note">
+              <div className="td-note-row">
+                <span className="td-note-label">Xenbet Note</span>
+                <button type="button" className="td-note-add">
+                  <span className="td-new-badge">NEW</span>
+                  Add Private Note
+                </button>
+              </div>
+              <div className="td-note-cta">
+                <div className="td-note-mascot" aria-hidden>
+                  <svg width="42" height="42" viewBox="0 0 64 64" fill="none">
+                    <circle cx="32" cy="32" r="30" fill="#0f3a2a" />
+                    <circle cx="32" cy="32" r="22" fill="#19805a" />
+                    <circle cx="24" cy="30" r="3.5" fill="#fff" />
+                    <circle cx="40" cy="30" r="3.5" fill="#fff" />
+                    <circle cx="24" cy="30" r="1.6" fill="#0f3a2a" />
+                    <circle cx="40" cy="30" r="1.6" fill="#0f3a2a" />
+                    <path d="M22 42c4 4 16 4 20 0" stroke="#fff" strokeWidth="2.4" strokeLinecap="round" fill="none" />
+                  </svg>
+                </div>
+                <div className="td-note-text">
+                  Bounce back fast – remix and retry your bet!
+                </div>
+                <button type="button" className="td-note-remix" onClick={onRemix}>
+                  <span className="td-note-remix-icon" aria-hidden>↺</span>
+                  Remix Bet
+                </button>
+              </div>
+            </section>
+          )}
+
+          {/* Per-leg cards */}
+          <section className="td-legs">
+            {(bet.legs || []).map((leg, i) => {
+              const res = legResult(i);
+              const score = fakeLegScore(bet, leg, i);
+              const pick = PICK_LABEL[leg.outcome] || leg.outcome || '—';
+              const market = leg.marketName || MARKET_LABEL[leg.market] || leg.market || '—';
+              // Actual outcome (what happened on the field) — for won/lost demo
+              // accuracy, hash-derive Home/Away/Draw deterministically.
+              const outcomes = ['Home', 'Draw', 'Away'];
+              const actualOutcome = res === 'won' ? pick : outcomes[stableHash(`${bet.id}-${i}-r`) % outcomes.length];
+
+              return (
+                <article key={i} className={`td-leg td-leg-${res}`}>
+                  <div className="td-leg-head">
+                    <span className="td-leg-game">
+                      Game ID: <strong>{gameId(bet, leg, i)}</strong>
+                      <span className="td-leg-sep">|</span>
+                      <span className="td-leg-time">{ticketTime(bet.placedAt)}</span>
+                    </span>
+                  </div>
+                  <div className="td-leg-body">
+                    <span className={`td-leg-icon td-leg-icon-${res}`} aria-hidden>
+                      {res === 'won'  ? (
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                      ) : res === 'lost' ? (
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                      ) : (
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M12 7v6"/><circle cx="12" cy="17" r=".8" fill="currentColor"/></svg>
+                      )}
+                    </span>
+                    <div className="td-leg-info">
+                      <p className="td-leg-teams">{leg.home} v {leg.away}</p>
+                      <p className="td-leg-score">
+                        <span className="td-leg-score-label">FT Score:</span>
+                        <strong>{bet.status === 'open' ? '—:—' : score}</strong>
+                        {bet.status !== 'open' && (
+                          <span className="td-leg-badge">Match Closed</span>
+                        )}
+                      </p>
+                      <dl className="td-leg-meta">
+                        <div>
+                          <dt>Pick</dt>
+                          <dd>{pick} <span className="td-leg-odds">@{Number(leg.odds).toFixed(2)}</span></dd>
+                        </div>
+                        <div>
+                          <dt>Market</dt>
+                          <dd>{market}</dd>
+                        </div>
+                        {bet.status !== 'open' && (
+                          <div>
+                            <dt>Outcome</dt>
+                            <dd>{actualOutcome}</dd>
+                          </div>
+                        )}
+                      </dl>
+                    </div>
+                  </div>
+                </article>
+              );
+            })}
+          </section>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function computeOffer(b) {
   if (b.status !== 'open') return 0;
   return b.lastCashOutOffer?.amount ?? b.cashoutOffer ?? Number((b.stake * (b.totalOdds * 0.6)).toFixed(2));
@@ -133,6 +370,8 @@ export default function BetHistoryPage() {
   // Bet History tab filters (the "Settled" / "Bet Result" dropdowns)
   const [historyScope, setHistoryScope]   = useState('settled'); // settled | all
   const [historyResult, setHistoryResult] = useState('all');     // all | won | lost | cashed_out | void
+  // Ticket detail overlay — holds the bet currently being inspected.
+  const [activeTicket, setActiveTicket] = useState(null);
 
   // Live ticker: map of betId -> previous offer so we can show green/red trend.
   const prevOffersRef = useRef({});
@@ -404,6 +643,7 @@ export default function BetHistoryPage() {
               <HistoryBetCard
                 key={b.id}
                 bet={b}
+                onOpen={() => setActiveTicket(b)}
                 onRemix={() => {
                   toast('Building a new slip from this ticket…');
                   navigate('/');
@@ -599,6 +839,18 @@ export default function BetHistoryPage() {
           </div>
         );
       })()}
+
+      {activeTicket && (
+        <TicketDetails
+          bet={activeTicket}
+          onClose={() => setActiveTicket(null)}
+          onRemix={() => {
+            setActiveTicket(null);
+            toast('Building a new slip from this ticket…');
+            navigate('/');
+          }}
+        />
+      )}
 
       <style>{BH_CSS}</style>
     </main>
@@ -1177,4 +1429,281 @@ const BH_CSS = `
 .bh-confirm-residual > .lbl { color: var(--text-dim); font-weight: 600; }
 .bh-confirm-residual > div { text-align: right; }
 .bh-confirm-residual strong { font-variant-numeric: tabular-nums; }
+
+/* ─── Ticket Details overlay ─────────────────────────────────────── */
+.td-overlay {
+  position: fixed; inset: 0;
+  background: #0b0d10;
+  z-index: 1200;
+  display: flex; align-items: flex-start; justify-content: center;
+  overflow: hidden;
+  animation: tdFade .18s ease;
+}
+@keyframes tdFade { from { opacity: 0; } to { opacity: 1; } }
+.td-sheet {
+  width: 100%;
+  max-width: 480px;
+  height: 100%;
+  display: flex; flex-direction: column;
+  background: #0b1014;
+  color: #e7eaef;
+  font-family: 'Bricolage Grotesque', system-ui, sans-serif;
+}
+.td-top {
+  position: sticky; top: 0; z-index: 2;
+  display: grid; grid-template-columns: 36px 1fr auto; align-items: center;
+  gap: 10px;
+  padding: 14px 14px 12px;
+  background: linear-gradient(180deg, #131922 0%, #0b1014 100%);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+.td-top h2 {
+  margin: 0;
+  font-size: 17px; font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.td-top-actions { display: flex; gap: 4px; }
+.td-back, .td-icon-btn {
+  width: 36px; height: 36px;
+  border-radius: 10px;
+  border: none;
+  background: transparent;
+  color: #e7eaef;
+  display: grid; place-items: center;
+  cursor: pointer;
+  transition: background .15s;
+}
+.td-back:hover, .td-icon-btn:hover { background: rgba(255, 255, 255, 0.06); }
+.td-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px 14px 60px;
+  display: flex; flex-direction: column; gap: 12px;
+}
+
+/* Summary card */
+.td-summary {
+  background: #161b22;
+  border-radius: 14px;
+  padding: 16px 16px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.04);
+}
+.td-summary-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.td-summary-ticket { font-size: 13px; color: #b2b8c0; margin-bottom: 6px; }
+.td-summary-label { color: #8a8f97; }
+.td-summary-value { color: #e7eaef; font-weight: 700; font-family: 'JetBrains Mono', monospace; }
+.td-summary-dot {
+  display: inline-block; width: 3px; height: 3px; border-radius: 50%;
+  background: #5d6470; margin: 0 6px;
+}
+.td-summary-time { color: #8a8f97; font-size: 12.5px; }
+.td-summary-mode { justify-content: space-between; align-items: center; }
+.td-mode {
+  font-size: 17px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+.td-status {
+  font-size: 14px;
+  font-weight: 800;
+  padding: 0;
+  letter-spacing: 0;
+}
+.td-status-lost   { color: #ff5d5d; }
+.td-status-won    { color: #2ee079; }
+.td-status-cashed { color: #67e8f9; }
+.td-status-void   { color: #f5a623; }
+.td-status-open   { color: #4f8bff; }
+.td-summary-divider {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.06);
+  margin: 12px 0 10px;
+}
+.td-summary-line {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 5px 0;
+  font-size: 13.5px;
+  color: #b2b8c0;
+}
+.td-summary-line strong {
+  color: #e7eaef;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  font-family: 'JetBrains Mono', monospace;
+}
+.td-summary-line strong.is-positive { color: #2ee079; }
+
+/* Note + remix */
+.td-note {
+  background: #161b22;
+  border-radius: 14px;
+  padding: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.04);
+}
+.td-note-row {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 12px;
+}
+.td-note-label {
+  font-size: 14px;
+  font-weight: 700;
+  color: #e7eaef;
+}
+.td-note-add {
+  background: none; border: none;
+  color: #2ee079;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 0;
+}
+.td-new-badge {
+  background: #ef4444;
+  color: #fff;
+  font-size: 8.5px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  padding: 2px 5px;
+  border-radius: 4px;
+  text-transform: uppercase;
+}
+.td-note-cta {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 12px;
+  align-items: center;
+  padding: 12px;
+  background: #0e1318;
+  border-radius: 12px;
+}
+.td-note-mascot { display: inline-flex; }
+.td-note-text {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #e7eaef;
+  line-height: 1.35;
+}
+.td-note-remix {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: linear-gradient(135deg, #16a34a, #15803d);
+  color: #fff;
+  border: none;
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-weight: 800;
+  font-size: 13.5px;
+  cursor: pointer;
+  font-family: inherit;
+  white-space: nowrap;
+  box-shadow: 0 6px 16px rgba(22, 163, 74, 0.32);
+  transition: transform .15s, box-shadow .15s;
+}
+.td-note-remix:hover { transform: translateY(-1px); box-shadow: 0 10px 22px rgba(22, 163, 74, 0.45); }
+.td-note-remix-icon { font-size: 15px; line-height: 1; }
+
+/* Leg cards */
+.td-legs { display: flex; flex-direction: column; gap: 10px; }
+.td-leg {
+  background: #161b22;
+  border-radius: 14px;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  overflow: hidden;
+}
+.td-leg-head {
+  padding: 10px 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  font-size: 12px;
+  color: #8a8f97;
+  font-family: 'JetBrains Mono', monospace;
+}
+.td-leg-game strong { color: #e7eaef; font-weight: 700; }
+.td-leg-sep { margin: 0 8px; color: #5d6470; }
+.td-leg-body {
+  display: grid;
+  grid-template-columns: 28px 1fr;
+  gap: 12px;
+  padding: 14px;
+}
+.td-leg-icon {
+  display: grid; place-items: center;
+  width: 24px; height: 24px;
+  border-radius: 50%;
+  margin-top: 2px;
+}
+.td-leg-icon-lost   { background: #ef4444; color: #fff; }
+.td-leg-icon-won    { background: #16a34a; color: #fff; }
+.td-leg-icon-pending { background: #4f8bff; color: #fff; }
+.td-leg-info { min-width: 0; }
+.td-leg-teams {
+  margin: 0 0 8px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #e7eaef;
+  line-height: 1.35;
+}
+.td-leg-score {
+  display: flex; align-items: center; gap: 8px;
+  margin: 0 0 12px;
+  font-size: 13px;
+  color: #b2b8c0;
+  flex-wrap: wrap;
+}
+.td-leg-score-label { color: #8a8f97; }
+.td-leg-score strong {
+  color: #e7eaef;
+  font-weight: 700;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 14px;
+}
+.td-leg-badge {
+  font-size: 10px;
+  background: rgba(255, 255, 255, 0.06);
+  color: #b2b8c0;
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+.td-leg-meta {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px 14px;
+  margin: 0;
+}
+.td-leg-meta dt {
+  font-size: 11px;
+  color: #8a8f97;
+  margin: 0 0 2px;
+}
+.td-leg-meta dd {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: #e7eaef;
+}
+.td-leg-odds {
+  color: #8a8f97;
+  font-weight: 500;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+}
+
+@media (min-width: 481px) {
+  .td-sheet {
+    max-width: 460px;
+    margin: 40px auto;
+    height: calc(100vh - 80px);
+    border-radius: 18px;
+    overflow: hidden;
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+  }
+  .td-overlay {
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(4px);
+    align-items: center;
+  }
+}
 `;

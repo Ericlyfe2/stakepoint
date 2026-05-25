@@ -9,7 +9,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
-  fetchActivity, fetchTransactions, fetchBetHistory,
+  fetchTransactions, fetchBetHistory,
   updateProfile, changePassword,
 } from '../api/betApi.js';
 import { useAccount, useToast } from '../providers/AccountProvider.jsx';
@@ -50,18 +50,6 @@ function longDate(iso) {
     year: 'numeric', month: 'long', day: 'numeric',
     hour: '2-digit', minute: '2-digit',
   });
-}
-function relTime(iso) {
-  if (!iso) return '';
-  const diff = Date.now() - new Date(iso).getTime();
-  const m = Math.round(diff / 60000);
-  if (m < 1) return 'just now';
-  if (m < 60) return `${m}m ago`;
-  const h = Math.round(m / 60);
-  if (h < 24) return `${h}h ago`;
-  const d = Math.round(h / 24);
-  if (d < 30) return `${d}d ago`;
-  return shortDate(iso);
 }
 function maskEmail(email) {
   if (!email) return '—';
@@ -107,7 +95,6 @@ export default function ProfilePage() {
   const [tab, setTab]                 = useState('overview');
   const [displayName, setDisplayName] = useState(account?.displayName || '');
   const [phone, setPhone]             = useState(account?.phone || '');
-  const [activity, setActivity]       = useState(null);
   const [transactions, setTransactions] = useState(null);
   const [bets, setBets]               = useState(null);
   const [pwForm, setPwForm]           = useState({ current: '', next: '', confirm: '' });
@@ -119,7 +106,6 @@ export default function ProfilePage() {
     if (!account) return;
     setDisplayName(account.displayName || '');
     setPhone(account.phone || '');
-    fetchActivity().then((d) => setActivity(d.activity || [])).catch(() => setActivity([]));
     fetchTransactions().then((d) => setTransactions(d.transactions || [])).catch(() => setTransactions([]));
     fetchBetHistory().then((d) => setBets(d.bets || [])).catch(() => setBets([]));
   }, [account]);
@@ -324,7 +310,6 @@ export default function ProfilePage() {
           ['overview',     'Overview'],
           ['transactions', 'Transactions'],
           ['security',     'Security'],
-          ['activity',     'Activity'],
         ].map(([k, label], i) => (
           <button
             key={k}
@@ -364,9 +349,6 @@ export default function ProfilePage() {
             busy={busy}
             onSubmit={submitPassword}
           />
-        )}
-        {tab === 'activity' && (
-          <PanelActivity activity={activity} />
         )}
       </section>
 
@@ -539,57 +521,6 @@ function PanelSecurity({ account, pwForm, setPwForm, err, busy, onSubmit }) {
           </button>
         </div>
       </form>
-    </div>
-  );
-}
-
-function PanelActivity({ activity }) {
-  if (activity === null) {
-    return (
-      <div className="dossier-card">
-        <header className="dossier-card-head">
-          <span className="dossier-card-num">§ 04</span>
-          <div><h3>Activity log</h3><p>Reading the latest events…</p></div>
-        </header>
-        <div className="dossier-skel-list">
-          {Array.from({ length: 5 }).map((_, i) => <div key={i} className="dossier-skel-row" />)}
-        </div>
-      </div>
-    );
-  }
-  if (!activity.length) {
-    return (
-      <div className="dossier-card">
-        <header className="dossier-card-head">
-          <span className="dossier-card-num">§ 04</span>
-          <div><h3>Activity log</h3><p>No events recorded yet.</p></div>
-        </header>
-        <Empty title="Quiet so far" sub="Logins, deposits, password resets — they all land here." />
-      </div>
-    );
-  }
-  return (
-    <div className="dossier-card">
-      <header className="dossier-card-head">
-        <span className="dossier-card-num">§ 04</span>
-        <div><h3>Activity log</h3><p>{activity.length} events · oldest first dropped, newest first.</p></div>
-      </header>
-      <ul className="dossier-act">
-        {activity.map((a, i) => (
-          <li key={i} className="dossier-act-item">
-            <span className="bullet" />
-            <div className="content">
-              <div className="kind">{(a.kind || 'event').replace(/_/g, ' ')}</div>
-              <div className="meta">
-                {longDate(a.at)}
-                {a.ip && <span> · IP {a.ip}</span>}
-                {a.by && <span> · by {a.by}</span>}
-              </div>
-            </div>
-            <span className="rel">{relTime(a.at)}</span>
-          </li>
-        ))}
-      </ul>
     </div>
   );
 }

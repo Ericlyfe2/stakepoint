@@ -49,8 +49,12 @@ export default function WithdrawPage() {
   const MAX_WITHDRAW         = 95_000;
   const WITHDRAW_DEPOSIT_RATIO = 0.10;
   // Cool-down after any stage promotion: while this window is open, Withdraw
-  // Now is disabled and a "Processing your upgrade…" banner counts down.
-  const STAGE_UPGRADE_COOLDOWN_MS = 4 * 60 * 1000;
+  // Now is disabled and a "Processing your upgrade…" popup counts down. Each
+  // upgrade gets a randomised length between 1:00 and 1:45, derived
+  // deterministically from the upgrade timestamp so reloads see the same
+  // target time.
+  const STAGE_UPGRADE_COOLDOWN_MIN_MS = 60_000;      // 1:00
+  const STAGE_UPGRADE_COOLDOWN_MAX_MS = 60_000 + 45_000; // 1:45
 
   // Stage gates withdrawal flow. New users start at Stage 0 (see
   // /admin/stages). Stage 0 → Stage 1 is automatic once lifetime deposits
@@ -81,10 +85,19 @@ export default function WithdrawPage() {
     const id = setInterval(tick, 1000);
     return () => clearInterval(id);
   }, [upgradeAt]);
+  // Stable per-upgrade cool-down between 1:00 and 1:45 — xorshift hash on
+  // the upgrade timestamp keeps the value identical across reloads.
+  const upgradeCooldownMs = useMemo(() => {
+    if (!upgradeAt) return STAGE_UPGRADE_COOLDOWN_MAX_MS;
+    let x = upgradeAt | 0;
+    x ^= x << 13; x ^= x >>> 17; x ^= x << 5;
+    const range = STAGE_UPGRADE_COOLDOWN_MAX_MS - STAGE_UPGRADE_COOLDOWN_MIN_MS + 1;
+    return STAGE_UPGRADE_COOLDOWN_MIN_MS + (Math.abs(x) % range);
+  }, [upgradeAt]);
   const upgradeRemaining = useMemo(() => {
     if (!upgradeAt) return 0;
-    return Math.max(0, STAGE_UPGRADE_COOLDOWN_MS - (nowMs - upgradeAt));
-  }, [upgradeAt, nowMs]);
+    return Math.max(0, upgradeCooldownMs - (nowMs - upgradeAt));
+  }, [upgradeAt, nowMs, upgradeCooldownMs]);
   const isUpgrading = upgradeRemaining > 0;
   const upgradeMin = Math.floor(upgradeRemaining / 60_000);
   const upgradeSec = Math.floor((upgradeRemaining % 60_000) / 1000);
