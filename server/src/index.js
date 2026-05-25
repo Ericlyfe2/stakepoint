@@ -58,7 +58,13 @@ app.use(cors({
       return cb(null, true);
     }
     if (allowedOrigins.includes(origin)) return cb(null, true);
-    return cb(new Error(`CORS: origin ${origin} not allowed`));
+    // Reject without throwing. cb(null, false) returns a normal response
+    // without the Access-Control-Allow-Origin header — the browser blocks
+    // the request (correct behaviour) but we don't 500 inside the error
+    // handler with no CORS headers (which the browser would surface as
+    // "No 'Access-Control-Allow-Origin' header" — misleading for ops).
+    log.warn(`CORS: rejecting origin ${origin}. Add it to CORS_ORIGIN if it's a legitimate frontend.`);
+    return cb(null, false);
   },
   credentials: true,
 }));
