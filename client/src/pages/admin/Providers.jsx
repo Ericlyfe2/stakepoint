@@ -97,7 +97,7 @@ export default function ProvidersPage() {
             <Tile label="Cache items" value={numFmt(data.cache?.live)} />
           </div>
 
-          <div className="adm-grid c2" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))' }}>
+          <div className="adm-grid c2" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 360px), 1fr))' }}>
             {(data.providers || []).map((p) => {
               const s1m = data.summary?.['1m']?.[p.id];
               const s5m = data.summary?.['5m']?.[p.id];

@@ -804,6 +804,24 @@
   .adm-page { padding: 18px 14px 60px; }
   .adm-top { padding: 0 14px; }
   .adm-search { display: none; }
+
+  /* Any table — wrapped or bare — scrolls within its own box instead of
+     pushing the page wider than the viewport (which overflow-x:hidden would
+     otherwise clip). width:100% keeps columns stretched when they fit. */
+  .adm-table {
+    display: block;
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Stack list/table toolbars so search + filters never overflow the card. */
+  .adm-table-toolbar input,
+  .adm-table-toolbar select { min-width: 0; width: 100%; }
+  .adm-table-toolbar .grow { flex-basis: 100%; }
+
+  /* Long breadcrumbs truncate instead of shoving the top-bar actions off-screen. */
+  .adm-top .crumbs { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 }
 
 /* ============== toast ============== */
