@@ -42,7 +42,7 @@ function MobileHeader({ account, onSignIn, onSignUp, onAvatar, onSearch, onBalan
   return (
     <div className="sb-mobile-header">
       <NavLink to="/" className="sb-logo" end>
-        Xen<em>bet</em>
+        Odd<em>sify</em>
       </NavLink>
 
       <button type="button" className="sb-search-btn" aria-label="Search" onClick={onSearch}>
@@ -215,7 +215,7 @@ export default function AppShell() {
   // openCount is best-effort — derived from a global window flag set by Home
   // when My Bets history loads. Avoids a second fetch here.
   const openCount = typeof window !== 'undefined'
-    ? (window.__xenbetOpenCount || 0)
+    ? (window.__oddsifyOpenCount || 0)
     : 0;
 
   // --- Search functionality ---
@@ -277,19 +277,19 @@ export default function AppShell() {
           <span><b>LIVE</b> Arsenal 2-1 Chelsea · 73&apos;</span>
           <span><b>BOOSTED</b> Real Madrid to win &amp; BTTS · <em>3.45</em></span>
           <span><b>LIVE</b> Aduana 0-0 Medeama · 22&apos;</span>
-          <span><b>Xenbet</b> sharper odds, instant payouts</span>
+          <span><b>Oddsify</b> sharper odds, instant payouts</span>
           <span><b>LIVE</b> Arsenal 2-1 Chelsea · 73&apos;</span>
           <span><b>BOOSTED</b> Real Madrid to win &amp; BTTS · <em>3.45</em></span>
           <span><b>LIVE</b> Aduana 0-0 Medeama · 22&apos;</span>
-          <span><b>Xenbet</b> sharper odds, instant payouts</span>
+          <span><b>Oddsify</b> sharper odds, instant payouts</span>
         </div>
       </div>
 
       <header className="app-header">
         <div className="header-inner">
           <NavLink to="/" className="logo" end>
-            <div className="logo-mark"><span>X</span></div>
-            <div className="logo-text">Xen<em>bet</em></div>
+            <div className="logo-mark"><svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden="true"><circle cx="11" cy="11" r="8" stroke="currentColor" strokeWidth="2.2"/><circle cx="11" cy="11" r="3.5" stroke="currentColor" strokeWidth="1.8"/><circle cx="11" cy="11" r="1.2" fill="currentColor"/></svg></div>
+            <div className="logo-text">Odd<em>sify</em></div>
           </NavLink>
           <nav id="main-nav">
             <NavLink to="/" end className={navCls}>Sports</NavLink>
@@ -339,8 +339,8 @@ export default function AppShell() {
         <div className="foot-inner">
           <div className="foot-brand">
             <div className="logo">
-              <div className="logo-mark"><span>X</span></div>
-              <div className="logo-text">Xen<em>bet</em></div>
+              <div className="logo-mark"><svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden="true"><circle cx="11" cy="11" r="8" stroke="currentColor" strokeWidth="2.2"/><circle cx="11" cy="11" r="3.5" stroke="currentColor" strokeWidth="1.8"/><circle cx="11" cy="11" r="1.2" fill="currentColor"/></svg></div>
+              <div className="logo-text">Odd<em>sify</em></div>
             </div>
             <p>Premium sports betting for Ghana — licensed, regulated, and built for the way you actually watch the game. Sharper odds, instant payouts.</p>
           </div>
@@ -384,7 +384,7 @@ export default function AppShell() {
           </div>
         </div>
         <div className="foot-bottom">
-          <div>© {new Date().getFullYear()} Xenbet GH · Licensed by the Gaming Commission of Ghana</div>
+          <div>© {new Date().getFullYear()} Oddsify GH · Licensed by the Gaming Commission of Ghana</div>
           <div className="respo">18+ · BET RESPONSIBLY</div>
         </div>
       </footer>
@@ -426,7 +426,7 @@ export default function AppShell() {
       <dialog ref={walletMenuDlg} className="bv-dialog wallet-menu-dialog" style={{ maxWidth: 360, width: '90%' }}>
         <div className="wallet-menu-inner" style={{ padding: '4px 2px' }}>
           <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-            <h3 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: 'var(--text)' }}>Xenbet Wallet</h3>
+            <h3 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: 'var(--text)' }}>Oddsify Wallet</h3>
             <button type="button" className="btn btn-ghost" onClick={() => walletMenuDlg.current?.close()} style={{ padding: '6px 10px', fontSize: 16 }}>✕</button>
           </header>
           
@@ -440,7 +440,7 @@ export default function AppShell() {
             position: 'relative',
             overflow: 'hidden'
           }}>
-            <div style={{ position: 'absolute', top: '-50%', left: '-50%', width: '200%', height: '200%', background: 'radial-gradient(circle, rgba(197,255,61,0.08) 0%, transparent 60%)', pointerEvents: 'none' }} />
+            <div style={{ position: 'absolute', top: '-50%', left: '-50%', width: '200%', height: '200%', background: 'radial-gradient(circle, rgba(255,184,0,0.08) 0%, transparent 60%)', pointerEvents: 'none' }} />
             <div style={{ fontSize: 11, textTransform: 'uppercase', color: 'var(--text-dim)', fontWeight: 700, letterSpacing: 1, marginBottom: 4 }}>Available Balance</div>
             <div style={{ fontSize: 32, fontWeight: 900, color: 'var(--accent)' }}>
               ₵{formatAmt(balance)}
@@ -463,8 +463,8 @@ export default function AppShell() {
                 alignItems: 'center',
                 justifyContent: 'center',
                 gap: 8,
-                background: 'linear-gradient(135deg, var(--accent), #b0e82d)',
-                color: '#0a0d0c',
+                background: 'linear-gradient(135deg, var(--accent), #ffcc33)',
+                color: '#000000',
                 border: 'none',
                 cursor: 'pointer'
               }}
@@ -487,7 +487,7 @@ export default function AppShell() {
                 alignItems: 'center',
                 justifyContent: 'center',
                 gap: 8,
-                background: 'linear-gradient(135deg, #ff4d3d, #cc3a2e)',
+                background: 'linear-gradient(135deg, #ff3554, #c8243f)',
                 color: '#fff',
                 border: 'none',
                 cursor: 'pointer'

@@ -19,7 +19,7 @@ export const JWT = {
   // shared devices.
   accessTtl: env.JWT_ACCESS_TTL  || '7d',
   refreshTtl:env.JWT_REFRESH_TTL || '3650d',
-  issuer:    'xenbet',
+  issuer:    'oddsify',
 };
 
 export const SMTP = {
@@ -28,7 +28,7 @@ export const SMTP = {
   secure: env.SMTP_SECURE === 'true',
   user: env.SMTP_USER || '',
   pass: env.SMTP_PASS || '',
-  from: env.SMTP_FROM || 'Xenbet <no-reply@xenbet.gh>',
+  from: env.SMTP_FROM || 'Oddsify <no-reply@oddsify.gh>',
   enabled: !!env.SMTP_HOST,
 };
 

@@ -49,7 +49,7 @@ export default function ProfilePage() {
         <div className="acct-empty-card">
           <p className="acct-empty-eyebrow">ACCOUNT · LOCKED</p>
           <h1>Sign in to use your account.</h1>
-          <Link className="acct-empty-cta" to="/login">Sign in to Xenbet →</Link>
+          <Link className="acct-empty-cta" to="/login">Sign in to Oddsify →</Link>
         </div>
         <style>{ACCT_CSS}</style>
       </main>
@@ -66,7 +66,7 @@ export default function ProfilePage() {
   const identity = account.phone || shortId(account.email) || 'Account';
 
   const handleSignOut = async () => {
-    if (typeof window !== 'undefined' && !window.confirm('Sign out of Xenbet?')) return;
+    if (typeof window !== 'undefined' && !window.confirm('Sign out of Oddsify?')) return;
     try { await signOut(); } catch (e) { toast(e?.message || 'Sign-out failed.'); }
   };
 
@@ -85,7 +85,7 @@ export default function ProfilePage() {
     <main className="acct">
       {/* Brand + balance pill */}
       <header className="acct-top">
-        <div className="acct-brand">Xen<em>bet</em></div>
+        <div className="acct-brand">Odd<em>sify</em></div>
         <button type="button" className="acct-balance-pill" onClick={() => navigate('/wallet')}>
           <span className="acct-balance-icon" aria-hidden><I.user width="14" height="14" /></span>
           <span className="acct-balance-amt">₵&nbsp;{fmtMoney(account.balance)}</span>

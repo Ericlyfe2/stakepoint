@@ -859,7 +859,7 @@ export default function Home({ initialChip }) {
                     onClick={async () => {
                       try {
                         if (navigator.share) {
-                          await navigator.share({ title: 'Xenbet slip', text: `Check out this slip on Xenbet — booking idea ${sc.code}` });
+                          await navigator.share({ title: 'Oddsify slip', text: `Check out this slip on Oddsify — booking idea ${sc.code}` });
                         } else {
                           await navigator.clipboard?.writeText(sc.code);
                           toast(`Code ${sc.code} copied.`);
@@ -1137,7 +1137,7 @@ export default function Home({ initialChip }) {
       {/* ─── Compliance / sponsors ─── */}
       <div className="sb-compliance">
         <div className="badge18">18+</div>
-        <div className="legal">© {new Date().getFullYear()} Xenbet GH · Licensed by the Gaming Commission of Ghana</div>
+        <div className="legal">© {new Date().getFullYear()} Oddsify GH · Licensed by the Gaming Commission of Ghana</div>
         <div className="sponsors">
           <span className="sponsor">Real Madrid</span>
           <span className="sponsor">LaLiga</span>
@@ -1211,7 +1211,7 @@ export default function Home({ initialChip }) {
             )}
 
             {betMode === 'system' && (
-              <div style={{ margin: '8px 0 4px', padding: '10px 12px', background: 'var(--surface-2)', border: '1px solid rgba(255,181,71,.18)', borderRadius: 10 }}>
+              <div style={{ margin: '8px 0 4px', padding: '10px 12px', background: 'var(--surface-2)', border: '1px solid rgba(252,198,0,.18)', borderRadius: 10 }}>
                 {eligibleSystems.length === 0 ? (
                   <p style={{ fontSize: 12, color: 'var(--text-soft)', margin: 0 }}>
                     Pick {systemTypeHint(selections.length)} to unlock a system bet.

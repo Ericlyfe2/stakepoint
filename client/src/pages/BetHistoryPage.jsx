@@ -370,7 +370,7 @@ function TicketDetails({ bet, onClose, onRemix }) {
             </div>
             <div className="td-summary-divider" />
             <div className="td-summary-line">
-              <span>Total Xenbet Return</span>
+              <span>Total Oddsify Return</span>
               <strong className={totalReturn > 0 ? 'is-positive' : ''}>{fmt(totalReturn)}</strong>
             </div>
             <div className="td-summary-line">
@@ -387,7 +387,7 @@ function TicketDetails({ bet, onClose, onRemix }) {
           {bet.status === 'lost' && (
             <section className="td-note">
               <div className="td-note-row">
-                <span className="td-note-label">Xenbet Note</span>
+                <span className="td-note-label">Oddsify Note</span>
                 <button type="button" className="td-note-add">
                   <span className="td-new-badge">NEW</span>
                   Add Private Note
@@ -846,8 +846,8 @@ export default function BetHistoryPage() {
                           className="bh-copy" 
                           onClick={() => {
                             navigator.share({
-                              title: 'My Xenbet Slip',
-                              text: `Check out my bet slip on Xenbet! Booking Code: ${code}`,
+                              title: 'My Oddsify Slip',
+                              text: `Check out my bet slip on Oddsify! Booking Code: ${code}`,
                             }).catch(() => {});
                           }}
                         >
@@ -1083,8 +1083,8 @@ const BH_CSS = `
   background-size: 12px;
   transition: border-color .15s;
 }
-.bh-history-select:hover { border-color: rgba(197, 255, 61, 0.4); }
-.bh-history-select:focus { outline: none; border-color: var(--accent, #c5ff3d); }
+.bh-history-select:hover { border-color: rgba(255, 184, 0, 0.4); }
+.bh-history-select:focus { outline: none; border-color: var(--accent, #ffb800); }
 
 .bh-history-icon-btn {
   background: #1a2724;
@@ -1098,7 +1098,7 @@ const BH_CSS = `
 }
 .bh-history-icon-btn:hover {
   background: #20312c;
-  border-color: rgba(197, 255, 61, 0.4);
+  border-color: rgba(255, 184, 0, 0.4);
 }
 
 .bh-hlist {
@@ -1389,9 +1389,9 @@ html[data-theme="light"] .bh-hleg-mkt { background: rgba(0, 0, 0, 0.06); }
   display: flex; flex-direction: column; gap: 10px;
   transition: border-color .2s ease, transform .2s ease;
 }
-.bh-card:hover { border-color: rgba(197, 255, 61, .25); transform: translateY(-2px); }
-.bh-card.status-won  { border-color: rgba(197, 255, 61, .35); }
-.bh-card.status-lost { border-color: rgba(255, 77, 61, .25); }
+.bh-card:hover { border-color: rgba(255, 184, 0, .25); transform: translateY(-2px); }
+.bh-card.status-won  { border-color: rgba(255, 184, 0, .35); }
+.bh-card.status-lost { border-color: rgba(255, 53, 84, .25); }
 
 .bh-card-head {
   display: flex; justify-content: space-between; align-items: center; gap: 10px;
@@ -1412,9 +1412,9 @@ html[data-theme="light"] .bh-hleg-mkt { background: rgba(0, 0, 0, 0.06); }
   text-transform: uppercase; align-self: flex-start;
 }
 .bh-status.open       { color: var(--accent-cool); background: rgba(106,208,255,.12); }
-.bh-status.won        { color: var(--accent);      background: rgba(197,255,61,.16); }
-.bh-status.cashed_out { color: var(--accent-warm); background: rgba(255,181,71,.12); }
-.bh-status.lost       { color: var(--accent-hot);  background: rgba(255,77,61,.12); }
+.bh-status.won        { color: var(--accent);      background: rgba(255,184,0,.16); }
+.bh-status.cashed_out { color: var(--accent-warm); background: rgba(252,198,0,.12); }
+.bh-status.lost       { color: var(--accent-hot);  background: rgba(255,53,84,.12); }
 .bh-status.void       { color: var(--text-soft);   background: var(--surface-2); }
 
 .bh-stats {
@@ -1471,14 +1471,14 @@ html[data-theme="light"] .bh-hleg-mkt { background: rgba(0, 0, 0, 0.06); }
   cursor: pointer;
   transition: transform .15s ease, box-shadow .15s ease;
 }
-.bh-cashout:hover { transform: translateY(-1px); box-shadow: 0 8px 18px rgba(255, 181, 71, .35); }
+.bh-cashout:hover { transform: translateY(-1px); box-shadow: 0 8px 18px rgba(252, 198, 0, .35); }
 
 .bh-cashed-note {
   margin: 0;
   font-size: 12.5px;
   color: var(--text-soft);
   padding: 8px 10px;
-  background: rgba(255, 181, 71, .08);
+  background: rgba(252, 198, 0, .08);
   border-radius: 8px;
 }
 .bh-cashed-note strong { color: var(--accent-warm); }
@@ -1507,7 +1507,7 @@ html[data-theme="light"] .bh-hleg-mkt { background: rgba(0, 0, 0, 0.06); }
 .bh-system-badge {
   font-size: 10px; font-weight: 800; letter-spacing: .08em;
   padding: 3px 8px; border-radius: 6px;
-  background: rgba(197, 255, 61, .12);
+  background: rgba(255, 184, 0, .12);
   color: var(--accent);
 }
 

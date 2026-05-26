@@ -210,7 +210,7 @@ function Confetti({ count = 36 }) {
     const delay = Math.random() * 1.4;
     const dur   = 2.4 + Math.random() * 2.2;
     const rot   = Math.random() * 360;
-    const colors = ['#ffd76d', '#ffb547', '#18f0a1', '#22d3ee', '#c5ff3d', '#ff9f1c'];
+    const colors = ['#ffd76d', '#ffb800', '#ffd54f', '#d4a857', '#ffcc33', '#ff9f1c'];
     const c = colors[i % colors.length];
     return { left, delay, dur, rot, c, key: i, w: 6 + Math.random() * 6, h: 9 + Math.random() * 9 };
   });

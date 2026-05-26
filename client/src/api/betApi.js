@@ -1,5 +1,5 @@
 /**
- * Xenbet API client.
+ * Oddsify API client.
  * - Reads/writes JWT tokens from localStorage (access + refresh).
  * - Auto-refreshes a single in-flight access token on 401.
  * - Throws an Error with .status/.body on non-2xx.
