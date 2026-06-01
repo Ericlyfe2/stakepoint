@@ -8,9 +8,11 @@ import {
 } from '../api/betApi.js';
 import { onLive, refreshAuth, disconnectSocket } from '../api/socketClient.js';
 import WinTrophyModal from '../components/WinTrophyModal.jsx';
+import DepositResultModal from '../components/DepositResultModal.jsx';
 import TxHeader from '../components/TxHeader.jsx';
 import PaybillInstructions from '../components/PaybillInstructions.jsx';
 import { appendTxCache } from '../lib/txCache.js';
+import { requestNotificationPermission, notify as osNotify } from '../lib/browserNotify.js';
 
 export const AccountCtx = React.createContext(null);
 export const ToastCtx   = React.createContext(null);
@@ -47,6 +49,11 @@ export default function AppProviders({ children }) {
   const [busy, setBusy] = useState(false);
   const [err,  setErr]  = useState('');
   const [wins, setWins] = useState([]);
+  // Queue of deposit decisions still to show. Approve/reject events push into
+  // it; the modal pops the head when dismissed. A queue (not a single value)
+  // means a burst of admin decisions never silently overwrites an unread
+  // popup the user hasn't acknowledged yet.
+  const [depositResults, setDepositResults] = useState([]);
   const [notifications, setNotifications] = useState(() => {
     try {
       const stored = typeof localStorage !== 'undefined' ? localStorage.getItem('sp_notifications') : null;
@@ -129,8 +136,16 @@ export default function AppProviders({ children }) {
 
   // Poll for freshly-settled wins the user hasn't seen.
   // (Realtime socket also pushes bet:won — poll is the safety net.)
+  //
+  // IMPORTANT: depend on `account?.id` (user identity), NOT on the whole
+  // `account` object. Every deposit approval / balance update produces a new
+  // account reference; if we depended on `account` we'd tear down and
+  // re-handshake the socket on every wallet change, racing the very modal
+  // we just queued. Identity-only deps mean the socket stays connected for
+  // the entire session.
+  const accountId = account?.id;
   useEffect(() => {
-    if (!account) { setWins([]); disconnectSocket(); return; }
+    if (!accountId) { setWins([]); disconnectSocket(); return; }
     let alive = true;
 
     refreshAuth(); // re-handshake the socket with the now-current access token
@@ -160,14 +175,58 @@ export default function AppProviders({ children }) {
     });
     const offPending = onLive('wallet:pending', ({ transaction, amount }) => {
       toast(`Deposit of GHS ${formatAmt(amount)} is pending admin approval.`, 'info', { ttl: 5000 });
-      if (account?.id && transaction) appendTxCache(account.id, transaction);
+      if (accountId && transaction) appendTxCache(accountId, transaction);
     });
     const offApproved = onLive('deposit:approved', ({ transaction, account: updatedAccount }) => {
       if (updatedAccount) setAccount(updatedAccount);
-      toast(`Deposit approved! GHS ${formatAmt(transaction?.amount)} credited.`, 'success');
+      const txId = transaction?.id;
+      const amt  = transaction?.amount;
+      const title = 'Deposit approved';
+      const body  = `GHS ${formatAmt(amt)} has been credited to your wallet.`;
+      toast(`Deposit approved! GHS ${formatAmt(amt)} credited.`, 'success');
+      // Persistent inbox entry — survives reload, de-duped by tx id.
+      addNotification({
+        id: `deposit-approved-${txId || Date.now()}`,
+        title,
+        body,
+        severity: 'info',
+        kind: 'deposit_approved',
+      });
+      // OS-level push — fires even when the tab is hidden / app is in the
+      // background. No-ops when permission isn't granted.
+      osNotify({
+        title,
+        body,
+        tag: `deposit-${txId || 'approved'}`,
+      });
+      // In-app centered modal — guaranteed visible, no permission required.
+      setDepositResults((prev) => {
+        if (txId && prev.some((r) => r.txId === txId)) return prev;
+        return [...prev, { kind: 'approved', amount: amt, txId, at: Date.now() }];
+      });
     });
     const offRejected = onLive('deposit:rejected', ({ transaction, reason }) => {
-      toast(`Deposit of GHS ${formatAmt(transaction?.amount)} rejected${reason ? ': ' + reason : ''}.`, 'warn');
+      const txId = transaction?.id;
+      const amt  = transaction?.amount;
+      const title = 'Deposit rejected';
+      const body  = `Your GHS ${formatAmt(amt)} deposit was rejected${reason ? ': ' + reason : '.'}`;
+      toast(`Deposit of GHS ${formatAmt(amt)} rejected${reason ? ': ' + reason : ''}.`, 'warn');
+      addNotification({
+        id: `deposit-rejected-${txId || Date.now()}`,
+        title,
+        body,
+        severity: 'critical',
+        kind: 'deposit_rejected',
+      });
+      osNotify({
+        title,
+        body,
+        tag: `deposit-${txId || 'rejected'}`,
+      });
+      setDepositResults((prev) => {
+        if (txId && prev.some((r) => r.txId === txId)) return prev;
+        return [...prev, { kind: 'rejected', amount: amt, reason, txId, at: Date.now() }];
+      });
     });
     const offWin = onLive('bet:won', async () => { try { await tick(); } catch {} });
     const offNotif = onLive('notification:new', (payload) => {
@@ -183,7 +242,7 @@ export default function AppProviders({ children }) {
       clearInterval(id);
       offWallet?.(); offPending?.(); offApproved?.(); offRejected?.(); offNotif?.(); offWin?.(); offSettled?.();
     };
-  }, [account]);
+  }, [accountId]);
 
   const dismissWins = useCallback(async () => {
     const toAck = [...wins];
@@ -200,6 +259,10 @@ export default function AppProviders({ children }) {
     if (authResponse?.accessToken) setTokens(authResponse.accessToken, authResponse.refreshToken);
     if (authResponse?.account) setAccount(authResponse.account);
     if (authResponse?.account) toast(`Signed in as ${authResponse.account.displayName || authResponse.account.email}`);
+    // Sign-in is a user gesture, so this is a good moment to ask for browser
+    // notification permission. Fire-and-forget — the helper no-ops on refusal
+    // or unsupported platforms, and never re-prompts once decided.
+    requestNotificationPermission().catch(() => {});
   }, [toast]);
 
   const signOut = useCallback(async () => {
@@ -232,6 +295,10 @@ export default function AppProviders({ children }) {
     const amt = parseFloat(String(depositAmt).replace(/,/g, ''));
     if (!Number.isFinite(amt) || amt <= 0) { setErr('Enter a valid amount.'); return; }
     if (amt < MIN_DEPOSIT) { setErr(`Minimum deposit is GHS ${MIN_DEPOSIT}.`); return; }
+    // Submitting a deposit is the moment the user most wants notified about
+    // its outcome — request browser permission here so the approve/reject
+    // socket event can surface even when the tab is backgrounded.
+    requestNotificationPermission().catch(() => {});
     try {
       setBusy(true);
       const data = await apiDeposit(amt, depositMethod);
@@ -276,6 +343,11 @@ export default function AppProviders({ children }) {
           wins={wins}
           onClose={dismissWins}
           onViewSlip={() => navigate('/my-bets')}
+        />
+
+        <DepositResultModal
+          result={depositResults[0] || null}
+          onClose={() => setDepositResults((prev) => prev.slice(1))}
         />
 
         <div className="toast-stack" role="status" aria-live="polite">

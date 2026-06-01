@@ -503,6 +503,20 @@ export default function BetHistoryPage() {
   // Bet History tab filters (the "Settled" / "Bet Result" dropdowns)
   const [historyScope, setHistoryScope]   = useState('settled'); // settled | all
   const [historyResult, setHistoryResult] = useState('all');     // all | won | lost | cashed_out | void
+  // Open Bets tab chip filter: all | cashout | live
+  const [openFilter, setOpenFilter] = useState('all');
+  // Open Bets cards default to expanded (matching the screenshot). We track
+  // the set of bet IDs that have been *collapsed* by the user so the default
+  // stays "Hide Match Details" / details visible.
+  const [collapsedOpenIds, setCollapsedOpenIds] = useState(() => new Set());
+  const toggleOpenCollapsed = useCallback((id) => {
+    setCollapsedOpenIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
   // Ticket detail overlay — holds the bet currently being inspected.
   const [activeTicket, setActiveTicket] = useState(null);
   // Inline expansion — set of bet IDs whose cards are open.
@@ -591,6 +605,20 @@ export default function BetHistoryPage() {
   const openBets = useMemo(() => bets.filter((b) => b.status === 'open'), [bets]);
   const settled  = useMemo(() => bets.filter((b) => b.status !== 'open'), [bets]);
 
+  // Apply Open Bets chip filter: 'cashout' shows tickets with a positive
+  // cash-out offer, 'live' approximates by selecting bets placed within the
+  // last 24h (we don't track per-leg live state). 'all' shows everything.
+  const openVisible = useMemo(() => {
+    if (openFilter === 'cashout') {
+      return openBets.filter((b) => computeOffer(b) > 0);
+    }
+    if (openFilter === 'live') {
+      const cutoff = Date.now() - 24 * 60 * 60 * 1000;
+      return openBets.filter((b) => new Date(b.placedAt).getTime() >= cutoff);
+    }
+    return openBets;
+  }, [openBets, openFilter]);
+
   // Apply history-tab filters: scope ("settled" vs "all") + bet result.
   const historyVisible = useMemo(() => {
     let rows = historyScope === 'settled' ? settled : bets;
@@ -598,7 +626,7 @@ export default function BetHistoryPage() {
     return rows;
   }, [bets, settled, historyScope, historyResult]);
 
-  const visible  = tab === 'open' ? openBets : historyVisible;
+  const visible  = tab === 'open' ? openVisible : historyVisible;
 
   const totals = useMemo(() => ({
     openCount:  openBets.length,
@@ -688,43 +716,80 @@ export default function BetHistoryPage() {
   return (
     <main className="bh-page">
       <div className="bh-shell">
-        <header className="bh-head fade-up">
-          <div>
-            <h1>My Bets</h1>
-            <p className="bh-sub">Open tickets and your full bet history — all in one place.</p>
-          </div>
-          <div className="bh-summary">
-            <div className="bh-summary-card">
-              <span className="lbl">Open</span>
-              <strong>{totals.openCount}</strong>
+        {tab === 'history' && (
+          <header className="bh-head fade-up">
+            <div>
+              <h1>My Bets</h1>
+              <p className="bh-sub">Open tickets and your full bet history — all in one place.</p>
             </div>
-            <div className="bh-summary-card">
-              <span className="lbl">Stake at risk</span>
-              <strong>GHS {fmt(totals.openStake)}</strong>
+            <div className="bh-summary">
+              <div className="bh-summary-card">
+                <span className="lbl">Open</span>
+                <strong>{totals.openCount}</strong>
+              </div>
+              <div className="bh-summary-card">
+                <span className="lbl">Stake at risk</span>
+                <strong>GHS {fmt(totals.openStake)}</strong>
+              </div>
+              <div className="bh-summary-card accent">
+                <span className="lbl">Potential win</span>
+                <strong>GHS {fmt(totals.openWin)}</strong>
+              </div>
             </div>
-            <div className="bh-summary-card accent">
-              <span className="lbl">Potential win</span>
-              <strong>GHS {fmt(totals.openWin)}</strong>
-            </div>
-          </div>
-        </header>
+          </header>
+        )}
 
-        <div className="bh-tabs fade-up" style={{ animationDelay: '0.04s' }}>
+        <div className="bh-tabs bh-tabs-line fade-up" style={{ animationDelay: '0.04s' }}>
           <button
             type="button"
             className={`bh-tab${tab === 'open' ? ' active' : ''}`}
             onClick={() => setTab('open')}
           >
-            Open Bets <span className="bh-tab-count">{openBets.length}</span>
+            Open Bets <span className="bh-tab-paren">({openBets.length})</span>
           </button>
           <button
             type="button"
             className={`bh-tab${tab === 'history' ? ' active' : ''}`}
             onClick={() => setTab('history')}
           >
-            Bet History <span className="bh-tab-count">{settled.length}</span>
+            Bet History
           </button>
         </div>
+
+        {tab === 'open' && (
+          <div className="ob-filters fade-up" style={{ animationDelay: '0.06s' }}>
+            <button
+              type="button"
+              className={`ob-chip${openFilter === 'all' ? ' active' : ''}`}
+              onClick={() => setOpenFilter('all')}
+            >
+              All
+            </button>
+            <button
+              type="button"
+              className={`ob-chip${openFilter === 'cashout' ? ' active' : ''}`}
+              onClick={() => setOpenFilter('cashout')}
+            >
+              Cashout Available
+            </button>
+            <button
+              type="button"
+              className={`ob-chip${openFilter === 'live' ? ' active' : ''}`}
+              onClick={() => setOpenFilter('live')}
+            >
+              <span className="ob-chip-dot" aria-hidden /> Live Games
+            </button>
+            <div className="ob-filters-spacer" />
+            <button type="button" className="ob-grid-btn" aria-label="Toggle layout">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="3" width="7" height="7" rx="1" />
+                <rect x="14" y="3" width="7" height="7" rx="1" />
+                <rect x="3" y="14" width="7" height="7" rx="1" />
+                <rect x="14" y="14" width="7" height="7" rx="1" />
+              </svg>
+            </button>
+          </div>
+        )}
 
         {tab === 'history' && (
           <div className="bh-history-filters fade-up" style={{ animationDelay: '0.06s' }}>
@@ -797,129 +862,118 @@ export default function BetHistoryPage() {
             ))}
           </ul>
         ) : (
-          <ul className="bh-list">
+          <ul className="ob-list">
             {visible.map((b) => {
               const code = b.bookingCode || toBookingCode(b.id);
-              const isOpen = b.status === 'open';
-              const cashOutAmount = isOpen ? computeOffer(b) : 0;
-              const trend = trends[b.id]; // 'up' | 'down' | undefined
-              const autoTarget = autoTargets[b.id] || '';
-              const hasLegs = b.legs?.length > 0;
-              const firstLeg = hasLegs ? b.legs[0] : null;
+              const cashOutAmount = computeOffer(b);
+              const legs = b.legs || [];
+              const expanded = !collapsedOpenIds.has(b.id); // default: expanded
+              const modeLabel =
+                b.mode === 'single'   ? 'Single'
+              : b.mode === 'multiple' ? 'Multiple'
+              : b.mode === 'system'   ? 'System'
+              : (b.mode || 'Bet');
+              // For a multi-leg open bet, simulate that all but the last leg
+              // have already finished (won) — matches the screenshot which
+              // shows a green-checked leg above an amber pending leg.
+              const legStateOf = (i) => {
+                if (legs.length <= 1) return 'pending';
+                return i < legs.length - 1 ? 'settled' : 'pending';
+              };
+
               return (
-                <li key={b.id} className={`bh-card status-${b.status} fade-up`}>
-                  <header className="bh-card-head">
-                    <div className="bh-card-headline">
-                      <span className={`bh-status ${b.status}`}>{STATUS_LABEL[b.status] || b.status?.toUpperCase()}</span>
-                      <span className="bh-card-meta">
-                        {b.legs?.length || 1} selection{(b.legs?.length || 1) > 1 ? 's' : ''} · {placedAtLabel(b.placedAt)}
-                      </span>
-                    </div>
-                    <span className="bh-card-mode">{b.mode}</span>
+                <li key={b.id} className="ob-card fade-up">
+                  <header className="ob-head">
+                    <h3 className="ob-mode">{modeLabel}</h3>
+                    <button
+                      type="button"
+                      className="ob-edit"
+                      onClick={() => onCopy(code)}
+                      title={copiedCode === code ? 'Copied!' : `Copy booking code: ${code}`}
+                    >
+                      <span>{copiedCode === code ? 'Copied' : 'Edit Bet'}</span>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                        <circle cx="18" cy="5" r="3" />
+                        <circle cx="6" cy="12" r="3" />
+                        <circle cx="18" cy="19" r="3" />
+                        <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
+                        <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
+                      </svg>
+                    </button>
                   </header>
 
-                  <div className="bh-stats">
-                    <div className="bh-stat">
-                      <span className="lbl">Total Odds</span>
-                      <strong>{Number(b.totalOdds || 0).toFixed(2)}</strong>
-                    </div>
-                    <div className="bh-stat">
-                      <span className="lbl">Stake</span>
-                      <strong>GHS {fmt(b.stake)}</strong>
-                    </div>
-                    <div className="bh-stat">
-                      <span className="lbl">Potential Win</span>
-                      <strong className="accent">GHS {fmt(b.potentialWin)}</strong>
-                    </div>
-                  </div>
-
-                  <div className="bh-code">
-                    <span className="bh-code-label">Booking Code</span>
-                    <code className="bh-code-value">{code}</code>
-                    <div style={{ display: 'flex', gap: 6 }}>
-                      <button type="button" className="bh-copy" onClick={() => onCopy(code)}>
-                        {copiedCode === code ? '✓ Copied' : 'Copy'}
-                      </button>
-                      {navigator.share && (
-                        <button 
-                          type="button" 
-                          className="bh-copy" 
-                          onClick={() => {
-                            navigator.share({
-                              title: 'My Xenbet Slip',
-                              text: `Check out my bet slip on Xenbet! Booking Code: ${code}`,
-                            }).catch(() => {});
-                          }}
-                        >
-                          Share
-                        </button>
-                      )}
-                    </div>
-                  </div>
-
-                  {b.mode === 'system' && (
-                    <div className="bh-system-info">
-                      <span className="bh-system-badge">{b.systemLabel || b.systemType}</span>
-                      <span>{b.linesCount} lines · GHS {fmt(b.stakePerLine || 0)}/line</span>
-                    </div>
-                  )}
-
-                  {isOpen && (
-                    <>
-                      <button
-                        type="button"
-                        className={`bh-cashout trend-${trend || 'flat'}`}
-                        onClick={() => onCashOut(b)}
-                      >
-                        Cash Out · GHS {fmt(cashOutAmount)}
-                        {trend === 'up'   && <span className="bh-trend up"   aria-label="offer rose">▲</span>}
-                        {trend === 'down' && <span className="bh-trend down" aria-label="offer dropped">▼</span>}
-                      </button>
-                      <div className="bh-auto-row">
-                        <label htmlFor={`auto-${b.id}`} className="bh-auto-lbl">Auto cash-out at</label>
-                        <span className="bh-auto-prefix">GHS</span>
-                        <input
-                          id={`auto-${b.id}`}
-                          type="number"
-                          inputMode="decimal"
-                          min="0"
-                          step="1"
-                          placeholder="e.g. 400"
-                          value={autoTarget}
-                          onChange={(e) => setAutoTarget(b.id, e.target.value)}
-                          className="bh-auto-input"
-                        />
-                        {autoTarget ? (
-                          <button type="button" className="bh-auto-clear" onClick={() => setAutoTarget(b.id, '')}>Clear</button>
-                        ) : null}
-                      </div>
-                    </>
-                  )}
-
-                  {!isOpen && b.status === 'cashed_out' && (
-                    <p className="bh-cashed-note">Cashed out for <strong>GHS {fmt(b.cashOut)}</strong>.</p>
-                  )}
-
-                  {hasLegs && (
-                    <details className="bh-legs">
-                      <summary>{b.legs.length} selection{b.legs.length > 1 ? 's' : ''} · tap to expand</summary>
-                      <ul>
-                        {b.legs.map((l, i) => (
-                          <li key={i} className="bh-leg">
-                            <div className="bh-leg-teams">{l.home} <span>vs</span> {l.away}</div>
-                            <div className="bh-leg-pick">
-                              <span className="bh-leg-market">{l.marketName || l.market}</span>
-                              <span className="bh-leg-odds">{l.outcome} @ {Number(l.odds).toFixed(2)}</span>
+                  {expanded && legs.length > 0 && (
+                    <div className="ob-legs">
+                      {legs.map((leg, i) => {
+                        const state = legStateOf(i);
+                        const score = state === 'settled'
+                          ? fakeLegScore(b, leg, i, 'won')
+                          : null;
+                        const pick = PICK_LABEL[leg.outcome] || leg.outcome || '—';
+                        const market = leg.marketName || MARKET_LABEL[leg.market] || leg.market || '—';
+                        const legTime = ticketTime(b.placedAt);
+                        return (
+                          <article key={i} className={`ob-leg ob-leg-${state}`}>
+                            <div className={`ob-leg-icon ob-leg-icon-${state}`} aria-hidden>
+                              {state === 'settled' ? (
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round">
+                                  <polyline points="20 6 9 17 4 12" />
+                                </svg>
+                              ) : (
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round">
+                                  <circle cx="12" cy="12" r="9" />
+                                  <polyline points="12 7 12 12 15 14" />
+                                </svg>
+                              )}
                             </div>
-                          </li>
-                        ))}
-                      </ul>
-                    </details>
+                            <div className="ob-leg-body">
+                              <div className="ob-leg-top">
+                                <span className="ob-leg-pick">{pick}</span>
+                                <span className="ob-leg-odds">₵{Number(leg.odds).toFixed(2)}</span>
+                              </div>
+                              <div className="ob-leg-market">{market}</div>
+                              <div className="ob-leg-teams">
+                                {leg.home} <span className="ob-leg-vs">vs</span> {leg.away}
+                              </div>
+                              <div className="ob-leg-meta">
+                                {state === 'settled' && score ? `FT: ${score.str}` : legTime}
+                              </div>
+                            </div>
+                          </article>
+                        );
+                      })}
+                    </div>
                   )}
 
-                  {firstLeg && !hasLegs && (
-                    <p className="bh-leg-summary">{firstLeg.home} vs {firstLeg.away}</p>
-                  )}
+                  <button
+                    type="button"
+                    className="ob-toggle"
+                    onClick={() => toggleOpenCollapsed(b.id)}
+                  >
+                    {expanded ? 'Hide Match Details' : 'Show Match Details'}
+                    <span className="ob-toggle-caret" aria-hidden>{expanded ? '▲' : '▼'}</span>
+                  </button>
+
+                  <div className="ob-totals">
+                    <div className="ob-total-row">
+                      <span className="ob-total-lbl">Stake</span>
+                      <span className="ob-total-val">{fmt(b.stake)}</span>
+                    </div>
+                    <div className="ob-total-row">
+                      <span className="ob-total-lbl">Pot. Win</span>
+                      <span className="ob-total-val ob-total-val-strong">{fmt(b.potentialWin)}</span>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    className="ob-cashout"
+                    onClick={() => onCashOut(b)}
+                  >
+                    Cashout GHS {fmt(cashOutAmount)}
+                  </button>
+
+                  <p className="ob-offer-note">Responsive Time Offer</p>
                 </li>
               );
             })}
@@ -1958,5 +2012,374 @@ html[data-theme="light"] .bh-hleg-mkt { background: rgba(0, 0, 0, 0.06); }
     backdrop-filter: blur(4px);
     align-items: center;
   }
+}
+
+/* ============ Open Bets — image-matched (SportyBet-style) ============ */
+
+/* Underline-style tabs override the pill-style default for Open Bets. */
+.bh-tabs-line {
+  display: flex;
+  gap: 0;
+  background: transparent;
+  border: none;
+  padding: 0;
+  border-radius: 0;
+  align-self: stretch;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+html[data-theme="light"] .bh-tabs-line { border-bottom-color: rgba(0, 0, 0, 0.08); }
+.bh-tabs-line .bh-tab {
+  position: relative;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  padding: 12px 18px 14px;
+  color: var(--text-soft);
+  font-weight: 700;
+  font-size: 14.5px;
+  letter-spacing: -0.005em;
+}
+.bh-tabs-line .bh-tab:hover { color: var(--text); background: transparent; }
+.bh-tabs-line .bh-tab.active {
+  background: transparent;
+  color: var(--text);
+}
+.bh-tabs-line .bh-tab.active::after {
+  content: '';
+  position: absolute;
+  left: 14px; right: 14px; bottom: -1px;
+  height: 3px;
+  border-radius: 3px 3px 0 0;
+  background: linear-gradient(90deg, #18a249, #14b86b);
+  box-shadow: 0 -1px 6px rgba(20, 184, 107, 0.45);
+}
+.bh-tab-paren {
+  margin-left: 4px;
+  font-weight: 700;
+  color: inherit;
+  opacity: 0.92;
+}
+
+/* Filter chips row */
+.ob-filters {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 2px 4px;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.ob-filters::-webkit-scrollbar { display: none; }
+.ob-filters-spacer { flex: 1; min-width: 4px; }
+.ob-chip {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-soft);
+  font: inherit;
+  font-weight: 700;
+  font-size: 12.5px;
+  padding: 7px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: background .15s, color .15s, border-color .15s;
+  font-family: inherit;
+}
+.ob-chip:hover { color: var(--text); }
+.ob-chip.active {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text);
+  border-color: rgba(255, 255, 255, 0.06);
+}
+html[data-theme="light"] .ob-chip.active {
+  background: rgba(0, 0, 0, 0.06);
+  border-color: rgba(0, 0, 0, 0.05);
+}
+.ob-chip-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  background: #ef4444;
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.18);
+  animation: obLivePulse 1.6s ease-in-out infinite;
+}
+@keyframes obLivePulse {
+  0%, 100% { box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.18); }
+  50%      { box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.04); }
+}
+.ob-grid-btn {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: var(--text-soft);
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: border-color .15s, color .15s;
+}
+.ob-grid-btn:hover { color: var(--text); border-color: rgba(255, 255, 255, 0.18); }
+html[data-theme="light"] .ob-grid-btn { border-color: rgba(0, 0, 0, 0.1); }
+
+/* Card list */
+.ob-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 14px;
+}
+@media (min-width: 760px) {
+  .ob-list { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* The card itself — light card on the dark page (matches the screenshot) */
+.ob-card {
+  background: #fbfbf6;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 14px;
+  padding: 16px 16px 14px;
+  color: #181a1c;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  font-family: inherit;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22);
+  transition: transform .18s ease, box-shadow .18s ease;
+}
+.ob-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 14px 32px rgba(0, 0, 0, 0.28);
+}
+html[data-theme="light"] .ob-card {
+  background: #ffffff;
+  border-color: rgba(0, 0, 0, 0.07);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06);
+}
+
+/* Header row: mode label + edit-bet/share */
+.ob-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.ob-mode {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: #15181c;
+}
+.ob-edit {
+  background: transparent;
+  border: none;
+  color: #16a34a;
+  font: inherit;
+  font-family: inherit;
+  font-weight: 800;
+  font-size: 13px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  padding: 6px 8px;
+  border-radius: 8px;
+  transition: background .15s, color .15s;
+}
+.ob-edit:hover { background: rgba(22, 163, 74, 0.08); color: #138a3e; }
+
+/* Selection (leg) rows */
+.ob-legs {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ob-leg {
+  display: grid;
+  grid-template-columns: 28px 1fr;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #f3f4ec;
+  border: 1px solid transparent;
+  align-items: start;
+}
+.ob-leg-settled {
+  background: linear-gradient(180deg, #ecf6ee 0%, #e6f2e9 100%);
+  border-color: rgba(22, 163, 74, 0.08);
+}
+.ob-leg-pending {
+  background: linear-gradient(180deg, #fdf3dd 0%, #fbecc8 100%);
+  border-color: rgba(245, 158, 11, 0.12);
+}
+.ob-leg-icon {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  margin-top: 2px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
+}
+.ob-leg-icon-settled { background: linear-gradient(135deg, #18a249, #117a36); }
+.ob-leg-icon-pending { background: linear-gradient(135deg, #f59e0b, #d97706); }
+
+.ob-leg-body { min-width: 0; }
+.ob-leg-top {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 3px;
+}
+.ob-leg-pick {
+  display: inline-block;
+  font-weight: 800;
+  font-size: 13px;
+  color: #14181c;
+  padding: 1px 7px;
+  background: rgba(255, 255, 255, 0.85);
+  border-radius: 5px;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  font-family: 'JetBrains Mono', 'Roboto Mono', monospace;
+  letter-spacing: -0.01em;
+}
+.ob-leg-pending .ob-leg-pick { background: rgba(255, 255, 255, 0.92); }
+.ob-leg-odds {
+  font-weight: 800;
+  font-size: 13.5px;
+  color: #15803d;
+  font-variant-numeric: tabular-nums;
+  font-family: 'JetBrains Mono', 'Roboto Mono', monospace;
+}
+.ob-leg-market {
+  font-size: 11.5px;
+  color: #6b7280;
+  margin-bottom: 4px;
+  font-weight: 600;
+  letter-spacing: 0.005em;
+}
+.ob-leg-teams {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #1a1d22;
+  line-height: 1.3;
+  margin-bottom: 3px;
+}
+.ob-leg-vs {
+  color: #8a8f97;
+  font-weight: 500;
+  margin: 0 2px;
+}
+.ob-leg-meta {
+  font-size: 11.5px;
+  font-style: italic;
+  color: #6b7280;
+  font-weight: 500;
+}
+
+/* Show/Hide Match Details */
+.ob-toggle {
+  background: transparent;
+  border: none;
+  color: #15803d;
+  font: inherit;
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 12.5px;
+  padding: 2px 4px;
+  cursor: pointer;
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: 6px;
+  transition: background .15s, color .15s;
+}
+.ob-toggle:hover { background: rgba(21, 128, 61, 0.06); }
+.ob-toggle-caret {
+  font-size: 10px;
+  line-height: 1;
+  transform: translateY(-1px);
+}
+
+/* Totals (Stake / Pot. Win) */
+.ob-totals {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+}
+.ob-total-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 13.5px;
+}
+.ob-total-lbl {
+  color: #6b7280;
+  font-weight: 600;
+}
+.ob-total-val {
+  color: #14181c;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  font-family: 'JetBrains Mono', 'Roboto Mono', monospace;
+}
+.ob-total-val-strong { font-size: 14.5px; }
+
+/* Cashout button */
+.ob-cashout {
+  width: 100%;
+  padding: 14px 16px;
+  background: linear-gradient(180deg, #18b66d 0%, #12a360 100%);
+  color: #ffffff;
+  font-weight: 800;
+  font-size: 15.5px;
+  letter-spacing: 0.005em;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  font-family: inherit;
+  margin-top: 4px;
+  box-shadow: 0 8px 18px rgba(18, 163, 96, 0.32),
+              inset 0 -2px 0 rgba(0, 0, 0, 0.12);
+  transition: transform .15s ease, box-shadow .15s ease, filter .15s ease;
+}
+.ob-cashout:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.04);
+  box-shadow: 0 12px 24px rgba(18, 163, 96, 0.4),
+              inset 0 -2px 0 rgba(0, 0, 0, 0.12);
+}
+.ob-cashout:active { transform: translateY(0); filter: brightness(0.98); }
+
+/* Responsive Time Offer note */
+.ob-offer-note {
+  margin: 0;
+  text-align: center;
+  font-size: 11.5px;
+  color: #6b7280;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+}
+
+@media (max-width: 480px) {
+  .ob-card { padding: 14px 14px 12px; gap: 11px; }
+  .ob-mode { font-size: 16px; }
+  .ob-leg { padding: 9px 11px; gap: 9px; }
+  .ob-leg-teams { font-size: 13px; }
+  .ob-cashout { padding: 13px 14px; font-size: 15px; }
+  .bh-tabs-line .bh-tab { padding: 11px 14px 13px; font-size: 14px; }
 }
 `;

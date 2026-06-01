@@ -1,9 +1,35 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { Card, Badge, Spinner, Empty, moneyFmt, ago, useToast } from '../../components/admin/primitives.jsx';
 import { adminListPendingDeposits, adminApproveDeposit, adminRejectDeposit } from '../../api/adminApi.js';
 import { IconCheck, IconClose } from '../../components/admin/Icons.jsx';
+import { onAdmin } from '../../api/adminSocket.js';
+import { requestNotificationPermission, notify as osNotify } from '../../lib/browserNotify.js';
 
 const REFRESH_MS = 8_000;
+
+/**
+ * Play a short attention chime when a new deposit arrives. Uses WebAudio so
+ * we don't ship an audio file; falls back to a no-op if the browser blocks
+ * autoplay (admin gets the toast + OS notification anyway).
+ */
+function playChime() {
+  try {
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) return;
+    const ctx = new Ctx();
+    const o = ctx.createOscillator();
+    const g = ctx.createGain();
+    o.connect(g); g.connect(ctx.destination);
+    o.type = 'sine';
+    o.frequency.setValueAtTime(880, ctx.currentTime);
+    o.frequency.exponentialRampToValueAtTime(1320, ctx.currentTime + 0.18);
+    g.gain.setValueAtTime(0.0001, ctx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.15, ctx.currentTime + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.4);
+    o.start(); o.stop(ctx.currentTime + 0.42);
+    setTimeout(() => { try { ctx.close(); } catch {} }, 600);
+  } catch { /* autoplay blocked / no audio context */ }
+}
 
 export default function DepositsPage() {
   const { toast: toastState, show } = useToast();
@@ -11,12 +37,18 @@ export default function DepositsPage() {
   const [err, setErr] = useState('');
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState(null);
-  const [rejectId, setRejectId] = useState(null);
-  const [rejectReason, setRejectReason] = useState('');
+  // Track which deposits we've already chimed for so a reload + socket replay
+  // doesn't double-notify the admin for the same transaction.
+  const seenIdsRef = useRef(new Set());
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (opts = {}) => {
     try {
       const r = await adminListPendingDeposits();
+      // Initial load seeds the seen-set so existing pending deposits don't
+      // each fire a chime. Subsequent polls just keep the set in sync.
+      if (opts.seed && Array.isArray(r?.pending)) {
+        for (const tx of r.pending) seenIdsRef.current.add(tx.id);
+      }
       setData(r);
       setErr('');
     } catch (e) {
@@ -28,10 +60,45 @@ export default function DepositsPage() {
 
   useEffect(() => {
     let alive = true;
-    const tick = () => load().then(() => alive && setTimeout(tick, REFRESH_MS));
+    // First call seeds; subsequent polls don't.
+    let first = true;
+    const tick = () => load(first ? { seed: true } : {}).then(() => {
+      first = false;
+      if (alive) setTimeout(tick, REFRESH_MS);
+    });
     tick();
     return () => { alive = false; };
   }, [load]);
+
+  // Live admin notifications when a user submits a new deposit. The server
+  // emits `wallet:deposit` to the admin namespace from routes/wallet.js as
+  // soon as the pending row lands -- no need to wait for the 8s poll.
+  useEffect(() => {
+    // Best-effort OS notification permission. Loading the admin page is a
+    // user-initiated navigation, which usually carries enough activation
+    // for the prompt to show.
+    requestNotificationPermission().catch(() => {});
+
+    const off = onAdmin('wallet:deposit', (payload) => {
+      const txId = payload?.transactionId;
+      if (txId && seenIdsRef.current.has(txId)) return;
+      if (txId) seenIdsRef.current.add(txId);
+
+      const amount = payload?.amount;
+      const userId = payload?.userId;
+      const title = 'New deposit request';
+      const body  = `GHS ${moneyFmt(amount)} from user ${userId || ''}`.trim();
+
+      show(`New deposit request — GHS ${moneyFmt(amount)}`, 'info');
+      osNotify({ title, body, tag: `admin-deposit-${txId || Date.now()}` });
+      playChime();
+      // Pull the row in immediately so the admin sees it without waiting
+      // for the next 8-second poll.
+      load();
+    });
+
+    return () => { off?.(); };
+  }, [load, show]);
 
   const handleApprove = async (id) => {
     setBusyId(id);
@@ -47,13 +114,15 @@ export default function DepositsPage() {
   };
 
   const handleReject = async (id) => {
-    if (!rejectReason.trim()) return;
+    // Single-click reject. The server still accepts an optional `reason`
+    // field, but the admin no longer has to fill it in to commit the action.
+    // Native confirm guards against accidental clicks; if you want to
+    // bypass it for a tighter workflow, drop this `if` block.
+    if (!window.confirm('Reject this deposit?')) return;
     setBusyId(id);
     try {
-      await adminRejectDeposit(id, { reason: rejectReason.trim() || undefined });
+      await adminRejectDeposit(id, {});
       show('Deposit rejected', 'success');
-      setRejectId(null);
-      setRejectReason('');
       load();
     } catch (e) {
       show(e.message || 'Rejection failed', 'error');
@@ -128,61 +197,28 @@ export default function DepositsPage() {
                   <td style={{ fontSize: 13, color: 'var(--text-dim)' }}>{(tx.method || 'momo').toUpperCase()}</td>
                   <td style={{ fontSize: 13, color: 'var(--text-dim)' }}>{ago(tx.at)}</td>
                   <td style={{ textAlign: 'right' }}>
-                    {rejectId === tx.id ? (
-                      <div style={{ display: 'flex', gap: 6, alignItems: 'center', justifyContent: 'flex-end' }}>
-                        <input
-                          type="text"
-                          placeholder="Reason (optional)"
-                          value={rejectReason}
-                          onChange={(e) => setRejectReason(e.target.value)}
-                          style={{
-                            padding: '6px 10px', borderRadius: 6, border: '1px solid var(--border)',
-                            background: 'var(--surface)', color: 'var(--text)', fontSize: 12, width: 160,
-                            outline: 'none',
-                          }}
-                          autoFocus
-                        />
-                        <button
-                          type="button"
-                          onClick={() => handleReject(tx.id)}
-                          disabled={busyId === tx.id}
-                          className="adm-btn adm-btn-sm"
-                          style={{ background: '#ef4444', color: '#fff', border: 'none' }}
-                        >
-                          {busyId === tx.id ? '…' : 'Confirm'}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => { setRejectId(null); setRejectReason(''); }}
-                          className="adm-btn adm-btn-sm"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    ) : (
-                      <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
-                        <button
-                          type="button"
-                          onClick={() => handleApprove(tx.id)}
-                          disabled={busyId === tx.id}
-                          className="adm-btn adm-btn-sm"
-                          style={{ background: '#22c55e', color: '#fff', border: 'none' }}
-                          title="Approve"
-                        >
-                          <IconCheck />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setRejectId(tx.id)}
-                          disabled={busyId === tx.id}
-                          className="adm-btn adm-btn-sm"
-                          style={{ background: '#ef4444', color: '#fff', border: 'none' }}
-                          title="Reject"
-                        >
-                          <IconClose />
-                        </button>
-                      </div>
-                    )}
+                    <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                      <button
+                        type="button"
+                        onClick={() => handleApprove(tx.id)}
+                        disabled={busyId === tx.id}
+                        className="adm-btn adm-btn-sm"
+                        style={{ background: '#22c55e', color: '#fff', border: 'none' }}
+                        title="Approve"
+                      >
+                        <IconCheck />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleReject(tx.id)}
+                        disabled={busyId === tx.id}
+                        className="adm-btn adm-btn-sm"
+                        style={{ background: '#ef4444', color: '#fff', border: 'none' }}
+                        title="Reject"
+                      >
+                        <IconClose />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}

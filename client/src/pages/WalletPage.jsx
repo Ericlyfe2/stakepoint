@@ -204,6 +204,10 @@ export default function WalletPage() {
                         {relTime(t.at || t.createdAt)}
                         {t.status === 'pending' && <span className="wallet-tx-pill pending">Pending</span>}
                         {t.status === 'rejected' && <span className="wallet-tx-pill rejected">Rejected</span>}
+                        {/* "Approved" only applies to deposits the admin queue has cleared. */}
+                        {t.kind === 'deposit' && t.status === 'completed' && (
+                          <span className="wallet-tx-pill approved">Approved</span>
+                        )}
                       </div>
                     </div>
                     <div className={`wallet-tx-amt ${isCredit ? 'credit' : 'debit'}`}>
@@ -515,6 +519,7 @@ const WALLET_CSS = `
 .wallet-tx-pill { display: inline-block; font-size: 9px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; padding: 2px 7px; border-radius: 999px; margin-left: 6px; }
 .wallet-tx-pill.pending { background: rgba(245,158,11,0.15); color: #f59e0b; }
 .wallet-tx-pill.rejected { background: rgba(239,68,68,0.15); color: #ef4444; }
+.wallet-tx-pill.approved { background: rgba(34,197,94,0.15); color: #22c55e; }
 
 .fade-up {
   animation: walletFadeUp .45s ease both;
