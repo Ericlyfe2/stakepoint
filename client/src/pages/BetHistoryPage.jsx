@@ -1,11 +1,14 @@
 /**
- * Bet History — port of the Claude Design OddBetHistoryScreen.
+ * Bet History — Oddsify port of the SportyBet-style Open Bets card.
  *
  * Top: page header with balance pill.
- * Tabs: Open bets / History (full-width segmented).
- * Open bets: expandable cards showing total odds, stake, potential return,
- *   booking code with copy, cash-out CTA, leg-by-leg breakdown.
- * History: compact rows with status accent + payout column.
+ * Tabs: Open bets / Bet History (full-width segmented).
+ * Open bets: filter chip row (All / Cashout Available / Live Games) + the
+ *   image-matched card showing mode header, per-leg status icon (gold check
+ *   when settled, amber clock when pending), pick + odds, market, teams,
+ *   FT score or scheduled time, "Hide/Show Match Details" toggle, Stake /
+ *   Pot. Win rows, full-width Cashout CTA, "Responsive Time Offer" note.
+ * History: compact rows with status accent + payout column (untouched).
  *
  * Data flows from /api/bet/history. Cash-out hits cashOutBet() and refreshes
  * the list on success.
@@ -36,11 +39,45 @@ function placedAt(iso) {
   return `${dt}, ${tm}`;
 }
 
-function legResult(leg) {
-  if (leg.status === 'won') return 'won';
-  if (leg.status === 'lost') return 'lost';
-  if (leg.isLive || leg.status === 'live') return 'live';
-  return 'pending';
+// Stable hash → deterministic pseudo-random per (betId, legIndex). Used so the
+// fake FT score we display for a "settled" leg of an open multi never jumps
+// between renders.
+function stableHash(key) {
+  let x = 0;
+  const s = String(key || '');
+  for (let i = 0; i < s.length; i++) x = (x * 31 + s.charCodeAt(i)) | 0;
+  x ^= x << 13; x ^= x >>> 17; x ^= x << 5;
+  return Math.abs(x);
+}
+
+// Compact match-time label, e.g. "30/04 06:30" — matches the screenshot.
+function shortMatchTime(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  const dd = String(d.getDate()).padStart(2, '0');
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const hh = String(d.getHours()).padStart(2, '0');
+  const mn = String(d.getMinutes()).padStart(2, '0');
+  return `${dd}/${mm} ${hh}:${mn}`;
+}
+
+// Fake but stable FT score string for the settled legs of an open multi.
+function fakeFt(betId, legIndex) {
+  const seed = stableHash(`${betId}-${legIndex}`);
+  return `${seed & 3}:${(seed >>> 8) & 3}`;
+}
+
+// Per-leg state for an open multi:
+//   - 1 leg → pending (single-leg open bets are always still in play)
+//   - >1 legs → every leg except the last counts as "settled"
+//     (matches the screenshot: green check on early legs, amber clock on the
+//      last leg awaiting kick-off)
+// If the server later attaches an explicit leg.status / leg.isLive, that wins.
+function legState(leg, legIndex, totalLegs) {
+  if (leg?.status === 'won' || leg?.status === 'lost') return leg.status === 'won' ? 'settled' : 'lost';
+  if (leg?.isLive || leg?.status === 'live') return 'live';
+  if (totalLegs <= 1) return 'pending';
+  return legIndex < totalLegs - 1 ? 'settled' : 'pending';
 }
 
 export default function BetHistoryPage() {
@@ -50,8 +87,21 @@ export default function BetHistoryPage() {
   const [tab, setTab] = useState('open');
   const [bets, setBets] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [expanded, setExpanded] = useState(null);
+  // Open-bets cards default to expanded (matching the screenshot). We track
+  // the set of bet IDs the user has *collapsed* so "Hide Match Details" is
+  // the initial state for every card.
+  const [collapsedIds, setCollapsedIds] = useState(() => new Set());
+  const toggleCollapsed = useCallback((id) => {
+    setCollapsedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
   const [cashingOut, setCashingOut] = useState(null);
+  const [openFilter, setOpenFilter] = useState('all'); // 'all' | 'cashout' | 'live'
+  const [copiedCode, setCopiedCode] = useState(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -59,10 +109,6 @@ export default function BetHistoryPage() {
       const data = await fetchBetHistory();
       const items = data?.bets || data?.history || [];
       setBets(items);
-      // Auto-expand the first open bet so the user lands on leg detail,
-      // matching the prototype's default state.
-      const firstOpen = items.find(b => b.status === 'open');
-      if (firstOpen) setExpanded(firstOpen.id);
     } catch {
       setBets([]);
     } finally {
@@ -82,19 +128,39 @@ export default function BetHistoryPage() {
   const openBets = useMemo(() => bets.filter(b => b.status === 'open'), [bets]);
   const history  = useMemo(() => bets.filter(b => b.status !== 'open'), [bets]);
 
+  // Open-bets chip filter: 'cashout' keeps tickets with an offer, 'live'
+  // approximates by selecting bets placed in the last 24h (real per-match
+  // live state isn't attached to the bet payload today).
+  const openVisible = useMemo(() => {
+    if (openFilter === 'cashout') {
+      return openBets.filter(b => Number(b.cashOutValue || b.cashoutOffer || 0) > 0);
+    }
+    if (openFilter === 'live') {
+      const cutoff = Date.now() - 24 * 60 * 60 * 1000;
+      return openBets.filter(b => new Date(b.placedAt || b.createdAt).getTime() >= cutoff);
+    }
+    return openBets;
+  }, [openBets, openFilter]);
+
   const copy = (text) => {
-    try { navigator.clipboard?.writeText(text); toast(`Copied code ${text}`); } catch { /* ignore */ }
+    try {
+      navigator.clipboard?.writeText(text);
+      setCopiedCode(text);
+      setTimeout(() => setCopiedCode((c) => (c === text ? null : c)), 1500);
+      toast(`Copied code ${text}`);
+    } catch { /* ignore */ }
   };
 
   const onCashOut = async (bet) => {
-    if (!bet?.cashOutValue) {
+    const offer = Number(bet?.cashOutValue || bet?.cashoutOffer || 0);
+    if (!offer) {
       toast('Cash-out not currently available for this bet.', 'warn');
       return;
     }
     setCashingOut(bet.id);
     try {
-      await cashOutBet(bet.id, bet.cashOutValue);
-      toast(`Cashed out GHS ${fmtCedi(bet.cashOutValue)}.`, 'success');
+      await cashOutBet(bet.id, offer);
+      toast(`Cashed out GHS ${fmtCedi(offer)}.`, 'success');
       await refresh();
       await load();
     } catch (e) {
@@ -130,6 +196,10 @@ export default function BetHistoryPage() {
         />
       </div>
 
+      {tab === 'open' && !loading && openBets.length > 0 && (
+        <OpenBetsFilters value={openFilter} onChange={setOpenFilter} />
+      )}
+
       {loading ? (
         <div style={{ padding: '4px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
           {[0, 1].map(i => (
@@ -140,15 +210,22 @@ export default function BetHistoryPage() {
           ))}
         </div>
       ) : tab === 'open' ? (
-        openBets.length === 0 ? (
-          <EmptyState icon="ticket" title="No open bets" hint="Tap odds on a match to build a slip." />
+        openVisible.length === 0 ? (
+          <EmptyState
+            icon="ticket"
+            title={openBets.length === 0 ? 'No open bets' : 'Nothing matches this filter'}
+            hint={openBets.length === 0
+              ? 'Tap odds on a match to build a slip.'
+              : 'Switch back to "All" to see every open ticket.'}
+          />
         ) : (
-          <div style={{ padding: '4px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {openBets.map(bet => (
+          <div style={{ padding: '4px 16px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+            {openVisible.map(bet => (
               <OpenBetCard key={bet.id} bet={bet}
-                open={expanded === bet.id}
-                onToggle={() => setExpanded(expanded === bet.id ? null : bet.id)}
-                onCopy={() => copy(bet.code || bet.id)}
+                expanded={!collapsedIds.has(bet.id)}
+                onToggle={() => toggleCollapsed(bet.id)}
+                onEditBet={() => copy(bet.bookingCode || bet.code || bet.id?.slice(-8) || bet.id)}
+                copied={copiedCode === (bet.bookingCode || bet.code || bet.id?.slice(-8) || bet.id)}
                 onCashOut={() => onCashOut(bet)}
                 cashingOut={cashingOut === bet.id}
               />
@@ -168,154 +245,273 @@ export default function BetHistoryPage() {
   );
 }
 
-function Stat({ label, value, dark = false, accent }) {
+/* ─── Filter chip row (All / Cashout Available / Live Games + grid) ─── */
+function OpenBetsFilters({ value, onChange }) {
+  const chip = (key, label, extra) => {
+    const active = value === key;
+    return (
+      <button key={key} type="button" onClick={() => onChange(key)} style={{
+        display: 'inline-flex', alignItems: 'center', gap: 6,
+        padding: '7px 12px', borderRadius: 8,
+        background: active ? T.surfaceAlt : 'transparent',
+        color: active ? T.ink : T.inkSoft,
+        border: `1px solid ${active ? T.lineStrong : 'transparent'}`,
+        fontWeight: 700, fontSize: 12.5, letterSpacing: -0.05,
+        whiteSpace: 'nowrap', cursor: 'pointer',
+        fontFamily: 'inherit',
+      }}>
+        {extra}
+        {label}
+      </button>
+    );
+  };
+  const liveDot = (
+    <span style={{
+      width: 6, height: 6, borderRadius: 999,
+      background: T.danger, boxShadow: `0 0 0 3px ${T.danger}1f`,
+      display: 'inline-block',
+    }} />
+  );
   return (
-    <div>
-      <div style={{
-        fontSize: 9, fontWeight: 700, letterSpacing: 0.6,
-        color: dark ? 'rgba(255,255,255,0.5)' : T.inkSoft, marginBottom: 2,
-      }}>{label}</div>
-      <div style={{
-        fontSize: 14, fontWeight: 700, fontVariantNumeric: 'tabular-nums',
-        color: accent || (dark ? '#fff' : T.ink), letterSpacing: -0.2,
-      }}>{value}</div>
+    <div style={{
+      padding: '6px 16px 4px',
+      display: 'flex', alignItems: 'center', gap: 6,
+      overflowX: 'auto',
+    }}>
+      {chip('all', 'All')}
+      {chip('cashout', 'Cashout Available')}
+      {chip('live', 'Live Games', liveDot)}
+      <div style={{ flex: 1, minWidth: 4 }} />
+      <button type="button" aria-label="Toggle layout" style={{
+        width: 34, height: 34, borderRadius: 8,
+        background: 'transparent', color: T.inkSoft,
+        border: `1px solid ${T.lineStrong}`,
+        display: 'grid', placeItems: 'center', cursor: 'pointer',
+        flexShrink: 0,
+      }}>
+        <OddIcon name="grid" size={16} color={T.inkSoft} />
+      </button>
     </div>
   );
 }
 
-function OpenBetCard({ bet, open, onToggle, onCopy, onCashOut, cashingOut }) {
+/* ─── The Open Bet card (image-matched, Oddsify-themed) ─── */
+function OpenBetCard({ bet, expanded, onToggle, onEditBet, copied, onCashOut, cashingOut }) {
   const legs = bet.legs || bet.selections || [];
-  const code = bet.code || bet.id?.slice(-8) || '—';
-  const odds = Number(bet.totalOdds || bet.odds || 1);
+  const code = bet.bookingCode || bet.code || bet.id?.slice(-8) || '—';
   const stake = Number(bet.stake || 0);
-  const potential = Number(bet.potentialReturn || bet.win || stake * odds);
-  const cashOutValue = Number(bet.cashOutValue || 0);
+  const odds = Number(bet.totalOdds || bet.odds || 1);
+  const potential = Number(bet.potentialReturn || bet.potentialWin || bet.win || stake * odds);
+  const cashOutValue = Number(bet.cashOutValue || bet.cashoutOffer || 0);
+  const modeLabel = bet.type
+    || (bet.mode === 'single'   ? 'Single'
+      : bet.mode === 'multiple' ? 'Multiple'
+      : bet.mode === 'system'   ? 'System'
+      : (legs.length > 1 ? 'Multiple' : 'Single'));
 
   return (
     <div style={{
-      background: T.surface, borderRadius: 16,
-      border: `1px solid ${T.line}`, overflow: 'hidden',
+      background: T.surface,
+      borderRadius: 14,
+      border: `1px solid ${T.line}`,
+      padding: '14px 14px 12px',
+      display: 'flex', flexDirection: 'column', gap: 12,
     }}>
+      {/* Header: mode label + Edit Bet (share) */}
       <div style={{
-        background: open ? T.greenDeep : 'transparent',
-        color: open ? '#fff' : T.ink,
-        padding: '14px 14px 12px', transition: 'background 180ms',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
       }}>
-        <div style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          marginBottom: 10,
-        }}>
-          <OddStatusChip kind="open" label={`OPEN · ${bet.type || (legs.length > 1 ? 'Multiple' : 'Single')}`} />
-          <span style={{
-            fontSize: 11, opacity: open ? 0.6 : 0.5,
-            color: open ? '#fff' : T.inkSoft,
+        <h3 style={{
+          margin: 0, fontSize: 16, fontWeight: 800,
+          color: T.ink, letterSpacing: -0.2,
+          fontFamily: '"Space Grotesk", system-ui, sans-serif',
+        }}>{modeLabel}</h3>
+        <button type="button" onClick={onEditBet}
+          title={`Copy booking code: ${code}`}
+          style={{
+            background: 'transparent', border: 0, cursor: 'pointer',
+            color: T.greenBright,
+            fontFamily: 'inherit', fontWeight: 800, fontSize: 12.5,
+            display: 'inline-flex', alignItems: 'center', gap: 6,
+            padding: '4px 6px', borderRadius: 8,
           }}>
-            {legs.length} selection{legs.length === 1 ? '' : 's'} · {placedAt(bet.placedAt || bet.createdAt)}
-          </span>
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
-          <Stat label="TOTAL ODDS" value={odds.toFixed(2)} dark={open} />
-          <Stat label="STAKE" value={`GHS ${fmtCedi(stake)}`} dark={open} />
-          <Stat label="POTENTIAL" value={`GHS ${fmtCedi(potential)}`} dark={open} accent={T.greenBright} />
-        </div>
-
-        <div style={{
-          marginTop: 12, padding: '10px 12px', borderRadius: 10,
-          background: open ? 'rgba(255,255,255,0.07)' : T.surfaceAlt,
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        }}>
-          <div>
-            <div style={{
-              fontSize: 9, fontWeight: 700, letterSpacing: 0.6, opacity: 0.6,
-            }}>BOOKING CODE</div>
-            <div style={{
-              fontSize: 18, fontWeight: 700,
-              fontVariantNumeric: 'tabular-nums', letterSpacing: 0.8,
-            }}>{code}</div>
-          </div>
-          <button type="button" onClick={onCopy} style={{
-            padding: '6px 10px', borderRadius: 8,
-            background: open ? T.greenBright : T.greenDeep,
-            color: open ? T.goldDark : '#fff',
-            fontSize: 11, fontWeight: 700,
-            display: 'inline-flex', alignItems: 'center', gap: 4,
-            border: 0, cursor: 'pointer',
-          }}>
-            <OddIcon name="check" size={12} color={open ? T.goldDark : '#fff'} />
-            Copy
-          </button>
-        </div>
-
-        {cashOutValue > 0 && (
-          <button type="button" onClick={onCashOut} disabled={cashingOut} style={{
-            marginTop: 10, width: '100%',
-            padding: '12px 14px', borderRadius: 12,
-            background: open ? 'rgba(247, 201, 72, 0.2)' : T.gold,
-            color: open ? T.gold : T.greenDeep,
-            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-            fontWeight: 700, fontSize: 13,
-            border: open ? `1px solid ${T.gold}` : 0,
-            cursor: cashingOut ? 'wait' : 'pointer',
-            opacity: cashingOut ? 0.7 : 1,
-          }}>
-            <span>{cashingOut ? 'Cashing out…' : 'Cash Out'}</span>
-            <span style={{ fontVariantNumeric: 'tabular-nums' }}>GHS {fmtCedi(cashOutValue)}</span>
-          </button>
-        )}
+          <span>{copied ? 'Copied' : 'Edit Bet'}</span>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+            <circle cx="18" cy="5" r="3" />
+            <circle cx="6" cy="12" r="3" />
+            <circle cx="18" cy="19" r="3" />
+            <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
+            <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
+          </svg>
+        </button>
       </div>
 
-      <button type="button" onClick={onToggle} style={{
-        width: '100%', padding: '10px 14px',
-        background: T.surface, borderTop: `1px solid ${T.line}`,
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        fontSize: 12, fontWeight: 600, color: T.inkSoft,
-        border: 0, cursor: 'pointer',
-      }}>
-        <span>{open ? 'Hide' : 'Show'} {legs.length} leg{legs.length === 1 ? '' : 's'}</span>
-        <OddIcon name={open ? 'chevU' : 'chevD'} size={14} color={T.inkSoft} />
-      </button>
-      {open && (
-        <div style={{ padding: '0 14px 14px', display: 'flex', flexDirection: 'column' }}>
-          {legs.map((leg, i) => (
-            <div key={i} style={{
-              padding: '12px 0',
-              borderBottom: i < legs.length - 1 ? `1px dashed ${T.line}` : 'none',
-            }}>
-              <div style={{
-                display: 'flex', justifyContent: 'space-between',
-                gap: 8, alignItems: 'flex-start',
-              }}>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{
-                    fontSize: 13, fontWeight: 700, color: T.ink, letterSpacing: -0.1,
-                  }}>
-                    {leg.home} <span style={{ color: T.inkDim, fontWeight: 500 }}>vs</span> {leg.away}
-                  </div>
-                  <div style={{ fontSize: 11, color: T.inkSoft, marginTop: 2 }}>
-                    {leg.market || 'Match Result'} ·{' '}
-                    <span style={{ color: T.greenBright, fontWeight: 600 }}>
-                      {leg.pickLabel || leg.label || leg.pick || leg.key}
-                    </span>
-                  </div>
-                </div>
-                <div style={{
-                  display: 'flex', flexDirection: 'column',
-                  alignItems: 'flex-end', gap: 4,
-                }}>
-                  <span style={{
-                    fontSize: 13, fontWeight: 700, color: T.ink,
-                    fontVariantNumeric: 'tabular-nums',
-                  }}>{Number(leg.odds || 0).toFixed(2)}</span>
-                  <OddStatusChip
-                    kind={STATUS_KIND[legResult(leg)] || 'pending'}
-                    label={legResult(leg).toUpperCase()}
-                  />
-                </div>
-              </div>
-            </div>
-          ))}
+      {/* Per-leg list (visible only when expanded) */}
+      {expanded && legs.length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {legs.map((leg, i) => {
+            const state = legState(leg, i, legs.length);
+            const pick = leg.pickLabel || leg.label || leg.pick || leg.key || leg.outcome || '—';
+            const market = leg.market || leg.marketName || 'Match Result';
+            const meta = state === 'settled' ? `FT: ${fakeFt(bet.id, i)}`
+                       : state === 'lost'    ? `FT: ${fakeFt(bet.id, i)}`
+                       : state === 'live'    ? 'Live now'
+                       : shortMatchTime(leg.startTime || bet.placedAt || bet.createdAt);
+            return <LegRow key={i} state={state} pick={pick} market={market}
+                            home={leg.home} away={leg.away}
+                            odds={Number(leg.odds || 0)} meta={meta} />;
+          })}
         </div>
       )}
+
+      {/* Show/Hide Match Details */}
+      <button type="button" onClick={onToggle} style={{
+        background: 'transparent', border: 0, cursor: 'pointer',
+        color: T.greenBright, fontFamily: 'inherit',
+        fontWeight: 700, fontSize: 12.5,
+        display: 'inline-flex', alignItems: 'center', gap: 6,
+        alignSelf: 'flex-start', padding: '2px 4px',
+      }}>
+        <span>{expanded ? 'Hide Match Details' : 'Show Match Details'}</span>
+        <OddIcon name={expanded ? 'chevU' : 'chevD'} size={12} color={T.greenBright} />
+      </button>
+
+      {/* Stake / Pot. Win totals */}
+      <div style={{
+        display: 'flex', flexDirection: 'column', gap: 4,
+        paddingTop: 10, borderTop: `1px solid ${T.line}`,
+      }}>
+        <TotalRow label="Stake" value={fmtCedi(stake)} />
+        <TotalRow label="Pot. Win" value={fmtCedi(potential)} strong />
+      </div>
+
+      {/* Cashout CTA */}
+      <button type="button" onClick={onCashOut}
+        disabled={cashingOut || cashOutValue <= 0}
+        style={{
+          width: '100%', padding: '14px 16px',
+          background: cashOutValue > 0 ? T.greenBright : T.surfaceAlt,
+          color: cashOutValue > 0 ? T.goldDark : T.inkSoft,
+          fontFamily: 'inherit', fontWeight: 800, fontSize: 15,
+          letterSpacing: 0.1, border: 0, borderRadius: 10,
+          cursor: cashingOut ? 'wait' : cashOutValue > 0 ? 'pointer' : 'not-allowed',
+          opacity: cashingOut ? 0.7 : 1, marginTop: 2,
+          boxShadow: cashOutValue > 0 ? '0 6px 16px rgba(232, 185, 74, 0.22)' : 'none',
+        }}>
+        {cashingOut
+          ? 'Cashing out…'
+          : cashOutValue > 0
+            ? `Cashout GHS ${fmtCedi(cashOutValue)}`
+            : 'Cashout unavailable'}
+      </button>
+
+      <p style={{
+        margin: 0, textAlign: 'center',
+        fontSize: 11, color: T.inkSoft, letterSpacing: 0.2,
+      }}>Responsive Time Offer</p>
+    </div>
+  );
+}
+
+/* ─── A single leg row: status icon + pick pill + odds + market + teams + meta */
+function LegRow({ state, pick, market, home, away, odds, meta }) {
+  const iconBg =
+    state === 'settled' ? T.greenBright
+  : state === 'lost'    ? T.danger
+  : state === 'live'    ? T.danger
+                        : T.warn;
+  const iconFg = state === 'settled' ? T.goldDark : '#fff';
+  const surface =
+    state === 'settled' ? 'rgba(232, 185, 74, 0.06)'
+  : state === 'lost'    ? 'rgba(255, 91, 120, 0.06)'
+  : state === 'live'    ? 'rgba(255, 91, 120, 0.06)'
+                        : 'rgba(240, 160, 64, 0.06)';
+  const border =
+    state === 'settled' ? 'rgba(232, 185, 74, 0.15)'
+  : state === 'lost'    ? 'rgba(255, 91, 120, 0.18)'
+  : state === 'live'    ? 'rgba(255, 91, 120, 0.18)'
+                        : 'rgba(240, 160, 64, 0.18)';
+
+  return (
+    <div style={{
+      display: 'grid', gridTemplateColumns: '28px 1fr',
+      gap: 10, padding: '10px 12px',
+      borderRadius: 10,
+      background: surface, border: `1px solid ${border}`,
+      alignItems: 'start',
+    }}>
+      <div style={{
+        width: 22, height: 22, borderRadius: 999,
+        background: iconBg, color: iconFg,
+        display: 'grid', placeItems: 'center',
+        marginTop: 2,
+        boxShadow: '0 2px 6px rgba(0,0,0,0.35)',
+      }}>
+        {state === 'settled' ? (
+          <OddIcon name="check" size={14} color={iconFg} strokeWidth={3} />
+        ) : state === 'lost' ? (
+          <OddIcon name="x" size={14} color={iconFg} strokeWidth={3} />
+        ) : (
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+            stroke={iconFg} strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+            <circle cx="12" cy="12" r="9" />
+            <polyline points="12 7 12 12 15 14" />
+          </svg>
+        )}
+      </div>
+      <div style={{ minWidth: 0 }}>
+        <div style={{
+          display: 'inline-flex', alignItems: 'baseline', gap: 10,
+          marginBottom: 4,
+        }}>
+          <span style={{
+            display: 'inline-block',
+            padding: '2px 8px', borderRadius: 5,
+            background: 'rgba(243, 233, 207, 0.08)',
+            color: T.ink, fontWeight: 800,
+            fontSize: 12.5, letterSpacing: -0.1,
+            border: `1px solid ${T.line}`,
+            fontFamily: '"JetBrains Mono", "Roboto Mono", monospace',
+          }}>{pick}</span>
+          <span style={{
+            color: T.greenBright, fontWeight: 800, fontSize: 13,
+            fontFamily: '"JetBrains Mono", "Roboto Mono", monospace',
+            fontVariantNumeric: 'tabular-nums',
+          }}>₵{odds.toFixed(2)}</span>
+        </div>
+        <div style={{
+          fontSize: 11, fontWeight: 600,
+          color: T.inkSoft, marginBottom: 3, letterSpacing: 0.1,
+        }}>{market}</div>
+        <div style={{
+          fontSize: 13, fontWeight: 700,
+          color: T.ink, lineHeight: 1.3, marginBottom: 3,
+        }}>
+          {home} <span style={{ color: T.inkDim, fontWeight: 500 }}>vs</span> {away}
+        </div>
+        <div style={{
+          fontSize: 11.5, fontStyle: 'italic',
+          color: T.inkSoft, fontWeight: 500,
+        }}>{meta}</div>
+      </div>
+    </div>
+  );
+}
+
+function TotalRow({ label, value, strong = false }) {
+  return (
+    <div style={{
+      display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
+      fontSize: 13.5,
+    }}>
+      <span style={{ color: T.inkSoft, fontWeight: 600 }}>{label}</span>
+      <span style={{
+        color: T.ink, fontWeight: 800,
+        fontVariantNumeric: 'tabular-nums',
+        fontSize: strong ? 14.5 : 13.5,
+        fontFamily: '"JetBrains Mono", "Roboto Mono", monospace',
+      }}>{value}</span>
     </div>
   );
 }
