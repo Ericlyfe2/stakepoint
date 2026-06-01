@@ -25,12 +25,36 @@ export const getAccess  = () => ls?.getItem(ACCESS_KEY)  || null;
 export const getRefresh = () => ls?.getItem(REFRESH_KEY) || null;
 export const clearTokens = () => { ls?.removeItem(ACCESS_KEY); ls?.removeItem(REFRESH_KEY); };
 
+// Render free-tier services hibernate after 15min and need ~30-60s to wake.
+// We give the first request a generous window, but anything beyond ~45s is
+// almost certainly a real outage — surfacing a clear error beats an infinite
+// spinner on the sign-in / sign-up screen.
+const REQUEST_TIMEOUT_MS = 45_000;
+
 async function rawFetch(path, opts = {}, retry = true) {
   const headers = new Headers(opts.headers || {});
   if (opts.body && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
   const access = getAccess();
   if (access && !headers.has('Authorization')) headers.set('Authorization', `Bearer ${access}`);
-  const res = await fetch(`${API_BASE}${path}`, { ...opts, headers });
+
+  // Race the request against a timeout so the UI never hangs forever when
+  // the backend is unreachable or hibernating with a wake-up error.
+  const ctl = typeof AbortController !== 'undefined' ? new AbortController() : null;
+  const timer = ctl ? setTimeout(() => ctl.abort(), REQUEST_TIMEOUT_MS) : null;
+  let res;
+  try {
+    res = await fetch(`${API_BASE}${path}`, { ...opts, headers, signal: ctl?.signal });
+  } catch (e) {
+    if (timer) clearTimeout(timer);
+    if (e?.name === 'AbortError') {
+      const err = new Error('Server unreachable. Please try again in a moment.');
+      err.status = 0;
+      err.body = { error: 'Server unreachable. Please try again in a moment.' };
+      throw err;
+    }
+    throw e;
+  }
+  if (timer) clearTimeout(timer);
   if (res.status !== 401 || !retry) return res;
 
   // Try silent refresh exactly once. Only sign the user out when the refresh
