@@ -1,5 +1,5 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useSearchParams, useNavigate, Link } from 'react-router-dom';
 import {
   fetchMatches,
   placeBet,
@@ -1134,7 +1134,7 @@ export default function Home({ initialChip }) {
       )}
 
       {/* ─── Home footer (sponsor / payslip / payment / legal / back-to-top) ─── */}
-      <footer className="sb-footer">
+      <section className="sb-footer" aria-label="Home footer">
         <div className="sb-gpw-slot">
           <GrandPrizeWinners />
         </div>
@@ -1184,11 +1184,11 @@ export default function Home({ initialChip }) {
             Age 18 and above only. Play Responsibly. Betting is addictive and can be psychologically harmful. Xenbet GH is licensed by the Gaming Commission of Ghana under Licence No 0006027.
           </p>
           <div className="sb-legal-links">
-            <a href="/terms">Terms &amp; Conditions</a>
+            <Link to="/terms">Terms &amp; Conditions</Link>
             <span className="sep">·</span>
-            <a href="/info">About Us</a>
+            <Link to="/info">About Us</Link>
             <span className="sep">·</span>
-            <a href="/help">System Status</a>
+            <Link to="/help">System Status</Link>
           </div>
         </div>
 
@@ -1199,7 +1199,7 @@ export default function Home({ initialChip }) {
         >
           Back to Top
         </button>
-      </footer>
+      </section>
 
       {/* ─── Floating slip pill (mobile only via CSS) ─── */}
       {selections.length > 0 && (
