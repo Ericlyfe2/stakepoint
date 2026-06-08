@@ -882,18 +882,21 @@ nav a .live-dot {
 .selection {
   background: var(--surface-2);
   border: 1px solid var(--line);
-  border-radius: 8px;
-  padding: 12px;
+  border-radius: 10px;
+  padding: 12px 14px;
   position: relative;
 }
 .selection .x {
   position: absolute;
   top: 8px; right: 8px;
-  width: 18px; height: 18px;
+  width: 20px; height: 20px;
   border-radius: 50%;
   display: grid; place-items: center;
-  color: var(--text-dim);
-  font-size: 11px;
+  background: rgba(229, 72, 72, 0.16);
+  color: var(--accent-hot);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1;
   transition: all .15s;
 }
 .selection .x:hover { background: var(--accent-hot); color: #fff; }
@@ -921,9 +924,9 @@ nav a .live-dot {
 }
 .sel-odds-val {
   font-family: 'JetBrains Mono', monospace;
-  font-weight: 700;
+  font-weight: 800;
   color: var(--accent);
-  font-size: 14px;
+  font-size: 15px;
 }
 .sel-trend {
   font-family: 'JetBrains Mono', monospace;
@@ -1040,6 +1043,172 @@ nav a .live-dot {
   border-radius: 50%;
   display: grid; place-items: center;
   font-size: 14px;
+}
+
+/* ----- SportyBet-style bet slip extensions ----- */
+
+/* Filter-row slip icon */
+.sb-chip-slip {
+  position: relative;
+}
+.sb-chip-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #0a0d0c;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid var(--bg);
+  box-sizing: content-box;
+}
+
+/* Slip header — count pill + balance pill */
+.slip-ct-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 7px;
+  margin-left: 6px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #0a0d0c;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  font-weight: 800;
+}
+.slip-balance {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-soft);
+  background: rgba(30, 200, 81, 0.12);
+  padding: 5px 9px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.slip-balance strong {
+  color: #1ec851;
+  font-weight: 800;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* Slip utility row (My Selections + trash) */
+.slip-utility-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0 4px;
+  margin: 0 0 10px;
+  border-bottom: 1px solid var(--line);
+}
+.slip-utility-row .lbl {
+  font-size: 11px;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  font-weight: 700;
+}
+.slip-trash {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-soft);
+  border: 0;
+  cursor: pointer;
+  transition: background .15s, color .15s;
+}
+.slip-trash:hover {
+  background: rgba(229, 72, 72, 0.12);
+  color: var(--accent-hot);
+}
+
+/* Selection card — new top row layout */
+.sel-row-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 4px;
+}
+.sel-row-top .sel-pick {
+  flex: 1;
+  margin-bottom: 0;
+}
+.sel-row-top .sel-odds-val {
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 800;
+  color: var(--accent);
+  font-size: 16px;
+  white-space: nowrap;
+}
+
+/* CTA pill */
+.slip-cta-pill {
+  margin: 8px 0 10px;
+  padding: 10px 14px;
+  background: linear-gradient(135deg, rgba(30, 200, 81, 0.16), rgba(30, 200, 81, 0.08));
+  border: 1px solid rgba(30, 200, 81, 0.32);
+  color: #1ec851;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
+  letter-spacing: .01em;
+}
+
+/* Total stake horizontal row */
+.stake-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.stake-row-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-soft);
+  letter-spacing: .04em;
+  white-space: nowrap;
+}
+.stake-row .stake-input {
+  flex: 1;
+  margin: 0;
+}
+
+/* Place Bet — stacked main + sub label */
+.place-bet-main {
+  display: block;
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: .02em;
+  text-transform: uppercase;
+  line-height: 1.1;
+}
+.place-bet-sub {
+  display: block;
+  margin-top: 2px;
+  font-size: 11px;
+  font-weight: 700;
+  opacity: .7;
+  text-transform: none;
+  letter-spacing: 0;
+  font-family: 'JetBrains Mono', monospace;
 }
 
 /* ===== STATS STRIP ===== */
@@ -2524,11 +2693,24 @@ nav a:active { transform: scale(.96); }
   margin: 10px auto 6px;
 }
 .sb-sheet-head {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 6px 16px 12px;
-  border-bottom: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  padding: 12px 16px 4px;
+  gap: 4px;
 }
-.sb-sheet-head h3 { font-size: 15px; font-weight: 800; margin: 0; }
+.sb-sheet-head .slip-head-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+}
+.sb-sheet-head h3 {
+  font-size: 15px;
+  font-weight: 800;
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+}
 .sb-sheet-close {
   background: var(--surface);
   border: 1px solid var(--line);
