@@ -1127,40 +1127,79 @@ export default function Home({ initialChip }) {
                   </div>
                 </section>
 
-                {lgIdx === 0 && <GrandPrizeWinners />}
               </Fragment>
             );
           })}
         </>
       )}
 
-      {/* ─── Compliance / sponsors ─── */}
-      <div className="sb-compliance">
-        <div className="badge18">18+</div>
-        <div className="legal">© {new Date().getFullYear()} Xenbet GH · Licensed by the Gaming Commission of Ghana</div>
-        <div className="sponsors">
-          <span className="sponsor">Real Madrid</span>
-          <span className="sponsor">LaLiga</span>
+      {/* ─── Home footer (sponsor / payslip / payment / legal / back-to-top) ─── */}
+      <footer className="sb-footer">
+        <div className="sb-gpw-slot">
+          <GrandPrizeWinners />
         </div>
-        <div className="tagline">The world's sharper betting platform</div>
-      </div>
 
-      {/* ─── Payslip ─── */}
-      <form className="sb-payslip" onSubmit={onPayslip}>
-        <div className="sb-payslip-label">Payslip</div>
-        <div className="sb-payslip-input">
-          <input
-            placeholder="*711+222#"
-            value={payslip}
-            onChange={(e) => setPayslip(e.target.value.toUpperCase())}
-            inputMode="text"
-            autoComplete="off"
-            spellCheck={false}
-          />
-          <button type="submit">Check</button>
+        <div className="sb-age-chip" aria-label="Age 18 and above only">18+</div>
+
+        <div className="sb-sponsor-card">
+          <div className="sb-sponsor-brand">Xenbet GH</div>
+          <div className="sb-sponsor-sub">Official Sponsor · Betting Partner</div>
+          <div className="sb-sponsor-logos" aria-hidden="true">
+            <span className="sb-logo-rm">R·M</span>
+            <span className="sb-logo-laliga">LaLiga</span>
+          </div>
+          <div className="sb-sponsor-tag">The world's sharper betting platform</div>
         </div>
-        <div className="sb-payslip-foot">Enter a booking code to view a slip</div>
-      </form>
+
+        <form className="sb-payslip" onSubmit={onPayslip}>
+          <div className="sb-payslip-label">Payslip</div>
+          <div className="sb-payslip-code">*711*222#</div>
+          <div className="sb-payslip-input">
+            <input
+              placeholder="Enter booking code"
+              value={payslip}
+              onChange={(e) => setPayslip(e.target.value.toUpperCase())}
+              inputMode="text"
+              autoComplete="off"
+              spellCheck={false}
+            />
+            <button type="submit">Check</button>
+          </div>
+          <div className="sb-payslip-foot">Enter a booking code to view a slip</div>
+        </form>
+
+        <div className="sb-payment">
+          <div className="sb-payment-label">Payment methods</div>
+          <div className="sb-payment-row" aria-hidden="true">
+            <span className="sb-pay-chip sb-pay-mtn">MTN</span>
+            <span className="sb-pay-chip sb-pay-telecel">telecel</span>
+            <span className="sb-pay-chip sb-pay-visa">VISA</span>
+            <span className="sb-pay-chip sb-pay-gtbank">GTBank</span>
+          </div>
+        </div>
+
+        <div className="sb-legal">
+          <div className="sb-legal-brand">Xenbet GH</div>
+          <p className="sb-legal-text">
+            Age 18 and above only. Play Responsibly. Betting is addictive and can be psychologically harmful. Xenbet GH is licensed by the Gaming Commission of Ghana under Licence No 0006027.
+          </p>
+          <div className="sb-legal-links">
+            <a href="/terms">Terms &amp; Conditions</a>
+            <span className="sep">·</span>
+            <a href="/info">About Us</a>
+            <span className="sep">·</span>
+            <a href="/help">System Status</a>
+          </div>
+        </div>
+
+        <button
+          type="button"
+          className="sb-totop"
+          onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+        >
+          Back to Top
+        </button>
+      </footer>
 
       {/* ─── Floating slip pill (mobile only via CSS) ─── */}
       {selections.length > 0 && (
