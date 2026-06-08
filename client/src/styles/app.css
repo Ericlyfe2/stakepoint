@@ -2351,9 +2351,10 @@ nav a:active { transform: scale(.96); }
   letter-spacing: .02em;
 }
 
-/* Sponsor card */
+/* Sponsor card — intentionally always white to read as a SportyBet-style brand card on both themes */
 .sb-sponsor-card {
   background: #ffffff;
+  border: 1px solid var(--line);
   border-radius: 14px;
   padding: 18px 14px 16px;
   text-align: center;
@@ -2554,7 +2555,7 @@ nav a:active { transform: scale(.96); }
   padding: 14px;
   background: #ffffff;
   color: #111;
-  border: 0;
+  border: 1px solid var(--line);
   border-radius: 10px;
   font-weight: 800;
   font-size: 13px;
