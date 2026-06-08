@@ -954,6 +954,20 @@ export default function Home({ initialChip }) {
             <path d="M4 6h16M7 12h10M10 18h4" />
           </svg>
         </button>
+        <button
+          type="button"
+          className="sb-chip sb-chip-icon sb-chip-slip"
+          aria-label="Bet slip"
+          onClick={() => setSlipOpen(true)}
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="6" y="3" width="12" height="18" rx="2" />
+            <path d="M9 7h6M9 11h6M9 15h4" />
+          </svg>
+          {selections.length > 0 && (
+            <span className="sb-chip-badge">{selections.length}</span>
+          )}
+        </button>
       </div>
 
       {/* ─── Countries view ─── */}
@@ -1214,15 +1228,42 @@ export default function Home({ initialChip }) {
       <dialog ref={slipDlg} className="sb-sheet" onClose={() => setSlipOpen(false)}>
         <div className="sb-sheet-grip" />
         <div className="sb-sheet-head">
-          <h3>Bet slip · <span style={{ color: 'var(--accent)' }}>{selections.length}</span></h3>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginLeft: 'auto' }}>
-            {account && (
-              <span className="slip-balance" style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-soft)', background: 'rgba(30,200,81,0.1)', padding: '4px 8px', borderRadius: 6 }}>
-                Balance: <span style={{ color: '#1ec851' }}>₵{formatAmt(account.balance)}</span>
-              </span>
-            )}
-            <button type="button" className="sb-sheet-close" onClick={() => setSlipOpen(false)} aria-label="Close" style={{ position: 'static', margin: 0 }}>×</button>
+          <div className="slip-head-row">
+            <h3>
+              Bet slip
+              {selections.length > 0 && <span className="slip-ct-badge">{selections.length}</span>}
+            </h3>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              {account && (
+                <span className="slip-balance">
+                  Balance <strong>GHS {formatAmt(account.balance)}</strong>
+                </span>
+              )}
+              <button
+                type="button"
+                className="sb-sheet-close"
+                onClick={() => setSlipOpen(false)}
+                aria-label="Close"
+                style={{ position: 'static', margin: 0 }}
+              >×</button>
+            </div>
           </div>
+          {selections.length > 0 && (
+            <div className="slip-utility-row">
+              <span className="lbl">My Selections</span>
+              <button
+                type="button"
+                className="slip-trash"
+                onClick={clearSlip}
+                aria-label="Clear all selections"
+                title="Clear all"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M19 6l-1.5 14a2 2 0 0 1-2 1.8H8.5a2 2 0 0 1-2-1.8L5 6" />
+                </svg>
+              </button>
+            </div>
+          )}
         </div>
         <div className="sb-sheet-body">
           <div className="betslip">
@@ -1233,21 +1274,6 @@ export default function Home({ initialChip }) {
                 </button>
               ))}
             </div>
-
-            {selections.length > 0 && (
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8, marginBottom: 4 }}>
-                <span style={{ fontSize: 11, color: 'var(--text-dim)', letterSpacing: '.1em', textTransform: 'uppercase' }}>
-                  {selections.length} selection{selections.length === 1 ? '' : 's'}
-                </span>
-                <button
-                  type="button"
-                  onClick={clearSlip}
-                  style={{ background: 'transparent', border: 'none', color: 'var(--text-soft)', fontSize: 11, fontWeight: 700, cursor: 'pointer', padding: '4px 8px' }}
-                >
-                  Clear all
-                </button>
-              </div>
-            )}
 
             {betMode === 'system' && (
               <div style={{ margin: '8px 0 4px', padding: '10px 12px', background: 'var(--surface-2)', border: '1px solid rgba(255,181,71,.18)', borderRadius: 10 }}>
@@ -1291,27 +1317,34 @@ export default function Home({ initialChip }) {
               {selections.map((s) => (
                 <div key={s.id} className="selection">
                   <button type="button" className="x" aria-label="Remove" onClick={() => removeById(s.id)}>×</button>
-                  <div className="sel-pick">{s.pickLabel}</div>
-                  <div className="sel-market">{s.marketLabel}</div>
-                  <div className="sel-teams">{s.meta}</div>
-                  <div className="sel-odds">
-                    <span style={{ fontSize: 11, color: 'var(--text-dim)', fontFamily: 'JetBrains Mono, monospace' }}>@{s.odds.toFixed(2)}</span>
+                  <div className="sel-row-top">
+                    <span className="sel-pick">{s.pickLabel}</span>
                     <span className="sel-odds-val">{s.odds.toFixed(2)}</span>
                   </div>
+                  <div className="sel-teams">{s.meta}</div>
+                  <div className="sel-market">{s.marketLabel}</div>
                 </div>
               ))}
             </div>
 
+            {betMode === 'multiple' && selections.length > 0 && selections.length < 3 && (
+              <div className="slip-cta-pill">
+                Add more qualifying selections to boost your bonus
+              </div>
+            )}
             <div className="stake-block">
-              <div className="stake-input">
-                <span>GHS</span>
-                <input
-                  type="text"
-                  value={stake}
-                  onChange={(e) => setStake(e.target.value)}
-                  inputMode="decimal"
-                  autoComplete="off"
-                />
+              <div className="stake-row">
+                <span className="stake-row-label">Total Stake</span>
+                <div className="stake-input">
+                  <span>GHS</span>
+                  <input
+                    type="text"
+                    value={stake}
+                    onChange={(e) => setStake(e.target.value)}
+                    inputMode="decimal"
+                    autoComplete="off"
+                  />
+                </div>
               </div>
               <div className="quick-stakes">
                 {[10, 50, 100].map((n) => (
@@ -1350,13 +1383,17 @@ export default function Home({ initialChip }) {
                   </>
                 ) : (
                   <>
-                    <div className="sum-row"><span className="lbl">Total odds</span><span className="val">{selections.length ? totalOdds.toFixed(2) : '—'}</span></div>
-                    <div className="sum-row"><span className="lbl">Stake</span><span className="val">GHS {formatAmt(stakePerLine)}</span></div>
+                    <div className="sum-row"><span className="lbl">Total Odds</span><span className="val">{selections.length ? totalOdds.toFixed(2) : '—'}</span></div>
                     {betMode === 'multiple' && (
-                      <div className="sum-row"><span className="lbl">Bonus boost</span><span className="val" style={{ color: 'var(--accent)' }}>+8%</span></div>
+                      <div className="sum-row">
+                        <span className="lbl">Max Bonus</span>
+                        <span className="val" style={{ color: 'var(--accent)' }}>
+                          {parseStake(stake) > 0 ? `GHS ${formatAmt(BONUS * parseStake(stake))}` : '—'}
+                        </span>
+                      </div>
                     )}
                     <div className="sum-row payout">
-                      <span className="lbl" style={{ color: 'var(--text)', fontWeight: 700 }}>Potential win</span>
+                      <span className="lbl" style={{ color: 'var(--text)', fontWeight: 700 }}>Potential Win</span>
                       <span className="val">{payout > 0 ? `GHS ${formatAmt(payout)}` : '—'}</span>
                     </div>
                   </>
@@ -1364,7 +1401,11 @@ export default function Home({ initialChip }) {
               </div>
               {slipErr && <div style={{ color: 'var(--danger, #ff5d5d)', fontSize: 13, textAlign: 'center', marginBottom: 12, fontWeight: 700 }}>{slipErr}</div>}
               <button type="button" className="place-bet" onClick={onPlaceBet} disabled={isPlacing}>
-                <span>{isPlacing ? 'Placing...' : 'Place bet'}</span><span className="arrow">→</span>
+                <span>
+                  <span className="place-bet-main">{isPlacing ? 'Placing...' : 'Place bet'}</span>
+                  <span className="place-bet-sub">About to pay GHS {formatAmt(totalStake)}</span>
+                </span>
+                <span className="arrow">→</span>
               </button>
             </div>
           </div>
