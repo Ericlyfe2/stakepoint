@@ -15,6 +15,8 @@ Replace the current sparse two-block bottom region (`.sb-compliance` + `.sb-pays
 
 ## Layout (top → bottom)
 
+0. **Grand Prize Winners** — relocated from its current inline position inside the leagues loop (Home.jsx:1130, rendered after the first league). New position: top of the footer stack, above the 18+ chip. Component itself is unchanged.
+
 1. **18+ chip** — single circular outlined badge, centered. Reuses existing `.badge18` styling, slightly larger.
 
 2. **Sponsor card** (light/white surface, rounded 14px):
@@ -50,7 +52,7 @@ Replace the current sparse two-block bottom region (`.sb-compliance` + `.sb-pays
 
 ## File changes
 
-- **`client/src/pages/Home.jsx`** — replace JSX block at lines 1137–1163 with the new footer JSX (~80 lines). No other lines touched.
+- **`client/src/pages/Home.jsx`** — (1) remove the inline `{lgIdx === 0 && <GrandPrizeWinners />}` at line 1130, (2) replace JSX block at lines 1137–1163 with the new footer JSX (~85 lines) which renders `<GrandPrizeWinners />` as its first child. No other lines touched.
 - **`client/src/styles/app.css`** — replace the existing `.sb-compliance` + `.sb-payslip` rule block (lines 2327–2403) and any media-query overrides at lines 2984–2989 with a new layered footer ruleset (~150 lines). Reuses existing CSS variables (`--surface`, `--surface-2`, `--bg`, `--line`, `--accent`, `--accent-hot`, `--accent-cool`, `--text`, `--text-soft`, `--text-dim`).
 - **No new files.** **No deleted files.** **No new dependencies.**
 
@@ -64,6 +66,7 @@ Replace the current sparse two-block bottom region (`.sb-compliance` + `.sb-pays
 - Booking-code lookup form (`onPayslip` handler, `payslip` state) is unchanged — only its visual container changes.
 - Floating bet-slip pill and slip bottom-sheet (Home.jsx lines 1165+) are unchanged.
 - Bottom navigation (in `AppShell`) is unchanged.
+- `GrandPrizeWinners` internals are unchanged — only its render location moves.
 
 ## Risks
 
