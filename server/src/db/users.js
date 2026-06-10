@@ -14,7 +14,7 @@ export function findByGoogleId(googleId) {
   return users.list().find((u) => u.googleId === googleId);
 }
 
-export function createUser(record) {
+export async function createUser(record) {
   const id = String(record.email || record.id || '').toLowerCase();
   if (!id) throw new Error('user requires email');
   if (users.get(id)) throw new Error('user already exists');
@@ -38,11 +38,11 @@ export function createUser(record) {
     twoFactorEnabled: false,
     activity: [],
   };
-  users.set(id, user);
+  await users.setCritical(id, user);
   return user;
 }
 
-export function updateUser(id, patch) {
+export async function updateUser(id, patch) {
   const key = String(id).toLowerCase();
   const current = users.get(key);
   if (!current) return null;
@@ -63,12 +63,12 @@ export function publicUser(u) {
   return safe;
 }
 
-export function deleteUser(id) {
+export async function deleteUser(id) {
   if (!id) return null;
   const key = String(id).toLowerCase();
   const u = users.get(key);
   if (!u) return null;
-  users.delete(key);
+  await users.deleteCritical(key);
   return u;
 }
 

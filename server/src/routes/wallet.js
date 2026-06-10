@@ -89,7 +89,7 @@ router.post('/withdraw', requireAuth, validate(withdrawSchema), asyncHandler(asy
   }
   if (amount > user.balance) throw badRequest('Insufficient balance.');
 
-  const updated = updateUser(user.id, { balance: Number((user.balance - amount).toFixed(2)) });
+  const updated = await updateUser(user.id, { balance: Number((user.balance - amount).toFixed(2)) });
   const tx = pushTx(user.id, { kind: 'withdraw', amount, method, status: 'completed', balanceAfter: updated.balance });
   logActivity(user.id, { kind: 'withdraw', amount, method });
   emitToUser(user.id, 'wallet:update', { balance: updated.balance, delta: -amount, reason: 'withdraw', method });

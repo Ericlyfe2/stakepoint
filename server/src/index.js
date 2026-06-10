@@ -28,9 +28,6 @@ import adminNotificationsRouter from './routes/admin/notifications.js';
 import adminDepositsRouter  from './routes/admin/deposits.js';
 import adminSettingsRouter  from './routes/admin/settings.js';
 import adminSupportRouter   from './routes/admin/support.js';
-import { seedAdmins } from './db/seedAdmins.js';
-import { seedDemoData } from './db/seedDemo.js';
-import { seedPromotionsIfEmpty } from './db/promotions.js';
 import { initStores } from './db/store.js';
 import { getSettings } from './db/settings.js';
 import { PROMOTIONS } from './matchesData.js';
@@ -72,6 +69,17 @@ app.use(cors({
 app.use(express.json({ limit: '256kb' }));
 app.use(metricsMiddleware);
 app.use(generalLimiter);
+
+/** Logs every HTTP request (method, path, status, duration). */
+app.use((req, res, next) => {
+  const start = Date.now();
+  res.on('finish', () => {
+    const ms = Date.now() - start;
+    const level = res.statusCode >= 500 ? 'error' : res.statusCode >= 400 ? 'warn' : 'info';
+    log[level](`${req.method} ${req.originalUrl} ${res.statusCode} ${ms}ms`);
+  });
+  next();
+});
 
 app.get('/api/health', (_req, res) => {
   res.json({
@@ -129,22 +137,26 @@ async function boot() {
   // synchronous get/set in route handlers is safe.
   await initStores();
 
-  // Seeds depend on stores being loaded.
-  await seedAdmins();
-  await seedDemoData();
-  const seeded = seedPromotionsIfEmpty((PROMOTIONS || []).map((p, i) => ({
-    title: p.title || p.name || 'Offer',
-    body: p.body || p.subtitle || '',
-    badge: p.badge || 'OFFER',
-    cta: p.cta || 'View',
-    accent: p.accent || '#7c5cff',
-    image: p.image || '',
-    eligibility: 'all',
-    bonusRate: p.bonusRate || 0,
-    active: true,
-    order: i,
-  })));
-  if (seeded) log.info(`Seeded ${seeded} promotions.`);
+  // Seeds are ONLY run when stores are empty, and only in development.
+  if (!isProd) {
+    const { seedAdmins } = await import('./db/seedAdmins.js');
+    const { seedDemoData } = await import('./db/seedDemo.js');
+    const { seedPromotionsIfEmpty } = await import('./db/promotions.js');
+    await seedAdmins();
+    const promoCount = seedPromotionsIfEmpty((PROMOTIONS || []).map((p, i) => ({
+      title: p.title || p.name || 'Offer',
+      body: p.body || p.subtitle || '',
+      badge: p.badge || 'OFFER',
+      cta: p.cta || 'View',
+      accent: p.accent || '#7c5cff',
+      image: p.image || '',
+      eligibility: 'all',
+      bonusRate: p.bonusRate || 0,
+      active: true,
+      order: i,
+    })));
+    if (promoCount) log.info(`Seeded ${promoCount} promotions (dev only).`);
+  }
 
   await new Promise((resolve) => server.listen(PORT, resolve));
   log.info(`Xenbet API listening on http://127.0.0.1:${PORT}`);

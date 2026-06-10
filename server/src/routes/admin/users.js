@@ -120,7 +120,7 @@ router.patch('/:id/status',
     if (action === 'unsuspend') patch = { suspended: false };
     if (action === 'verify')    patch = { emailVerified: true };
     if (action === 'unverify')  patch = { emailVerified: false };
-    const next = updateUser(u.id, patch);
+    const next = await updateUser(u.id, patch);
     if (action === 'suspend') revokeAllForAccount(u.id);
     audit(req, { action: `user.${action}`, target: u.id, targetType: 'user', severity: action === 'suspend' ? 'warning' : 'info', meta: { reason } });
     logActivity(u.id, { kind: `admin_${action}`, by: req.admin.email, reason });
@@ -276,7 +276,7 @@ router.post('/:id/reset-password',
     if (!u) return next(notFound('User not found'));
     const tempPassword = `Stp-${randomBytes(6).toString('base64url')}!`;
     const passwordHash = await hashPassword(tempPassword);
-    updateUser(u.id, { passwordHash });
+    await updateUser(u.id, { passwordHash });
     revokeAllForAccount(u.id);
     audit(req, { action: 'user.password.reset', target: u.id, targetType: 'user', severity: 'warning' });
     res.json({ ok: true, tempPassword });
@@ -308,7 +308,7 @@ router.post('/',
     if (issues.length) throw badRequest(issues[0], { issues });
     if (findByEmail(email)) throw conflict('An account with this email already exists.');
     const passwordHash = await hashPassword(password);
-    const user = createUser({
+    const user = await createUser({
       email,
       displayName: displayName || email,
       passwordHash,

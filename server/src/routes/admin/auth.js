@@ -179,7 +179,7 @@ router.post('/change-password', requireAdmin, asyncHandler(async (req, res) => {
   const ok = await verifyPassword(currentPassword, req.admin.passwordHash);
   if (!ok) throw unauthorized('Current password incorrect.');
   const passwordHash = await hashPassword(newPassword);
-  updateUser(req.admin.id, { passwordHash });
+  await updateUser(req.admin.id, { passwordHash });
   revokeAllForAccount(req.admin.id);
   audit(req, { action: 'admin.password.changed', severity: 'warning' });
   res.json({ ok: true });

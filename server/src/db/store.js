@@ -48,11 +48,18 @@ async function ensureSchema() {
     CREATE TABLE IF NOT EXISTS kv_store (
       store_name TEXT NOT NULL,
       key        TEXT NOT NULL,
-      data       JSONB NOT NULL,
+      data       JSONB NOT NULL DEFAULT '{}',
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       PRIMARY KEY (store_name, key)
     );
   `);
+  // Performance indexes — CREATE INDEX CONCURRENTLY can't be used inside
+  // a multi-statement txn, so we issue them separately. IF NOT EXISTS
+  // makes them idempotent.
+  await getPool().query('CREATE INDEX IF NOT EXISTS idx_kv_store_updated_at ON kv_store (updated_at DESC);');
+  await getPool().query('CREATE INDEX IF NOT EXISTS idx_kv_store_store_name ON kv_store (store_name);');
+  // GIN index on data JSONB for queries against fields inside the JSON document.
+  await getPool().query('CREATE INDEX IF NOT EXISTS idx_kv_store_data_gin ON kv_store USING GIN (data);');
 }
 
 async function loadFromPg(name) {
@@ -125,20 +132,26 @@ export function createStore(name, fallback = {}) {
     }
   };
 
+  let flushInProgress = false;
+
   const flushPg = async () => {
-    if (!state.dirty) return;
+    if (!state.dirty || flushInProgress) return;
+    flushInProgress = true;
     state.dirty = false;
     const keys    = [...state.dirtyKeys];   state.dirtyKeys.clear();
     const deletes = [...state.deletedKeys]; state.deletedKeys.clear();
     try {
-      for (const k of keys)    await upsertPg(name, k, state.data[k]);
-      for (const k of deletes) await deletePg(name, k);
+      const ops = [];
+      for (const k of keys)    ops.push(upsertPg(name, k, state.data[k]));
+      for (const k of deletes) ops.push(deletePg(name, k));
+      await Promise.all(ops);
     } catch (e) {
-      // Put the keys back so a later flush retries them.
       keys.forEach((k) => state.dirtyKeys.add(k));
       deletes.forEach((k) => state.deletedKeys.add(k));
       state.dirty = true;
       log.error(`kv_store flush failed for "${name}":`, e.message);
+    } finally {
+      flushInProgress = false;
     }
   };
 
@@ -151,7 +164,6 @@ export function createStore(name, fallback = {}) {
   const flush = () => {
     if (state.timer) { clearTimeout(state.timer); state.timer = null; }
     if (useDb) {
-      // Return the promise so SIGTERM can await it.
       state.pendingFlush = flushPg();
       return state.pendingFlush;
     }
@@ -171,10 +183,11 @@ export function createStore(name, fallback = {}) {
       }
     }
     if (state.timer) return;
+    const debounceMs = useDb ? 50 : 20;
     state.timer = setTimeout(() => {
       state.timer = null;
       flush();
-    }, useDb ? 200 : 50);
+    }, debounceMs);
   };
 
   const api = {
@@ -190,6 +203,31 @@ export function createStore(name, fallback = {}) {
     },
     list() { ensureLoaded(); return Object.values(state.data); },
     flush,
+
+    /** Critical write — flushes immediately and awaits the result. */
+    async setCritical(k, v) {
+      ensureLoaded();
+      state.data[k] = v;
+      if (useDb) {
+        await upsertPg(name, k, v);
+      } else {
+        markDirty(k);
+        flushFile();
+      }
+      return v;
+    },
+
+    /** Critical delete — flushes immediately and awaits the result. */
+    async deleteCritical(k) {
+      ensureLoaded();
+      delete state.data[k];
+      if (useDb) {
+        await deletePg(name, k);
+      } else {
+        markDirty(k, true);
+        flushFile();
+      }
+    },
 
     // Internal: called by initStores() to populate the in-memory cache.
     async _load() {

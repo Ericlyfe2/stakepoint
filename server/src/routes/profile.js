@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { requireAuth } from '../middleware/auth.js';
 import { validate } from '../middleware/validate.js';
+import { asyncHandler } from '../utils/asyncHandler.js';
 import { updateUser, publicUser, logActivity } from '../db/users.js';
 
 const router = Router();
@@ -36,10 +37,10 @@ router.get('/', requireAuth, (req, res) => {
   res.json({ account: publicUser(req.user) });
 });
 
-router.patch('/', requireAuth, validate(profileSchema), (req, res) => {
-  const updated = updateUser(req.user.id, req.body);
+router.patch('/', requireAuth, validate(profileSchema), asyncHandler(async (req, res) => {
+  const updated = await updateUser(req.user.id, req.body);
   logActivity(req.user.id, { kind: 'profile_update' });
   res.json({ account: publicUser(updated) });
-});
+}));
 
 export default router;

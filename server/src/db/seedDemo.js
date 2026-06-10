@@ -47,6 +47,8 @@ function isoNDaysAgo(days, jitter = true) {
 }
 
 export async function seedDemoData() {
+  // NEVER seed fake data in production or when a real database is connected.
+  if (process.env.NODE_ENV === 'production' || process.env.DATABASE_URL) return false;
   if (Object.keys(betsStore.all() || {}).length > 0) return false;
 
   const existingNonAdmin = allUsers().filter((u) => u.role !== 'admin').length;
