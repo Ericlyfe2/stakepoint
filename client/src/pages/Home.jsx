@@ -1,1 +1,191 @@
-/** * Home ΓÇö mobile-first landing screen ported from the Claude Design * Oddsify.html "OddHomeScreen". Sticky brand header, payout marquee, rotating * promo banner, category grid, top-leagues row, live + featured upcoming * sections. Data flows from the live /api/bet/matches endpoint via betApi. * * Real-time odds updates from the socket are intentionally not subscribed * here yet ΓÇö the existing aggregator polls every 60s and pushes wallet / * deposit events globally; live odds movement will land in a follow-up. */import { useEffect, useMemo, useState } from 'react';import { useNavigate } from 'react-router-dom';import { fetchMatches } from '../api/betApi.js';import { useAccount } from '../providers/AccountProvider.jsx';import { useSlip } from '../providers/SlipProvider.jsx';import {  T,  OddTopHeader, OddPayoutTicker, OddPromoBanner, OddCategoryGrid,  OddLeagueRow, OddMatchCard, OddsifyWordmark, OddIcon,} from '../components/odd/primitives.jsx';import { flattenLeagues } from '../components/odd/normalize.js';export default function Home() {  const navigate = useNavigate();  const { account, openDeposit } = useAccount();  const { picks, togglePick } = useSlip();  const [matches, setMatches] = useState([]);  const [leagues, setLeagues] = useState([]);  const [loading, setLoading] = useState(true);  const [err, setErr] = useState('');  useEffect(() => {    let alive = true;    setLoading(true);    fetchMatches('football')      .then((data) => {        if (!alive) return;        setMatches(flattenLeagues(data));        // Synthesise a "top leagues" row from the response, keeping live counts.        setLeagues((data.leagues || []).map((l) => ({          id: l.id,          name: l.name,          short: l.name.split(' ┬╖ ')[0].split(' ').slice(0, 2).join(' '),          code: l.crest?.label || l.name.slice(0, 3).toUpperCase(),          color: extractColor(l.crest?.style) || '#1a1814',          live: (l.matches || []).filter(m => m.isLive).length,        })));      })      .catch((e) => { if (alive) setErr(e?.message || 'Failed to load matches.'); })      .finally(() => { if (alive) setLoading(false); });    return () => { alive = false; };  }, []);  const liveMatches = useMemo(() => matches.filter(m => m.isLive), [matches]);  const upcoming    = useMemo(() => matches.filter(m => !m.isLive).slice(0, 6), [matches]);  const liveCount   = liveMatches.length;  const onAuth = (mode) => navigate(mode === 'signup' ? '/login?next=/wallet' : '/login');  return (    <div style={{ background: T.bg, minHeight: '100vh', paddingBottom: 120 }}>      <OddTopHeader        user={account}        onAuth={onAuth}        onSearch={() => navigate('/sports')}        onBalanceClick={() => openDeposit()}      />      <OddPayoutTicker />      <OddPromoBanner onAction={() => navigate('/promos')} />      <OddCategoryGrid        liveCount={liveCount}        onPick={(c) => navigate(c.to || '/')}      />      <OddLeagueRow        leagues={leagues.length ? leagues : undefined}        onSeeAll={() => navigate('/sports')}        onPick={() => navigate('/sports')}      />      <SectionHeader        icon={<span style={{          width: 8, height: 8, borderRadius: 999, background: T.danger,          boxShadow: `0 0 0 4px ${T.danger}33`,        }} />}        title="Live now"        count={liveCount}        action="All live ΓåÆ"        onAction={() => navigate('/sports')}      />      <MatchList loading={loading} err={err} matches={liveMatches}        picks={picks} onPick={togglePick}        emptyLabel="No live matches right now ΓÇö check back at kickoff." />      <SectionHeader title="Featured upcoming" action="More ΓåÆ" onAction={() => navigate('/sports')} />      <MatchList loading={loading} err={err} matches={upcoming}        picks={picks} onPick={togglePick}        emptyLabel="Nothing scheduled yet." />      <div style={{ padding: '24px 16px 60px', textAlign: 'center' }}>        <OddsifyWordmark size={18} color={T.ink} accent={T.greenBright} />        <div style={{          fontSize: 10, color: T.inkDim, marginTop: 8, letterSpacing: 0.4,        }}>18+ ┬╖ BET RESPONSIBLY ┬╖ LICENSED GHA</div>      </div>    </div>  );}function SectionHeader({ icon, title, count, action, onAction }) {  return (    <div style={{      padding: count !== undefined ? '4px 16px 10px' : '20px 16px 10px',      display: 'flex', alignItems: 'center', justifyContent: 'space-between',    }}>      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>        {icon}        <h3 style={{          fontSize: 15, fontWeight: 700, color: T.ink, letterSpacing: -0.2,          fontFamily: '"Space Grotesk", system-ui, sans-serif',        }}>{title}</h3>        {count !== undefined && (          <span style={{ fontSize: 11, color: T.inkSoft, fontWeight: 600 }}>{count}</span>        )}      </div>      {action && (        <button type="button" onClick={onAction} style={{          fontSize: 11, color: T.greenBright, fontWeight: 600,          background: 'transparent', border: 0, cursor: 'pointer',        }}>{action}</button>      )}    </div>  );}function MatchList({ loading, err, matches, picks, onPick, emptyLabel }) {  if (loading) {    return (      <div style={{ padding: '0 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>        {[0, 1, 2].map(i => (          <div key={i} style={{            height: 168, borderRadius: 16, background: T.greenDeep,            border: '1px solid rgba(255,255,255,0.05)',            opacity: 0.5 + i * 0.15,          }} />        ))}      </div>    );  }  if (err) {    return (      <div style={{ padding: '0 16px' }}>        <div style={{          padding: '14px', borderRadius: 12, background: 'rgba(255,91,120,0.12)',          color: '#ff8095', fontSize: 13, fontWeight: 600,        }}>{err}</div>      </div>    );  }  if (!matches?.length) {    return (      <div style={{ padding: '0 16px' }}>        <div style={{          padding: '14px', borderRadius: 12, background: T.surface,          border: `1px solid ${T.line}`, color: T.inkSoft,          fontSize: 12, textAlign: 'center',        }}>{emptyLabel}</div>      </div>    );  }  return (    <div style={{ padding: '0 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>      {matches.map(m => (        <OddMatchCard key={m.id} match={m} picks={picks} onPick={onPick} />      ))}    </div>  );}/** * Pull a hex from the league crest's inline-gradient style (e.g. * "background:linear-gradient(135deg,#3d195b,#00ff87)") so the row of round * flag badges picks up the league's brand colour without an extra request. */function extractColor(styleStr) {  if (!styleStr || typeof styleStr !== 'string') return null;  const m = styleStr.match(/#[0-9a-fA-F]{3,8}/);  return m ? m[0] : null;}
+/**
+ * Home ΓÇö mobile-first landing screen ported from the Claude Design
+ * Oddsify.html "OddHomeScreen". Sticky brand header, payout marquee, rotating
+ * promo banner, category grid, top-leagues row, live + featured upcoming
+ * sections. Data flows from the live /api/bet/matches endpoint via betApi.
+ *
+ * Real-time odds updates from the socket are intentionally not subscribed
+ * here yet ΓÇö the existing aggregator polls every 60s and pushes wallet /
+ * deposit events globally; live odds movement will land in a follow-up.
+ */
+import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { fetchMatches } from '../api/betApi.js';
+import { useAccount } from '../providers/AccountProvider.jsx';
+import { useSlip } from '../providers/SlipProvider.jsx';
+import {
+  T,
+  OddTopHeader, OddPayoutTicker, OddPromoBanner, OddCategoryGrid,
+  OddLeagueRow, OddMatchCard, OddsifyWordmark, OddIcon,
+} from '../components/odd/primitives.jsx';
+import { flattenLeagues } from '../components/odd/normalize.js';
+
+export default function Home() {
+  const navigate = useNavigate();
+  const { account, openDeposit } = useAccount();
+  const { picks, togglePick } = useSlip();
+
+  const [matches, setMatches] = useState([]);
+  const [leagues, setLeagues] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState('');
+
+  useEffect(() => {
+    let alive = true;
+    setLoading(true);
+    fetchMatches('football')
+      .then((data) => {
+        if (!alive) return;
+        setMatches(flattenLeagues(data));
+        // Synthesise a "top leagues" row from the response, keeping live counts.
+        setLeagues((data.leagues || []).map((l) => ({
+          id: l.id,
+          name: l.name,
+          short: l.name.split(' ┬╖ ')[0].split(' ').slice(0, 2).join(' '),
+          code: l.crest?.label || l.name.slice(0, 3).toUpperCase(),
+          color: extractColor(l.crest?.style) || '#1a1814',
+          live: (l.matches || []).filter(m => m.isLive).length,
+        })));
+      })
+      .catch((e) => { if (alive) setErr(e?.message || 'Failed to load matches.'); })
+      .finally(() => { if (alive) setLoading(false); });
+    return () => { alive = false; };
+  }, []);
+
+  const liveMatches = useMemo(() => matches.filter(m => m.isLive), [matches]);
+  const upcoming    = useMemo(() => matches.filter(m => !m.isLive).slice(0, 6), [matches]);
+  const liveCount   = liveMatches.length;
+
+  const onAuth = (mode) => navigate(mode === 'signup' ? '/login?next=/wallet' : '/login');
+
+  return (
+    <div style={{ background: T.bg, minHeight: '100vh', paddingBottom: 120 }}>
+      <OddTopHeader
+        user={account}
+        onAuth={onAuth}
+        onSearch={() => navigate('/sports')}
+        onBalanceClick={() => openDeposit()}
+      />
+      <OddPayoutTicker />
+      <OddPromoBanner onAction={() => navigate('/promos')} />
+      <OddCategoryGrid
+        liveCount={liveCount}
+        onPick={(c) => navigate(c.to || '/')}
+      />
+
+      <OddLeagueRow
+        leagues={leagues.length ? leagues : undefined}
+        onSeeAll={() => navigate('/sports')}
+        onPick={() => navigate('/sports')}
+      />
+
+      <SectionHeader
+        icon={<span style={{
+          width: 8, height: 8, borderRadius: 999, background: T.danger,
+          boxShadow: `0 0 0 4px ${T.danger}33`,
+        }} />}
+        title="Live now"
+        count={liveCount}
+        action="All live ΓåÆ"
+        onAction={() => navigate('/sports')}
+      />
+
+      <MatchList loading={loading} err={err} matches={liveMatches}
+        picks={picks} onPick={togglePick}
+        emptyLabel="No live matches right now ΓÇö check back at kickoff." />
+
+      <SectionHeader title="Featured upcoming" action="More ΓåÆ" onAction={() => navigate('/sports')} />
+      <MatchList loading={loading} err={err} matches={upcoming}
+        picks={picks} onPick={togglePick}
+        emptyLabel="Nothing scheduled yet." />
+
+      <div style={{ padding: '24px 16px 60px', textAlign: 'center' }}>
+        <OddsifyWordmark size={18} color={T.ink} accent={T.greenBright} />
+        <div style={{
+          fontSize: 10, color: T.inkDim, marginTop: 8, letterSpacing: 0.4,
+        }}>18+ ┬╖ BET RESPONSIBLY ┬╖ LICENSED GHA</div>
+      </div>
+    </div>
+  );
+}
+
+function SectionHeader({ icon, title, count, action, onAction }) {
+  return (
+    <div style={{
+      padding: count !== undefined ? '4px 16px 10px' : '20px 16px 10px',
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        {icon}
+        <h3 style={{
+          fontSize: 15, fontWeight: 700, color: T.ink, letterSpacing: -0.2,
+          fontFamily: '"Space Grotesk", system-ui, sans-serif',
+        }}>{title}</h3>
+        {count !== undefined && (
+          <span style={{ fontSize: 11, color: T.inkSoft, fontWeight: 600 }}>{count}</span>
+        )}
+      </div>
+      {action && (
+        <button type="button" onClick={onAction} style={{
+          fontSize: 11, color: T.greenBright, fontWeight: 600,
+          background: 'transparent', border: 0, cursor: 'pointer',
+        }}>{action}</button>
+      )}
+    </div>
+  );
+}
+
+function MatchList({ loading, err, matches, picks, onPick, emptyLabel }) {
+  if (loading) {
+    return (
+      <div style={{ padding: '0 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {[0, 1, 2].map(i => (
+          <div key={i} style={{
+            height: 168, borderRadius: 16, background: T.greenDeep,
+            border: '1px solid rgba(255,255,255,0.05)',
+            opacity: 0.5 + i * 0.15,
+          }} />
+        ))}
+      </div>
+    );
+  }
+  if (err) {
+    return (
+      <div style={{ padding: '0 16px' }}>
+        <div style={{
+          padding: '14px', borderRadius: 12, background: 'rgba(255,91,120,0.12)',
+          color: '#ff8095', fontSize: 13, fontWeight: 600,
+        }}>{err}</div>
+      </div>
+    );
+  }
+  if (!matches?.length) {
+    return (
+      <div style={{ padding: '0 16px' }}>
+        <div style={{
+          padding: '14px', borderRadius: 12, background: T.surface,
+          border: `1px solid ${T.line}`, color: T.inkSoft,
+          fontSize: 12, textAlign: 'center',
+        }}>{emptyLabel}</div>
+      </div>
+    );
+  }
+  return (
+    <div style={{ padding: '0 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+      {matches.map(m => (
+        <OddMatchCard key={m.id} match={m} picks={picks} onPick={onPick} />
+      ))}
+    </div>
+  );
+}
+
+/**
+ * Pull a hex from the league crest's inline-gradient style (e.g.
+ * "background:linear-gradient(135deg,#3d195b,#00ff87)") so the row of round
+ * flag badges picks up the league's brand colour without an extra request.
+ */
+function extractColor(styleStr) {
+  if (!styleStr || typeof styleStr !== 'string') return null;
+  const m = styleStr.match(/#[0-9a-fA-F]{3,8}/);
+  return m ? m[0] : null;
+}
