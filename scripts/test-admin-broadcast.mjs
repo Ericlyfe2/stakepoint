@@ -19,7 +19,7 @@ import { setTimeout as wait } from 'node:timers/promises';
 process.env.NODE_ENV       ||= 'test';
 process.env.PORT           ||= '4099';
 process.env.JWT_SECRET     ||= 'test-secret-key-for-development-only-32+';
-process.env.ADMIN_EMAIL    ||= 'admin@xenbet.gh';
+process.env.ADMIN_EMAIL    ||= 'admin@oddsify.gh';
 process.env.ADMIN_PASSWORD ||= 'Admin@12345';
 
 const PORT = Number(process.env.PORT);

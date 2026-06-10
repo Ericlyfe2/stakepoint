@@ -19,7 +19,7 @@ export const JWT = {
   // shared devices.
   accessTtl: env.JWT_ACCESS_TTL  || '7d',
   refreshTtl:env.JWT_REFRESH_TTL || '3650d',
-  issuer:    'xenbet',
+  issuer:    'oddsify',
 };
 
 export const SMTP = {
@@ -28,7 +28,7 @@ export const SMTP = {
   secure: env.SMTP_SECURE === 'true',
   user: env.SMTP_USER || '',
   pass: env.SMTP_PASS || '',
-  from: env.SMTP_FROM || 'Xenbet <no-reply@xenbet.gh>',
+  from: env.SMTP_FROM || 'Oddsify <no-reply@oddsify.gh>',
   enabled: !!env.SMTP_HOST,
 };
 
@@ -46,12 +46,19 @@ export const RATE_LIMITS = {
 export const ODDS_API_KEY = env.ODDS_API_KEY || '';
 
 // Comma-separated list of allowed origins for CORS in production.
-// Example: "https://stakepoint-client.vercel.app,https://www.example.com"
+// Example: "https://oddsify-client.vercel.app,https://www.example.com"
 // In development, localhost is always allowed.
 export const CORS_ORIGINS = (env.CORS_ORIGIN || '')
   .split(',')
   .map(s => s.trim())
   .filter(Boolean);
+
+// Optional: name of a Vercel project whose preview URLs should also be
+// trusted. When set (e.g. "oddsify-client"), the server accepts any origin
+// matching `https://oddsify-client.vercel.app` OR `https://oddsify-client-*.vercel.app`.
+// Without this knob, every new Vercel preview deployment would need an
+// explicit entry in CORS_ORIGIN. Leave unset if not deploying to Vercel.
+export const CORS_ALLOW_VERCEL = (env.CORS_ALLOW_VERCEL || '').trim();
 
 export const PATHS = {
   root: path.resolve(__dirname, '../..'),
@@ -87,8 +94,8 @@ if (isProd && (!JWT.secret || JWT.secret === 'dev-only-secret-change-me' || JWT.
   console.error('[env] FATAL: JWT_SECRET must be set to a 32+ char random string in production.');
   process.exit(1);
 }
-if (isProd && CORS_ORIGINS.length === 0) {
-  console.error('[env] FATAL: CORS_ORIGIN must list at least one allowed frontend origin in production.');
+if (isProd && CORS_ORIGINS.length === 0 && !CORS_ALLOW_VERCEL) {
+  console.error('[env] FATAL: set CORS_ORIGIN (comma-separated origins) or CORS_ALLOW_VERCEL (Vercel project name) in production.');
   process.exit(1);
 }
 if (!isProd && JWT.secret === 'dev-only-secret-change-me') {

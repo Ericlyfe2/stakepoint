@@ -118,7 +118,7 @@ const cashoutSchema = z.object({
 /* ------------ public meta ------------ */
 
 router.get('/health', (_req, res) => {
-  res.json({ ok: true, service: 'xenbet-betting-api', oddsApi: oddsApiStatus() });
+  res.json({ ok: true, service: 'oddsify-betting-api', oddsApi: oddsApiStatus() });
 });
 
 router.get('/sports', (_req, res) => {

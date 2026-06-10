@@ -5,7 +5,8 @@ import http from 'http';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
-import { isProd, PORT, GOOGLE, SMTP, CORS_ORIGINS } from './config/env.js';
+import { isProd, PORT, GOOGLE, SMTP, CORS_ORIGINS, CORS_ALLOW_VERCEL } from './config/env.js';
+import { buildOriginAllowlist } from './utils/corsOrigin.js';
 import { generalLimiter } from './middleware/rateLimit.js';
 import { errorHandler, notFoundHandler } from './middleware/error.js';
 import { log } from './utils/logger.js';
@@ -47,20 +48,19 @@ app.use(helmet({
   crossOriginOpenerPolicy: { policy: 'same-origin-allow-popups' }, // required by Google Identity Services popup
   crossOriginResourcePolicy: { policy: 'cross-origin' },           // allow Google's button assets
 }));
-const devOrigins = ['http://localhost:5173', 'http://127.0.0.1:5173'];
-const allowedOrigins = isProd ? CORS_ORIGINS : [...devOrigins, ...CORS_ORIGINS];
+// Shared predicate — also reused by realtime.js for Socket.IO so the two
+// transports always agree on what's allowed (including Vercel preview URLs
+// when CORS_ALLOW_VERCEL is set).
+const isAllowedOrigin = buildOriginAllowlist({
+  isProd,
+  allowedOrigins: CORS_ORIGINS,
+  vercelProject: CORS_ALLOW_VERCEL,
+});
 app.use(cors({
   origin: (origin, cb) => {
-    if (!origin) return cb(null, true);
-    if (!isProd && (origin.startsWith('http://localhost') || origin.startsWith('http://192.168.') || origin.startsWith('http://127.0.0.1'))) {
-      return cb(null, true);
-    }
-    if (allowedOrigins.includes(origin)) return cb(null, true);
-    // Reject without throwing. cb(null, false) returns a normal response
-    // without the Access-Control-Allow-Origin header — the browser blocks
-    // the request (correct behaviour) but we don't 500 inside the error
-    // handler with no CORS headers (which the browser would surface as
-    // "No 'Access-Control-Allow-Origin' header" — misleading for ops).
+    if (isAllowedOrigin(origin)) return cb(null, true);
+    // Reject without throwing (cb(null, false)) so the browser gets a clean
+    // CORS error instead of a confusing 500 with no CORS headers.
     log.warn(`CORS: rejecting origin ${origin}. Add it to CORS_ORIGIN if it's a legitimate frontend.`);
     return cb(null, false);
   },
@@ -84,7 +84,7 @@ app.use((req, res, next) => {
 app.get('/api/health', (_req, res) => {
   res.json({
     ok: true,
-    service: 'xenbet-api',
+    service: 'oddsify-api',
     version: '1.0.0',
     google: GOOGLE.enabled,
     smtp: SMTP.enabled,
@@ -159,7 +159,7 @@ async function boot() {
   }
 
   await new Promise((resolve) => server.listen(PORT, resolve));
-  log.info(`Xenbet API listening on http://127.0.0.1:${PORT}`);
+  log.info(`Oddsify API listening on http://127.0.0.1:${PORT}`);
 
   try {
     startSettlementLoop();

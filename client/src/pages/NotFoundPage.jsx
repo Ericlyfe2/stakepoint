@@ -36,7 +36,7 @@ export default function NotFoundPage() {
             fontWeight: 900,
             letterSpacing: '-0.04em',
             lineHeight: 1,
-            color: 'var(--accent, #c5ff3d)',
+            color: 'var(--accent, #ffb800)',
             margin: '12px 0 4px',
           }}
         >404</div>
@@ -54,7 +54,7 @@ export default function NotFoundPage() {
             onClick={() => navigate('/')}
             style={{
               padding: '12px 22px', borderRadius: 10, border: 'none',
-              background: 'var(--accent, #c5ff3d)', color: 'var(--bg, #0b0b0b)',
+              background: 'var(--accent, #ffb800)', color: 'var(--bg, #0b0b0b)',
               font: 'inherit', fontSize: 13.5, fontWeight: 800, cursor: 'pointer',
             }}
           >Go to homepage</button>

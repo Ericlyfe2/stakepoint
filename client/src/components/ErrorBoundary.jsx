@@ -16,7 +16,7 @@ export default class ErrorBoundary extends Component {
 
   componentDidCatch(error, info) {
     if (typeof console !== 'undefined') {
-      console.error('[xenbet] uncaught render error:', error, info?.componentStack);
+      console.error('[oddsify] uncaught render error:', error, info?.componentStack);
     }
   }
 
@@ -103,7 +103,7 @@ export default class ErrorBoundary extends Component {
                 padding: '11px 18px',
                 borderRadius: 10,
                 border: 'none',
-                background: 'var(--accent, #c5ff3d)',
+                background: 'var(--accent, #ffb800)',
                 color: 'var(--bg, #0b0b0b)',
                 font: 'inherit',
                 fontSize: 13.5,

@@ -99,7 +99,7 @@ export default function AdminLogin() {
           </div>
         </div>
         <div style={{ fontSize: 12, color: 'rgba(255,255,255,.5)' }}>
-          © {new Date().getFullYear()} Xenbet Gaming · Licensed by the Gaming Commission of Ghana
+          © {new Date().getFullYear()} Oddsify Gaming · Licensed by the Gaming Commission of Ghana
         </div>
       </aside>
 
@@ -148,11 +148,11 @@ export default function AdminLogin() {
                 </div>
                 {showDemo && (
                   <div style={{ marginTop: 10, fontFamily: 'var(--ff-mono)', fontSize: 11.5, lineHeight: 1.6 }}>
-                    Super: <code style={{ color: 'var(--text)' }}>admin@xenbet.gh</code> / <code>Admin@12345</code><br />
-                    Finance: <code style={{ color: 'var(--text)' }}>finance@xenbet.gh</code> / <code>Finance@12345</code><br />
-                    Odds: <code style={{ color: 'var(--text)' }}>odds@xenbet.gh</code> / <code>Odds@12345</code><br />
-                    Support: <code style={{ color: 'var(--text)' }}>support@xenbet.gh</code> / <code>Support@12345</code><br />
-                    Moderator: <code style={{ color: 'var(--text)' }}>mod@xenbet.gh</code> / <code>Moderator@12345</code>
+                    Super: <code style={{ color: 'var(--text)' }}>admin@oddsify.gh</code> / <code>Admin@12345</code><br />
+                    Finance: <code style={{ color: 'var(--text)' }}>finance@oddsify.gh</code> / <code>Finance@12345</code><br />
+                    Odds: <code style={{ color: 'var(--text)' }}>odds@oddsify.gh</code> / <code>Odds@12345</code><br />
+                    Support: <code style={{ color: 'var(--text)' }}>support@oddsify.gh</code> / <code>Support@12345</code><br />
+                    Moderator: <code style={{ color: 'var(--text)' }}>mod@oddsify.gh</code> / <code>Moderator@12345</code>
                   </div>
                 )}
               </div>

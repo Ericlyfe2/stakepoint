@@ -34,7 +34,8 @@
 import { Server as IOServer } from 'socket.io';
 import { verifyAccessToken } from './token.js';
 import { getUserById } from '../db/users.js';
-import { isProd, CORS_ORIGINS } from '../config/env.js';
+import { isProd, CORS_ORIGINS, CORS_ALLOW_VERCEL } from '../config/env.js';
+import { buildOriginAllowlist } from '../utils/corsOrigin.js';
 import { log } from '../utils/logger.js';
 
 let io = null;
@@ -59,12 +60,20 @@ function updateSnapshot(fixtureKey, patch) {
 
 export function attachRealtime(httpServer) {
   if (io) return io;
+  // Use the same allowlist function as Express CORS so HTTP + WebSocket
+  // origins are validated identically (including Vercel preview wildcards).
+  const isAllowedOrigin = buildOriginAllowlist({
+    isProd,
+    allowedOrigins: CORS_ORIGINS,
+    vercelProject: CORS_ALLOW_VERCEL,
+  });
   io = new IOServer(httpServer, {
     path: '/socket.io',
     cors: {
-      origin: isProd
-        ? CORS_ORIGINS
-        : ['http://localhost:5173', 'http://127.0.0.1:5173', ...CORS_ORIGINS],
+      origin: (origin, cb) => {
+        if (isAllowedOrigin(origin)) return cb(null, true);
+        return cb(new Error(`CORS: origin ${origin} not allowed`), false);
+      },
       credentials: true,
     },
     pingInterval: 25_000,

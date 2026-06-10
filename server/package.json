@@ -1,5 +1,5 @@
 {
-  "name": "xenbet-server",
+  "name": "oddsify-server",
   "private": true,
   "version": "1.0.0",
   "type": "module",

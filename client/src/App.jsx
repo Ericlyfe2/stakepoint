@@ -5,6 +5,7 @@ import ScrollRestoration from './components/ScrollRestoration.jsx';
 import NotFoundPage from './pages/NotFoundPage.jsx';
 import AppShell from './layout/AppShell.jsx';
 import Home from './pages/Home.jsx';
+import SportsPage from './pages/SportsPage.jsx';
 import LoginPage from './pages/LoginPage.jsx';
 import ProfilePage from './pages/ProfilePage.jsx';
 import WalletPage from './pages/WalletPage.jsx';
@@ -85,7 +86,8 @@ export default function App() {
               <Route path="/reset-password"   element={<Navigate to="/login" replace />} />
               <Route element={<AppShell />}>
                 <Route path="/"          element={<Home />} />
-                <Route path="/live"      element={<Home initialChip="live" />} />
+                <Route path="/sports"    element={<SportsPage />} />
+                <Route path="/live"      element={<SportsPage />} />
                 <Route path="/my-bets"   element={<BetHistoryPage />} />
                 <Route path="/casino"             element={<CasinoPage />} />
                 <Route path="/casino/dice"        element={<DicePage />} />
