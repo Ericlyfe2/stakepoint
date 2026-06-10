@@ -1428,9 +1428,19 @@ footer {
   color: var(--text);
   border: 1px solid var(--line);
   border-radius: var(--r-lg);
-  padding: 28px;
+  padding: 24px;
   max-width: 420px;
   width: calc(100vw - 40px);
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  outline: none;
+}
+.bv-dialog-content {
+  flex: 1;
+  overflow-y: auto;
+  margin-bottom: 16px;
+  padding-right: 4px;
 }
 .bv-dialog::backdrop {
   background: rgba(0, 0, 0, 0.72);

@@ -288,6 +288,64 @@ export const FALLBACK_FOOTBALL_LEAGUES = [
       }),
     ],
   },
+  {
+    id: 'laliga', name: 'Spain La Liga', region: 'europe',
+    countryMeta: 'ESP · MATCHDAY 22',
+    crest: { style: 'background:linear-gradient(135deg,#00529f,#f1a10a);color:#fff', label: 'LL' },
+    matches: [
+      makeFootballMatch({
+        id: 'es-rea-bar', home: 'Real Madrid', away: 'Barcelona',
+        kickoff: '20:00', day: 'Today',
+        odds: { '1': 1.95, 'X': 3.6, '2': 3.4 },
+        extraMarketCount: 124, fh: 'wwwww', fa: 'wwdww',
+      }),
+      makeFootballMatch({
+        id: 'es-atl-sev', home: 'Atletico Madrid', away: 'Sevilla',
+        kickoff: '18:30', day: 'Today',
+        odds: { '1': 1.6, 'X': 3.8, '2': 5.2 },
+        extraMarketCount: 98, fh: 'wdwdl', fa: 'ddlld',
+      }),
+    ],
+  },
+  {
+    id: 'serie_a', name: 'Italy Serie A', region: 'europe',
+    countryMeta: 'ITA · MATCHDAY 21',
+    crest: { style: 'background:linear-gradient(135deg,#007a33,#ffffff,#cd212a);color:#000', label: 'SA' },
+    matches: [
+      makeFootballMatch({
+        id: 'it-juv-mil', home: 'Juventus', away: 'AC Milan',
+        kickoff: '19:45', day: 'Today',
+        odds: { '1': 2.2, 'X': 3.1, '2': 3.3 },
+        extraMarketCount: 110, fh: 'wdwdd', fa: 'wwdwd',
+      }),
+    ],
+  },
+  {
+    id: 'bundesliga', name: 'Germany Bundesliga', region: 'europe',
+    countryMeta: 'GER · MATCHDAY 20',
+    crest: { style: 'background:linear-gradient(135deg,#000000,#dd0000,#ffce00);color:#fff', label: 'BL' },
+    matches: [
+      makeFootballMatch({
+        id: 'ge-bay-dor', home: 'Bayern München', away: 'Borussia Dortmund',
+        kickoff: '15:30', day: 'Today',
+        odds: { '1': 1.5, 'X': 4.5, '2': 5.4 },
+        extraMarketCount: 115, fh: 'wwwwl', fa: 'wwdww',
+      }),
+    ],
+  },
+  {
+    id: 'ligue1', name: 'France Ligue 1', region: 'europe',
+    countryMeta: 'FRA · MATCHDAY 23',
+    crest: { style: 'background:linear-gradient(135deg,#091c3e,#00b4f0);color:#fff', label: 'L1' },
+    matches: [
+      makeFootballMatch({
+        id: 'fr-psg-mar', home: 'PSG', away: 'Marseille',
+        kickoff: '20:45', day: 'Today',
+        odds: { '1': 1.38, 'X': 4.8, '2': 7.0 },
+        extraMarketCount: 105, fh: 'wdwww', fa: 'wwdld',
+      }),
+    ],
+  },
 ];
 
 export const FALLBACK_BASKETBALL_LEAGUES = [
