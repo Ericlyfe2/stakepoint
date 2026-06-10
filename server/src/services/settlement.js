@@ -197,7 +197,7 @@ export function settleNow() {
     betsStore.set(bet.id, updated);
 
     if (user && credit > 0) {
-      const nextUser = updateUser(user.id, { balance: Number((user.balance + credit).toFixed(2)) });
+      const nextUser = await updateUser(user.id, { balance: Number((user.balance + credit).toFixed(2)) });
       pushTx(user.id, {
         kind: status === 'won' ? 'bet_won' : 'bet_void_refund',
         amount: credit, status: 'completed',

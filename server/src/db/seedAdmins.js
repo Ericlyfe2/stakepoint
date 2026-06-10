@@ -46,6 +46,8 @@ const DEFAULTS = [
 ];
 
 export async function seedAdmins() {
+  // Never auto-seed in production — admins must be created manually via /admin.
+  if (process.env.NODE_ENV === 'production' || process.env.DATABASE_URL) return 0;
   const existing = allUsers().filter((u) => u.role === 'admin');
   if (existing.length > 0) return existing.length;
 
@@ -54,7 +56,7 @@ export async function seedAdmins() {
     const passwordHash = await hashPassword(spec.password);
     const present = findByEmail(spec.email);
     if (present) {
-      updateUser(present.id, {
+      await updateUser(present.id, {
         role: 'admin',
         adminRole: spec.adminRole,
         emailVerified: true,
@@ -62,7 +64,7 @@ export async function seedAdmins() {
         displayName: spec.displayName,
       });
     } else {
-      createUser({
+      await createUser({
         email: spec.email,
         displayName: spec.displayName,
         passwordHash,
@@ -70,7 +72,7 @@ export async function seedAdmins() {
         role: 'admin',
         balance: 0,
       });
-      updateUser(spec.email, {
+      await updateUser(spec.email, {
         adminRole: spec.adminRole,
         kycStatus: 'verified',
         twoFactorEnabled: false,

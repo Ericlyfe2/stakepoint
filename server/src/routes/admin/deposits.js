@@ -87,7 +87,7 @@ router.post('/:id/approve',
       autoUnblocked = true;
     }
 
-    const updated = updateUser(foundUserId, patch);
+    const updated = await updateUser(foundUserId, patch);
 
     const userTxs = txStore.get(foundUserId) || [];
     const updatedTxs = userTxs.map((t) =>

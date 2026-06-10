@@ -163,9 +163,7 @@ export default function Home({ initialChip }) {
         const data = await fetchMatches(sportId);
         if (cancelled) return;
         setSnapshot(data);
-        if (sportId === 'football' && selections.length === 0) {
-          setSelections((data.seedSlip || []).map((s) => ({ ...s })));
-        }
+        // Live data only — hardcoded seed selections removed
       } catch (e) {
         if (!cancelled) setLoadErr(e.message || 'Could not load fixtures.');
       }
@@ -490,12 +488,6 @@ export default function Home({ initialChip }) {
     requestAnimationFrame(() => marketsDlg.current?.showModal());
   };
 
-  const onPayslip = async (e) => {
-    e.preventDefault();
-    const ok = await loadFromCode(payslip);
-    if (ok) setPayslip('');
-  };
-
   // Code-loader state for the Featured/Codes tab input (declared above early
   // returns so hook order stays stable across renders).
   const [featuredCode, setFeaturedCode] = useState('');
@@ -696,6 +688,48 @@ export default function Home({ initialChip }) {
 
   return (
     <>
+      {/* ─── Persistent Booking Code Bar (always visible) ─── */}
+      <form
+        onSubmit={async (e) => { e.preventDefault(); await loadFromCode(payslip); if (payslip) setPayslip(''); }}
+        className="sb-booking-bar"
+        style={{
+          display: 'flex', gap: 8, padding: '8px 12px',
+          alignItems: 'stretch',
+          background: 'var(--surface, #161616)',
+          borderBottom: '1px solid var(--surface-border, #2a2a2a)',
+        }}
+      >
+        <input
+          type="text"
+          value={payslip}
+          onChange={(e) => setPayslip(e.target.value.toUpperCase().replace(/\s+/g, ''))}
+          placeholder="Enter booking code (e.g. ME94621)"
+          maxLength={12}
+          autoCapitalize="characters"
+          spellCheck={false}
+          style={{
+            flex: 1, padding: '10px 14px', borderRadius: 10,
+            border: '1px solid var(--surface-border, #2a2a2a)',
+            background: 'var(--surface-2, #1e1e1e)',
+            color: 'var(--text, #fff)',
+            fontSize: 14, fontWeight: 700, letterSpacing: '0.06em',
+            outline: 'none',
+          }}
+        />
+        <button
+          type="submit"
+          disabled={!payslip.trim()}
+          style={{
+            padding: '0 18px', borderRadius: 10, border: 'none',
+            background: payslip.trim() ? '#116f43' : '#2a2a2a',
+            color: '#fff', fontWeight: 800, fontSize: 13, cursor: payslip.trim() ? 'pointer' : 'not-allowed',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          Load Slip
+        </button>
+      </form>
+
       {/* ─── Sport tabs (with Live) ─── */}
       <div className="sb-sport-tabs">
         <button
@@ -1141,18 +1175,15 @@ export default function Home({ initialChip }) {
                   </div>
                 </section>
 
+                {lgIdx === 0 && null}
               </Fragment>
             );
           })}
         </>
       )}
 
-      {/* ─── Home footer (sponsor / payslip / payment / legal / back-to-top) ─── */}
+      {/* ─── Home footer (sponsor / payment / legal / back-to-top) ─── */}
       <section className="sb-footer" aria-label="Home footer">
-        <div className="sb-gpw-slot">
-          <GrandPrizeWinners />
-        </div>
-
         <div className="sb-age-chip" aria-label="Age 18 and above only">18+</div>
 
         <div className="sb-sponsor-card">
@@ -1164,23 +1195,6 @@ export default function Home({ initialChip }) {
           </div>
           <div className="sb-sponsor-tag">The world's sharper betting platform</div>
         </div>
-
-        <form className="sb-payslip" onSubmit={onPayslip}>
-          <div className="sb-payslip-label">Payslip</div>
-          <div className="sb-payslip-code">*711*222#</div>
-          <div className="sb-payslip-input">
-            <input
-              placeholder="Enter booking code"
-              value={payslip}
-              onChange={(e) => setPayslip(e.target.value.toUpperCase())}
-              inputMode="text"
-              autoComplete="off"
-              spellCheck={false}
-            />
-            <button type="submit">Check</button>
-          </div>
-          <div className="sb-payslip-foot">Enter a booking code to view a slip</div>
-        </form>
 
         <div className="sb-payment">
           <div className="sb-payment-label">Payment methods</div>
@@ -1214,6 +1228,8 @@ export default function Home({ initialChip }) {
           Back to Top
         </button>
       </section>
+
+      {/* Booking code is now available via the persistent bar at the top */}
 
       {/* ─── Floating slip pill (mobile only via CSS) ─── */}
       {selections.length > 0 && (
@@ -1526,52 +1542,5 @@ export default function Home({ initialChip }) {
   );
 }
 
-/* ─── Helper: generate a random winner entry ─── */
-function makeWinner() {
-  // Ghana mobile prefixes (MTN, Vodafone/Telecel, AirtelTigo, Glo) — masked
-  // so the punter's identity stays private. Example: 024 *** **42
-  const prefixes = ['024', '025', '054', '055', '059', '020', '050', '027', '057', '026', '056'];
-  const prefix = prefixes[Math.floor(Math.random() * prefixes.length)];
-  const lastTwo = String(Math.floor(Math.random() * 100)).padStart(2, '0');
-  const who = `${prefix} *** **${lastTwo}`;
-  const amt = 200000 + Math.random() * (600501.75 - 200000);
-  const mins = Math.floor(Math.random() * 3) + 1;
-  return { who, amt, src: 'in Sports', ago: mins === 1 ? '1 min ago' : `${mins} mins ago` };
-}
-
-/* ─── Live Grand Prize Winners ticker ─── */
-function GrandPrizeWinners() {
-  const [items, setItems] = useState(() => Array.from({ length: 10 }, () => makeWinner()));
-
-  useEffect(() => {
-    const id = setInterval(() => {
-      setItems((prev) => { const n = [...prev]; n.shift(); n.push(makeWinner()); return n; });
-    }, 3500);
-    return () => clearInterval(id);
-  }, []);
-
-  const doubled = [...items, ...items];
-
-  return (
-    <section className="sb-winners">
-      <div className="sb-winners-head">
-        <h3>🏆 Grand Prize Winners</h3>
-      </div>
-      <div className="sb-winners-scroll">
-        <div className="sb-winners-track">
-          {doubled.map((w, i) => (
-            <div key={i} className="sb-winner">
-              <div className="sb-winner-bg-icon">
-                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19,5h-2V3c0-0.55-0.45-1-1-1H8C7.45,2,7,2.45,7,3v2H5C3.9,5,3,5.9,3,7v1c0,2.55,1.92,4.63,4.39,4.94C8.23,14.73,9.44,16,11,16v3H7v2h10v-2h-4v-3c1.56,0,2.77-1.27,3.61-3.06C19.08,12.63,21,10.55,21,8V7C21,5.9,20.1,5,19,5z M5,8V7h2v3.82C5.84,10.4,5,9.3,5,8z M19,8c0,1.3-0.84,2.4-2,2.82V7h2V8z"/></svg>
-              </div>
-              <span className="who">{w.who}</span>
-              <span className="amt">GHS {formatAmt(w.amt)}</span>
-              <span className="src">{w.src}</span>
-              <span className="ago">{w.ago}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-}
+/* Grand Prize Winners — shows real winners from the database
+   when the feature is implemented. Currently disabled. */

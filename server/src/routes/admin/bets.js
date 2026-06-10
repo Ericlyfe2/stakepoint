@@ -128,7 +128,7 @@ router.post('/:id/settle',
 
     let updatedUser = user;
     if (credit > 0) {
-      updatedUser = updateUser(user.id, { balance: Number((user.balance + credit).toFixed(2)) });
+      updatedUser = await updateUser(user.id, { balance: Number((user.balance + credit).toFixed(2)) });
       pushTx(user.id, { kind: result === 'won' ? 'bet_won' : 'bet_void_refund', amount: credit, status: 'completed', balanceAfter: updatedUser.balance, ref: bet.id });
     }
     logActivity(user.id, { kind: `bet_${result}`, betId: bet.id, credit });
@@ -156,7 +156,7 @@ router.post('/:id/cancel',
 
     let updatedUser = user;
     if (refund > 0) {
-      updatedUser = updateUser(user.id, { balance: Number((user.balance + refund).toFixed(2)) });
+      updatedUser = await updateUser(user.id, { balance: Number((user.balance + refund).toFixed(2)) });
       pushTx(user.id, { kind: 'bet_cancel_refund', amount: refund, status: 'completed', balanceAfter: updatedUser.balance, ref: bet.id });
     }
     logActivity(user.id, { kind: 'bet_cancelled', betId: bet.id, refund });
@@ -252,7 +252,7 @@ router.post('/bulk',
           const updatedBet = { ...bet, status: r, settledAt: new Date().toISOString(), settledBy: req.admin.email, settleReason: reason || null, settledPayout: credit };
           betsStore.set(bet.id, updatedBet);
           if (credit > 0) {
-            const updatedUser = updateUser(user.id, { balance: Number((user.balance + credit).toFixed(2)) });
+            const updatedUser = await updateUser(user.id, { balance: Number((user.balance + credit).toFixed(2)) });
             pushTx(user.id, { kind: r === 'won' ? 'bet_won' : 'bet_void_refund', amount: credit, status: 'completed', balanceAfter: updatedUser.balance, ref: bet.id });
           }
           logActivity(user.id, { kind: `bet_${r}`, betId: bet.id, credit });
@@ -266,7 +266,7 @@ router.post('/bulk',
           const updatedBet = { ...bet, status: 'cancelled', cancelledAt: new Date().toISOString(), cancelledBy: req.admin.email, cancelReason: reason || 'Bulk cancel' };
           betsStore.set(bet.id, updatedBet);
           if (refund > 0) {
-            const updatedUser = updateUser(user.id, { balance: Number((user.balance + refund).toFixed(2)) });
+            const updatedUser = await updateUser(user.id, { balance: Number((user.balance + refund).toFixed(2)) });
             pushTx(user.id, { kind: 'bet_cancel_refund', amount: refund, status: 'completed', balanceAfter: updatedUser.balance, ref: bet.id });
           }
           logActivity(user.id, { kind: 'bet_cancelled', betId: bet.id, refund });

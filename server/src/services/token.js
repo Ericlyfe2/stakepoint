@@ -2,10 +2,12 @@ import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import { JWT } from '../config/env.js';
 import { createStore } from '../db/store.js';
+import { log } from '../utils/logger.js';
 
 const refreshStore = createStore('refresh_tokens', {});
 
 export function signAccessToken(account) {
+  log.debug(`signing access token for ${account.id}`);
   return jwt.sign(
     { sub: account.id, email: account.email, role: account.role || 'user', scope: 'user' },
     JWT.secret,

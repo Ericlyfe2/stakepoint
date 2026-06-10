@@ -9,6 +9,7 @@ import {
   revokeRefreshToken, lookupRefresh, revokeAllForAccount,
 } from '../services/token.js';
 import { verifyGoogleIdToken } from '../services/oauth.js';
+import { issueOtp, checkOtp, consumeOtp } from '../services/otp.js';
 import { requireAuth } from '../middleware/auth.js';
 import {
   publicAdmin, bruteCheck, bumpBrute, clearBrute, issueAdminSession,
@@ -89,7 +90,7 @@ router.post('/register',
     if (findByEmail(email)) throw conflict('An account with this email already exists.');
 
     const passwordHash = await hashPassword(password);
-    const user = createUser({
+    const user = await createUser({
       email,
       displayName: displayName || email,
       passwordHash,
@@ -151,7 +152,7 @@ router.post('/login',
       }
       if (!user.country) patch = { country: submittedCountry };
     }
-    const fresh = patch ? updateUser(user.id, patch) : user;
+    const fresh = patch ? await updateUser(user.id, patch) : user;
 
     logActivity(fresh.id, { kind: 'login_success', ip: req.ip, userAgent: req.get('user-agent') });
     const session = issueSession(fresh, req);
@@ -198,7 +199,7 @@ router.post('/change-password',
       if (!ok) throw unauthorized('Current password is incorrect.');
     }
     const passwordHash = await hashPassword(newPassword);
-    updateUser(user.id, { passwordHash });
+    await updateUser(user.id, { passwordHash });
     revokeAllForAccount(user.id);
     logActivity(user.id, { kind: 'password_changed', ip: req.ip });
     res.json({ ok: true, message: 'Password changed. Other sessions were signed out.' });
@@ -212,7 +213,7 @@ router.post('/google',
     const submittedCountry = req.body.country;
     let user = findByEmail(profile.email) || findByGoogleId(profile.googleId);
     if (!user) {
-      user = createUser({
+      user = await createUser({
         email: profile.email,
         displayName: profile.displayName,
         googleId: profile.googleId,
@@ -221,15 +222,62 @@ router.post('/google',
         country: submittedCountry || null,
       });
     } else if (!user.googleId) {
-      user = updateUser(user.id, { googleId: profile.googleId, picture: profile.picture, emailVerified: true });
+      user = await updateUser(user.id, { googleId: profile.googleId, picture: profile.picture, emailVerified: true });
     }
     if (user.suspended) throw unauthorized('Account suspended.');
     if (submittedCountry && !user.country) {
-      user = updateUser(user.id, { country: submittedCountry });
+      user = await updateUser(user.id, { country: submittedCountry });
     }
     logActivity(user.id, { kind: 'login_google', ip: req.ip });
     const session = issueSession(user, req);
     res.json({ ok: true, kind: 'user', account: publicUser(user), ...session });
+  })
+);
+
+/* ------------ Password Reset with OTP ------------ */
+
+const forgotSchema = z.object({
+  email: emailLike,
+});
+
+const resetSchema = z.object({
+  email: emailLike,
+  code: z.string().min(6).max(6),
+  newPassword: z.string(),
+});
+
+router.post('/forgot-password',
+  registerLimiter,
+  validate(forgotSchema),
+  asyncHandler(async (req, res) => {
+    const { email } = req.body;
+    const user = findByEmail(email);
+    if (!user) {
+      // Don't reveal whether the email exists — always return ok.
+      return res.json({ ok: true, message: 'If the email exists, a code has been sent.' });
+    }
+    await issueOtp(email, 'reset');
+    log.info(`password reset OTP sent to ${email}`);
+    res.json({ ok: true, message: 'If the email exists, a code has been sent.' });
+  })
+);
+
+router.post('/reset-password',
+  registerLimiter,
+  validate(resetSchema),
+  asyncHandler(async (req, res) => {
+    const { email, code, newPassword } = req.body;
+    passwordOrThrow(newPassword);
+    const user = findByEmail(email);
+    if (!user) throw badRequest('Reset link expired or invalid.');
+    checkOtp(email, 'reset', code);
+    const passwordHash = await hashPassword(newPassword);
+    await updateUser(user.id, { passwordHash });
+    consumeOtp(email, 'reset');
+    revokeAllForAccount(user.id);
+    logActivity(user.id, { kind: 'password_reset', ip: req.ip });
+    log.info(`password reset completed for ${email}`);
+    res.json({ ok: true, message: 'Password changed. Please sign in with your new password.' });
   })
 );
 

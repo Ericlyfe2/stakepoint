@@ -5,7 +5,6 @@ import {
   CASINO_GAMES,
   VIRTUAL_LEAGUES,
   JACKPOT_GAME,
-  PROMOTIONS,
   getMatchById,
   getOddsSnapshot,
   getSport,
@@ -322,7 +321,7 @@ router.post('/place',
     // Index this bet so live ticks can recompute its cash-out offer.
     cashOutEngine.registerBet(receipt);
 
-    const updated = updateUser(user.id, { balance: Number((user.balance - totalStake).toFixed(2)) });
+    const updated = await updateUser(user.id, { balance: Number((user.balance - totalStake).toFixed(2)) });
     pushTx(user.id, {
       kind: 'bet_placed', amount: -totalStake, status: 'completed',
       balanceAfter: updated.balance, ref: id,
@@ -458,7 +457,7 @@ router.delete('/bets/:id',
       cashOutEngine.registerBet(residual);
     }
 
-    const updated = updateUser(req.user.id, {
+    const updated = await updateUser(req.user.id, {
       balance: Number((req.user.balance + cashedPortion).toFixed(2)),
     });
     pushTx(req.user.id, {
@@ -512,7 +511,7 @@ router.post('/jackpot/enter',
       fee: JACKPOT_GAME.entryFee, currency: CURRENCY, picks, drawsIn: JACKPOT_GAME.drawsIn,
     };
     jackpotStore.set(id, entry);
-    const updated = updateUser(user.id, {
+    const updated = await updateUser(user.id, {
       balance: Number((user.balance - JACKPOT_GAME.entryFee).toFixed(2)),
     });
     pushTx(user.id, { kind: 'jackpot_entry', amount: -JACKPOT_GAME.entryFee, status: 'completed', balanceAfter: updated.balance, ref: id });
@@ -523,7 +522,8 @@ router.post('/jackpot/enter',
 
 router.get('/promos', (_req, res) => {
   const fromStore = listActivePromotions();
-  res.json({ promotions: fromStore.length ? fromStore : PROMOTIONS });
+  // Only return real promotions from the database — never hardcoded fallbacks.
+  res.json({ promotions: fromStore }); // empty array when none exist
 });
 
 cashOutEngine.onOffer((bet, payload) => {
