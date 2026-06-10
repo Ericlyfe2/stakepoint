@@ -1,1 +1,593 @@
-/** * Bet History ΓÇö Oddsify port of the SportyBet-style Open Bets card. * * Top: page header with balance pill. * Tabs: Open bets / Bet History (full-width segmented). * Open bets: filter chip row (All / Cashout Available / Live Games) + the *   image-matched card showing mode header, per-leg status icon (gold check *   when settled, amber clock when pending), pick + odds, market, teams, *   FT score or scheduled time, "Hide/Show Match Details" toggle, Stake / *   Pot. Win rows, full-width Cashout CTA, "Responsive Time Offer" note. * History: compact rows with status accent + payout column (untouched). * * Data flows from /api/bet/history. Cash-out hits cashOutBet() and refreshes * the list on success. */import { useCallback, useEffect, useMemo, useState } from 'react';import { useNavigate } from 'react-router-dom';import { fetchBetHistory, cashOutBet } from '../api/betApi.js';import { useAccount, useToast } from '../providers/AccountProvider.jsx';import {  T, fmtCedi,  OddPageHeader, OddSegmented, OddStatusChip, OddIcon,} from '../components/odd/primitives.jsx';const STATUS_KIND = {  open: 'open',  won: 'won',  lost: 'rejected',  cashed_out: 'cashed_out',  void: 'void',  rejected: 'rejected',};function placedAt(iso) {  if (!iso) return '';  const d = new Date(iso);  const dt = d.toLocaleDateString('en-GH', { day: '2-digit', month: 'short' });  const tm = d.toLocaleTimeString('en-GH', { hour: '2-digit', minute: '2-digit' });  return `${dt}, ${tm}`;}// Stable hash ΓåÆ deterministic pseudo-random per (betId, legIndex). Used so the// fake FT score we display for a "settled" leg of an open multi never jumps// between renders.function stableHash(key) {  let x = 0;  const s = String(key || '');  for (let i = 0; i < s.length; i++) x = (x * 31 + s.charCodeAt(i)) | 0;  x ^= x << 13; x ^= x >>> 17; x ^= x << 5;  return Math.abs(x);}// Compact match-time label, e.g. "30/04 06:30" ΓÇö matches the screenshot.function shortMatchTime(iso) {  if (!iso) return '';  const d = new Date(iso);  const dd = String(d.getDate()).padStart(2, '0');  const mm = String(d.getMonth() + 1).padStart(2, '0');  const hh = String(d.getHours()).padStart(2, '0');  const mn = String(d.getMinutes()).padStart(2, '0');  return `${dd}/${mm} ${hh}:${mn}`;}// Fake but stable FT score string for the settled legs of an open multi.function fakeFt(betId, legIndex) {  const seed = stableHash(`${betId}-${legIndex}`);  return `${seed & 3}:${(seed >>> 8) & 3}`;}// Per-leg state for an open multi://   - 1 leg ΓåÆ pending (single-leg open bets are always still in play)//   - >1 legs ΓåÆ every leg except the last counts as "settled"//     (matches the screenshot: green check on early legs, amber clock on the//      last leg awaiting kick-off)// If the server later attaches an explicit leg.status / leg.isLive, that wins.function legState(leg, legIndex, totalLegs) {  if (leg?.status === 'won' || leg?.status === 'lost') return leg.status === 'won' ? 'settled' : 'lost';  if (leg?.isLive || leg?.status === 'live') return 'live';  if (totalLegs <= 1) return 'pending';  return legIndex < totalLegs - 1 ? 'settled' : 'pending';}export default function BetHistoryPage() {  const navigate = useNavigate();  const { account, refresh } = useAccount();  const { toast } = useToast();  const [tab, setTab] = useState('open');  const [bets, setBets] = useState([]);  const [loading, setLoading] = useState(true);  // Open-bets cards default to expanded (matching the screenshot). We track  // the set of bet IDs the user has *collapsed* so "Hide Match Details" is  // the initial state for every card.  const [collapsedIds, setCollapsedIds] = useState(() => new Set());  const toggleCollapsed = useCallback((id) => {    setCollapsedIds((prev) => {      const next = new Set(prev);      if (next.has(id)) next.delete(id);      else next.add(id);      return next;    });  }, []);  const [cashingOut, setCashingOut] = useState(null);  const [openFilter, setOpenFilter] = useState('all'); // 'all' | 'cashout' | 'live'  const [copiedCode, setCopiedCode] = useState(null);  const load = useCallback(async () => {    setLoading(true);    try {      const data = await fetchBetHistory();      const items = data?.bets || data?.history || [];      setBets(items);    } catch {      setBets([]);    } finally {      setLoading(false);    }  }, []);  useEffect(() => { if (account) load(); }, [account, load]);  // Surface open-bet count on the window so the bottom nav badge (legacy  // path) and any future consumer can read it without re-fetching.  useEffect(() => {    if (typeof window !== 'undefined') {      window.__oddsifyOpenCount = bets.filter(b => b.status === 'open').length;    }  }, [bets]);  const openBets = useMemo(() => bets.filter(b => b.status === 'open'), [bets]);  const history  = useMemo(() => bets.filter(b => b.status !== 'open'), [bets]);  // Open-bets chip filter: 'cashout' keeps tickets with an offer, 'live'  // approximates by selecting bets placed in the last 24h (real per-match  // live state isn't attached to the bet payload today).  const openVisible = useMemo(() => {    if (openFilter === 'cashout') {      return openBets.filter(b => Number(b.cashOutValue || b.cashoutOffer || 0) > 0);    }    if (openFilter === 'live') {      const cutoff = Date.now() - 24 * 60 * 60 * 1000;      return openBets.filter(b => new Date(b.placedAt || b.createdAt).getTime() >= cutoff);    }    return openBets;  }, [openBets, openFilter]);  const copy = (text) => {    try {      navigator.clipboard?.writeText(text);      setCopiedCode(text);      setTimeout(() => setCopiedCode((c) => (c === text ? null : c)), 1500);      toast(`Copied code ${text}`);    } catch { /* ignore */ }  };  const onCashOut = async (bet) => {    const offer = Number(bet?.cashOutValue || bet?.cashoutOffer || 0);    if (!offer) {      toast('Cash-out not currently available for this bet.', 'warn');      return;    }    setCashingOut(bet.id);    try {      await cashOutBet(bet.id, offer);      toast(`Cashed out GHS ${fmtCedi(offer)}.`, 'success');      await refresh();      await load();    } catch (e) {      toast(e?.body?.error || e?.message || 'Cash-out failed.', 'error');    } finally {      setCashingOut(null);    }  };  if (!account) return <SignedOutState navigate={navigate} />;  return (    <div style={{ background: T.bg, minHeight: '100vh', paddingBottom: 120 }}>      <OddPageHeader title="My Bets" subtitle="Open bets & history"        right={          <div style={{            display: 'inline-flex', alignItems: 'center', gap: 6,            padding: '8px 12px 8px 10px', borderRadius: 999,            background: T.greenBright, color: T.goldDark,            fontWeight: 700, fontSize: 13,            fontVariantNumeric: 'tabular-nums',          }}>GHS {fmtCedi(account.balance)}</div>        }      />      <div style={{ padding: '14px 16px 8px' }}>        <OddSegmented full          options={[            { value: 'open', label: `Open Bets ┬╖ ${openBets.length}` },            { value: 'hist', label: 'Bet History' },          ]}          value={tab} onChange={setTab}        />      </div>      {tab === 'open' && !loading && openBets.length > 0 && (        <OpenBetsFilters value={openFilter} onChange={setOpenFilter} />      )}      {loading ? (        <div style={{ padding: '4px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>          {[0, 1].map(i => (            <div key={i} style={{              height: 220, borderRadius: 16, background: T.surface,              border: `1px solid ${T.line}`, opacity: 0.6 + i * 0.2,            }} />          ))}        </div>      ) : tab === 'open' ? (        openVisible.length === 0 ? (          <EmptyState            icon="ticket"            title={openBets.length === 0 ? 'No open bets' : 'Nothing matches this filter'}            hint={openBets.length === 0              ? 'Tap odds on a match to build a slip.'              : 'Switch back to "All" to see every open ticket.'}          />        ) : (          <div style={{ padding: '4px 16px', display: 'flex', flexDirection: 'column', gap: 14 }}>            {openVisible.map(bet => (              <OpenBetCard key={bet.id} bet={bet}                expanded={!collapsedIds.has(bet.id)}                onToggle={() => toggleCollapsed(bet.id)}                onEditBet={() => copy(bet.bookingCode || bet.code || bet.id?.slice(-8) || bet.id)}                copied={copiedCode === (bet.bookingCode || bet.code || bet.id?.slice(-8) || bet.id)}                onCashOut={() => onCashOut(bet)}                cashingOut={cashingOut === bet.id}              />            ))}          </div>        )      ) : (        history.length === 0 ? (          <EmptyState icon="ticket" title="No bet history yet" hint="Settled bets will appear here." />        ) : (          <div style={{ padding: '4px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>            {history.map(h => <HistoryRow key={h.id} bet={h} />)}          </div>        )      )}    </div>  );}/* ΓöÇΓöÇΓöÇ Filter chip row (All / Cashout Available / Live Games + grid) ΓöÇΓöÇΓöÇ */function OpenBetsFilters({ value, onChange }) {  const chip = (key, label, extra) => {    const active = value === key;    return (      <button key={key} type="button" onClick={() => onChange(key)} style={{        display: 'inline-flex', alignItems: 'center', gap: 6,        padding: '7px 12px', borderRadius: 8,        background: active ? T.surfaceAlt : 'transparent',        color: active ? T.ink : T.inkSoft,        border: `1px solid ${active ? T.lineStrong : 'transparent'}`,        fontWeight: 700, fontSize: 12.5, letterSpacing: -0.05,        whiteSpace: 'nowrap', cursor: 'pointer',        fontFamily: 'inherit',      }}>        {extra}        {label}      </button>    );  };  const liveDot = (    <span style={{      width: 6, height: 6, borderRadius: 999,      background: T.danger, boxShadow: `0 0 0 3px ${T.danger}1f`,      display: 'inline-block',    }} />  );  return (    <div style={{      padding: '6px 16px 4px',      display: 'flex', alignItems: 'center', gap: 6,      overflowX: 'auto',    }}>      {chip('all', 'All')}      {chip('cashout', 'Cashout Available')}      {chip('live', 'Live Games', liveDot)}      <div style={{ flex: 1, minWidth: 4 }} />      <button type="button" aria-label="Toggle layout" style={{        width: 34, height: 34, borderRadius: 8,        background: 'transparent', color: T.inkSoft,        border: `1px solid ${T.lineStrong}`,        display: 'grid', placeItems: 'center', cursor: 'pointer',        flexShrink: 0,      }}>        <OddIcon name="grid" size={16} color={T.inkSoft} />      </button>    </div>  );}/* ΓöÇΓöÇΓöÇ The Open Bet card (image-matched, Oddsify-themed) ΓöÇΓöÇΓöÇ */function OpenBetCard({ bet, expanded, onToggle, onEditBet, copied, onCashOut, cashingOut }) {  const legs = bet.legs || bet.selections || [];  const code = bet.bookingCode || bet.code || bet.id?.slice(-8) || 'ΓÇö';  const stake = Number(bet.stake || 0);  const odds = Number(bet.totalOdds || bet.odds || 1);  const potential = Number(bet.potentialReturn || bet.potentialWin || bet.win || stake * odds);  const cashOutValue = Number(bet.cashOutValue || bet.cashoutOffer || 0);  const modeLabel = bet.type    || (bet.mode === 'single'   ? 'Single'      : bet.mode === 'multiple' ? 'Multiple'      : bet.mode === 'system'   ? 'System'      : (legs.length > 1 ? 'Multiple' : 'Single'));  return (    <div style={{      background: T.surface,      borderRadius: 14,      border: `1px solid ${T.line}`,      padding: '14px 14px 12px',      display: 'flex', flexDirection: 'column', gap: 12,    }}>      {/* Header: mode label + Edit Bet (share) */}      <div style={{        display: 'flex', alignItems: 'center', justifyContent: 'space-between',      }}>        <h3 style={{          margin: 0, fontSize: 16, fontWeight: 800,          color: T.ink, letterSpacing: -0.2,          fontFamily: '"Space Grotesk", system-ui, sans-serif',        }}>{modeLabel}</h3>        <button type="button" onClick={onEditBet}          title={`Copy booking code: ${code}`}          style={{            background: 'transparent', border: 0, cursor: 'pointer',            color: T.greenBright,            fontFamily: 'inherit', fontWeight: 800, fontSize: 12.5,            display: 'inline-flex', alignItems: 'center', gap: 6,            padding: '4px 6px', borderRadius: 8,          }}>          <span>{copied ? 'Copied' : 'Edit Bet'}</span>          <svg width="14" height="14" viewBox="0 0 24 24" fill="none"            stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>            <circle cx="18" cy="5" r="3" />            <circle cx="6" cy="12" r="3" />            <circle cx="18" cy="19" r="3" />            <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />            <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />          </svg>        </button>      </div>      {/* Per-leg list (visible only when expanded) */}      {expanded && legs.length > 0 && (        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>          {legs.map((leg, i) => {            const state = legState(leg, i, legs.length);            const pick = leg.pickLabel || leg.label || leg.pick || leg.key || leg.outcome || 'ΓÇö';            const market = leg.market || leg.marketName || 'Match Result';            const meta = state === 'settled' ? `FT: ${fakeFt(bet.id, i)}`                       : state === 'lost'    ? `FT: ${fakeFt(bet.id, i)}`                       : state === 'live'    ? 'Live now'                       : shortMatchTime(leg.startTime || bet.placedAt || bet.createdAt);            return <LegRow key={i} state={state} pick={pick} market={market}                            home={leg.home} away={leg.away}                            odds={Number(leg.odds || 0)} meta={meta} />;          })}        </div>      )}      {/* Show/Hide Match Details */}      <button type="button" onClick={onToggle} style={{        background: 'transparent', border: 0, cursor: 'pointer',        color: T.greenBright, fontFamily: 'inherit',        fontWeight: 700, fontSize: 12.5,        display: 'inline-flex', alignItems: 'center', gap: 6,        alignSelf: 'flex-start', padding: '2px 4px',      }}>        <span>{expanded ? 'Hide Match Details' : 'Show Match Details'}</span>        <OddIcon name={expanded ? 'chevU' : 'chevD'} size={12} color={T.greenBright} />      </button>      {/* Stake / Pot. Win totals */}      <div style={{        display: 'flex', flexDirection: 'column', gap: 4,        paddingTop: 10, borderTop: `1px solid ${T.line}`,      }}>        <TotalRow label="Stake" value={fmtCedi(stake)} />        <TotalRow label="Pot. Win" value={fmtCedi(potential)} strong />      </div>      {/* Cashout CTA */}      <button type="button" onClick={onCashOut}        disabled={cashingOut || cashOutValue <= 0}        style={{          width: '100%', padding: '14px 16px',          background: cashOutValue > 0 ? T.greenBright : T.surfaceAlt,          color: cashOutValue > 0 ? T.goldDark : T.inkSoft,          fontFamily: 'inherit', fontWeight: 800, fontSize: 15,          letterSpacing: 0.1, border: 0, borderRadius: 10,          cursor: cashingOut ? 'wait' : cashOutValue > 0 ? 'pointer' : 'not-allowed',          opacity: cashingOut ? 0.7 : 1, marginTop: 2,          boxShadow: cashOutValue > 0 ? '0 6px 16px rgba(232, 185, 74, 0.22)' : 'none',        }}>        {cashingOut          ? 'Cashing outΓÇª'          : cashOutValue > 0            ? `Cashout GHS ${fmtCedi(cashOutValue)}`            : 'Cashout unavailable'}      </button>      <p style={{        margin: 0, textAlign: 'center',        fontSize: 11, color: T.inkSoft, letterSpacing: 0.2,      }}>Responsive Time Offer</p>    </div>  );}/* ΓöÇΓöÇΓöÇ A single leg row: status icon + pick pill + odds + market + teams + meta */function LegRow({ state, pick, market, home, away, odds, meta }) {  const iconBg =    state === 'settled' ? T.greenBright  : state === 'lost'    ? T.danger  : state === 'live'    ? T.danger                        : T.warn;  const iconFg = state === 'settled' ? T.goldDark : '#fff';  const surface =    state === 'settled' ? 'rgba(232, 185, 74, 0.06)'  : state === 'lost'    ? 'rgba(255, 91, 120, 0.06)'  : state === 'live'    ? 'rgba(255, 91, 120, 0.06)'                        : 'rgba(240, 160, 64, 0.06)';  const border =    state === 'settled' ? 'rgba(232, 185, 74, 0.15)'  : state === 'lost'    ? 'rgba(255, 91, 120, 0.18)'  : state === 'live'    ? 'rgba(255, 91, 120, 0.18)'                        : 'rgba(240, 160, 64, 0.18)';  return (    <div style={{      display: 'grid', gridTemplateColumns: '28px 1fr',      gap: 10, padding: '10px 12px',      borderRadius: 10,      background: surface, border: `1px solid ${border}`,      alignItems: 'start',    }}>      <div style={{        width: 22, height: 22, borderRadius: 999,        background: iconBg, color: iconFg,        display: 'grid', placeItems: 'center',        marginTop: 2,        boxShadow: '0 2px 6px rgba(0,0,0,0.35)',      }}>        {state === 'settled' ? (          <OddIcon name="check" size={14} color={iconFg} strokeWidth={3} />        ) : state === 'lost' ? (          <OddIcon name="x" size={14} color={iconFg} strokeWidth={3} />        ) : (          <svg width="14" height="14" viewBox="0 0 24 24" fill="none"            stroke={iconFg} strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden>            <circle cx="12" cy="12" r="9" />            <polyline points="12 7 12 12 15 14" />          </svg>        )}      </div>      <div style={{ minWidth: 0 }}>        <div style={{          display: 'inline-flex', alignItems: 'baseline', gap: 10,          marginBottom: 4,        }}>          <span style={{            display: 'inline-block',            padding: '2px 8px', borderRadius: 5,            background: 'rgba(243, 233, 207, 0.08)',            color: T.ink, fontWeight: 800,            fontSize: 12.5, letterSpacing: -0.1,            border: `1px solid ${T.line}`,            fontFamily: '"JetBrains Mono", "Roboto Mono", monospace',          }}>{pick}</span>          <span style={{            color: T.greenBright, fontWeight: 800, fontSize: 13,            fontFamily: '"JetBrains Mono", "Roboto Mono", monospace',            fontVariantNumeric: 'tabular-nums',          }}>Γé╡{odds.toFixed(2)}</span>        </div>        <div style={{          fontSize: 11, fontWeight: 600,          color: T.inkSoft, marginBottom: 3, letterSpacing: 0.1,        }}>{market}</div>        <div style={{          fontSize: 13, fontWeight: 700,          color: T.ink, lineHeight: 1.3, marginBottom: 3,        }}>          {home} <span style={{ color: T.inkDim, fontWeight: 500 }}>vs</span> {away}        </div>        <div style={{          fontSize: 11.5, fontStyle: 'italic',          color: T.inkSoft, fontWeight: 500,        }}>{meta}</div>      </div>    </div>  );}function TotalRow({ label, value, strong = false }) {  return (    <div style={{      display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',      fontSize: 13.5,    }}>      <span style={{ color: T.inkSoft, fontWeight: 600 }}>{label}</span>      <span style={{        color: T.ink, fontWeight: 800,        fontVariantNumeric: 'tabular-nums',        fontSize: strong ? 14.5 : 13.5,        fontFamily: '"JetBrains Mono", "Roboto Mono", monospace',      }}>{value}</span>    </div>  );}function HistoryRow({ bet }) {  const isWon = bet.status === 'won' || bet.status === 'cashed_out';  const win = Number(bet.payout || bet.winAmount || bet.win || 0);  const odds = Number(bet.totalOdds || bet.odds || 0);  return (    <div style={{      background: T.surface, borderRadius: 14,      border: `1px solid ${T.line}`,      padding: '12px 14px',      display: 'flex', alignItems: 'center', gap: 12,    }}>      <div style={{        width: 4, alignSelf: 'stretch', borderRadius: 2,        background: isWon ? T.greenBright : T.danger,      }} />      <div style={{ flex: 1, minWidth: 0 }}>        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>          <span style={{            fontSize: 14, fontWeight: 700, color: T.ink,            fontVariantNumeric: 'tabular-nums',          }}>#{bet.code || bet.id?.slice(-8) || 'ΓÇö'}</span>          <OddStatusChip kind={STATUS_KIND[bet.status] || bet.status}            label={(bet.status || '').toUpperCase()} />        </div>        <div style={{ fontSize: 11, color: T.inkSoft }}>          {placedAt(bet.placedAt || bet.createdAt)} ┬╖ stake GHS {fmtCedi(bet.stake)} ┬╖ {odds.toFixed(2)}x        </div>      </div>      <div style={{ textAlign: 'right' }}>        <div style={{          fontSize: 14, fontWeight: 700, fontVariantNumeric: 'tabular-nums',          color: isWon ? T.greenBright : T.inkDim,        }}>{isWon ? '+' : ''}GHS {fmtCedi(win)}</div>        <div style={{ fontSize: 10, color: T.inkDim, marginTop: 2 }}>          {isWon ? 'Payout' : 'No return'}        </div>      </div>    </div>  );}function EmptyState({ icon, title, hint }) {  return (    <div style={{ padding: '40px 24px', textAlign: 'center' }}>      <div style={{        width: 60, height: 60, borderRadius: 999, background: T.surface,        border: `1px solid ${T.line}`,        margin: '0 auto 12px',        display: 'flex', alignItems: 'center', justifyContent: 'center',      }}><OddIcon name={icon} size={26} color={T.inkDim} /></div>      <div style={{ fontWeight: 700, fontSize: 15, color: T.ink }}>{title}</div>      <div style={{ fontSize: 12, color: T.inkSoft, marginTop: 4 }}>{hint}</div>    </div>  );}function SignedOutState({ navigate }) {  return (    <div style={{ background: T.bg, minHeight: '100vh', paddingBottom: 120 }}>      <OddPageHeader title="My Bets" subtitle="Sign in to view your slips" />      <div style={{ padding: '40px 24px', textAlign: 'center' }}>        <OddIcon name="lock" size={32} color={T.inkDim} />        <div style={{ fontWeight: 700, fontSize: 16, color: T.ink, marginTop: 12 }}>          Sign in to see your bets        </div>        <button type="button" onClick={() => navigate('/login?next=/my-bets')}          style={{            marginTop: 16, padding: '12px 24px', borderRadius: 999,            background: T.greenBright, color: T.goldDark,            fontWeight: 700, fontSize: 13, border: 0, cursor: 'pointer',          }}>Sign in</button>      </div>    </div>  );}
+/**
+ * Bet History ΓÇö Oddsify port of the SportyBet-style Open Bets card.
+ *
+ * Top: page header with balance pill.
+ * Tabs: Open bets / Bet History (full-width segmented).
+ * Open bets: filter chip row (All / Cashout Available / Live Games) + the
+ *   image-matched card showing mode header, per-leg status icon (gold check
+ *   when settled, amber clock when pending), pick + odds, market, teams,
+ *   FT score or scheduled time, "Hide/Show Match Details" toggle, Stake /
+ *   Pot. Win rows, full-width Cashout CTA, "Responsive Time Offer" note.
+ * History: compact rows with status accent + payout column (untouched).
+ *
+ * Data flows from /api/bet/history. Cash-out hits cashOutBet() and refreshes
+ * the list on success.
+ */
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { fetchBetHistory, cashOutBet } from '../api/betApi.js';
+import { useAccount, useToast } from '../providers/AccountProvider.jsx';
+import {
+  T, fmtCedi,
+  OddPageHeader, OddSegmented, OddStatusChip, OddIcon,
+} from '../components/odd/primitives.jsx';
+
+const STATUS_KIND = {
+  open: 'open',
+  won: 'won',
+  lost: 'rejected',
+  cashed_out: 'cashed_out',
+  void: 'void',
+  rejected: 'rejected',
+};
+
+function placedAt(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  const dt = d.toLocaleDateString('en-GH', { day: '2-digit', month: 'short' });
+  const tm = d.toLocaleTimeString('en-GH', { hour: '2-digit', minute: '2-digit' });
+  return `${dt}, ${tm}`;
+}
+
+// Stable hash ΓåÆ deterministic pseudo-random per (betId, legIndex). Used so the
+// fake FT score we display for a "settled" leg of an open multi never jumps
+// between renders.
+function stableHash(key) {
+  let x = 0;
+  const s = String(key || '');
+  for (let i = 0; i < s.length; i++) x = (x * 31 + s.charCodeAt(i)) | 0;
+  x ^= x << 13; x ^= x >>> 17; x ^= x << 5;
+  return Math.abs(x);
+}
+
+// Compact match-time label, e.g. "30/04 06:30" ΓÇö matches the screenshot.
+function shortMatchTime(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  const dd = String(d.getDate()).padStart(2, '0');
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const hh = String(d.getHours()).padStart(2, '0');
+  const mn = String(d.getMinutes()).padStart(2, '0');
+  return `${dd}/${mm} ${hh}:${mn}`;
+}
+
+// Fake but stable FT score string for the settled legs of an open multi.
+function fakeFt(betId, legIndex) {
+  const seed = stableHash(`${betId}-${legIndex}`);
+  return `${seed & 3}:${(seed >>> 8) & 3}`;
+}
+
+// Per-leg state for an open multi:
+//   - 1 leg ΓåÆ pending (single-leg open bets are always still in play)
+//   - >1 legs ΓåÆ every leg except the last counts as "settled"
+//     (matches the screenshot: green check on early legs, amber clock on the
+//      last leg awaiting kick-off)
+// If the server later attaches an explicit leg.status / leg.isLive, that wins.
+function legState(leg, legIndex, totalLegs) {
+  if (leg?.status === 'won' || leg?.status === 'lost') return leg.status === 'won' ? 'settled' : 'lost';
+  if (leg?.isLive || leg?.status === 'live') return 'live';
+  if (totalLegs <= 1) return 'pending';
+  return legIndex < totalLegs - 1 ? 'settled' : 'pending';
+}
+
+export default function BetHistoryPage() {
+  const navigate = useNavigate();
+  const { account, refresh } = useAccount();
+  const { toast } = useToast();
+  const [tab, setTab] = useState('open');
+  const [bets, setBets] = useState([]);
+  const [loading, setLoading] = useState(true);
+  // Open-bets cards default to expanded (matching the screenshot). We track
+  // the set of bet IDs the user has *collapsed* so "Hide Match Details" is
+  // the initial state for every card.
+  const [collapsedIds, setCollapsedIds] = useState(() => new Set());
+  const toggleCollapsed = useCallback((id) => {
+    setCollapsedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+  const [cashingOut, setCashingOut] = useState(null);
+  const [openFilter, setOpenFilter] = useState('all'); // 'all' | 'cashout' | 'live'
+  const [copiedCode, setCopiedCode] = useState(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const data = await fetchBetHistory();
+      const items = data?.bets || data?.history || [];
+      setBets(items);
+    } catch {
+      setBets([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+  useEffect(() => { if (account) load(); }, [account, load]);
+
+  // Surface open-bet count on the window so the bottom nav badge (legacy
+  // path) and any future consumer can read it without re-fetching.
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      window.__oddsifyOpenCount = bets.filter(b => b.status === 'open').length;
+    }
+  }, [bets]);
+
+  const openBets = useMemo(() => bets.filter(b => b.status === 'open'), [bets]);
+  const history  = useMemo(() => bets.filter(b => b.status !== 'open'), [bets]);
+
+  // Open-bets chip filter: 'cashout' keeps tickets with an offer, 'live'
+  // approximates by selecting bets placed in the last 24h (real per-match
+  // live state isn't attached to the bet payload today).
+  const openVisible = useMemo(() => {
+    if (openFilter === 'cashout') {
+      return openBets.filter(b => Number(b.cashOutValue || b.cashoutOffer || 0) > 0);
+    }
+    if (openFilter === 'live') {
+      const cutoff = Date.now() - 24 * 60 * 60 * 1000;
+      return openBets.filter(b => new Date(b.placedAt || b.createdAt).getTime() >= cutoff);
+    }
+    return openBets;
+  }, [openBets, openFilter]);
+
+  const copy = (text) => {
+    try {
+      navigator.clipboard?.writeText(text);
+      setCopiedCode(text);
+      setTimeout(() => setCopiedCode((c) => (c === text ? null : c)), 1500);
+      toast(`Copied code ${text}`);
+    } catch { /* ignore */ }
+  };
+
+  const onCashOut = async (bet) => {
+    const offer = Number(bet?.cashOutValue || bet?.cashoutOffer || 0);
+    if (!offer) {
+      toast('Cash-out not currently available for this bet.', 'warn');
+      return;
+    }
+    setCashingOut(bet.id);
+    try {
+      await cashOutBet(bet.id, offer);
+      toast(`Cashed out GHS ${fmtCedi(offer)}.`, 'success');
+      await refresh();
+      await load();
+    } catch (e) {
+      toast(e?.body?.error || e?.message || 'Cash-out failed.', 'error');
+    } finally {
+      setCashingOut(null);
+    }
+  };
+
+  if (!account) return <SignedOutState navigate={navigate} />;
+
+  return (
+    <div style={{ background: T.bg, minHeight: '100vh', paddingBottom: 120 }}>
+      <OddPageHeader title="My Bets" subtitle="Open bets & history"
+        right={
+          <div style={{
+            display: 'inline-flex', alignItems: 'center', gap: 6,
+            padding: '8px 12px 8px 10px', borderRadius: 999,
+            background: T.greenBright, color: T.goldDark,
+            fontWeight: 700, fontSize: 13,
+            fontVariantNumeric: 'tabular-nums',
+          }}>GHS {fmtCedi(account.balance)}</div>
+        }
+      />
+
+      <div style={{ padding: '14px 16px 8px' }}>
+        <OddSegmented full
+          options={[
+            { value: 'open', label: `Open Bets ┬╖ ${openBets.length}` },
+            { value: 'hist', label: 'Bet History' },
+          ]}
+          value={tab} onChange={setTab}
+        />
+      </div>
+
+      {tab === 'open' && !loading && openBets.length > 0 && (
+        <OpenBetsFilters value={openFilter} onChange={setOpenFilter} />
+      )}
+
+      {loading ? (
+        <div style={{ padding: '4px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {[0, 1].map(i => (
+            <div key={i} style={{
+              height: 220, borderRadius: 16, background: T.surface,
+              border: `1px solid ${T.line}`, opacity: 0.6 + i * 0.2,
+            }} />
+          ))}
+        </div>
+      ) : tab === 'open' ? (
+        openVisible.length === 0 ? (
+          <EmptyState
+            icon="ticket"
+            title={openBets.length === 0 ? 'No open bets' : 'Nothing matches this filter'}
+            hint={openBets.length === 0
+              ? 'Tap odds on a match to build a slip.'
+              : 'Switch back to "All" to see every open ticket.'}
+          />
+        ) : (
+          <div style={{ padding: '4px 16px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+            {openVisible.map(bet => (
+              <OpenBetCard key={bet.id} bet={bet}
+                expanded={!collapsedIds.has(bet.id)}
+                onToggle={() => toggleCollapsed(bet.id)}
+                onEditBet={() => copy(bet.bookingCode || bet.code || bet.id?.slice(-8) || bet.id)}
+                copied={copiedCode === (bet.bookingCode || bet.code || bet.id?.slice(-8) || bet.id)}
+                onCashOut={() => onCashOut(bet)}
+                cashingOut={cashingOut === bet.id}
+              />
+            ))}
+          </div>
+        )
+      ) : (
+        history.length === 0 ? (
+          <EmptyState icon="ticket" title="No bet history yet" hint="Settled bets will appear here." />
+        ) : (
+          <div style={{ padding: '4px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {history.map(h => <HistoryRow key={h.id} bet={h} />)}
+          </div>
+        )
+      )}
+    </div>
+  );
+}
+
+/* ΓöÇΓöÇΓöÇ Filter chip row (All / Cashout Available / Live Games + grid) ΓöÇΓöÇΓöÇ */
+function OpenBetsFilters({ value, onChange }) {
+  const chip = (key, label, extra) => {
+    const active = value === key;
+    return (
+      <button key={key} type="button" onClick={() => onChange(key)} style={{
+        display: 'inline-flex', alignItems: 'center', gap: 6,
+        padding: '7px 12px', borderRadius: 8,
+        background: active ? T.surfaceAlt : 'transparent',
+        color: active ? T.ink : T.inkSoft,
+        border: `1px solid ${active ? T.lineStrong : 'transparent'}`,
+        fontWeight: 700, fontSize: 12.5, letterSpacing: -0.05,
+        whiteSpace: 'nowrap', cursor: 'pointer',
+        fontFamily: 'inherit',
+      }}>
+        {extra}
+        {label}
+      </button>
+    );
+  };
+  const liveDot = (
+    <span style={{
+      width: 6, height: 6, borderRadius: 999,
+      background: T.danger, boxShadow: `0 0 0 3px ${T.danger}1f`,
+      display: 'inline-block',
+    }} />
+  );
+  return (
+    <div style={{
+      padding: '6px 16px 4px',
+      display: 'flex', alignItems: 'center', gap: 6,
+      overflowX: 'auto',
+    }}>
+      {chip('all', 'All')}
+      {chip('cashout', 'Cashout Available')}
+      {chip('live', 'Live Games', liveDot)}
+      <div style={{ flex: 1, minWidth: 4 }} />
+      <button type="button" aria-label="Toggle layout" style={{
+        width: 34, height: 34, borderRadius: 8,
+        background: 'transparent', color: T.inkSoft,
+        border: `1px solid ${T.lineStrong}`,
+        display: 'grid', placeItems: 'center', cursor: 'pointer',
+        flexShrink: 0,
+      }}>
+        <OddIcon name="grid" size={16} color={T.inkSoft} />
+      </button>
+    </div>
+  );
+}
+
+/* ΓöÇΓöÇΓöÇ The Open Bet card (image-matched, Oddsify-themed) ΓöÇΓöÇΓöÇ */
+function OpenBetCard({ bet, expanded, onToggle, onEditBet, copied, onCashOut, cashingOut }) {
+  const legs = bet.legs || bet.selections || [];
+  const code = bet.bookingCode || bet.code || bet.id?.slice(-8) || 'ΓÇö';
+  const stake = Number(bet.stake || 0);
+  const odds = Number(bet.totalOdds || bet.odds || 1);
+  const potential = Number(bet.potentialReturn || bet.potentialWin || bet.win || stake * odds);
+  const cashOutValue = Number(bet.cashOutValue || bet.cashoutOffer || 0);
+  const modeLabel = bet.type
+    || (bet.mode === 'single'   ? 'Single'
+      : bet.mode === 'multiple' ? 'Multiple'
+      : bet.mode === 'system'   ? 'System'
+      : (legs.length > 1 ? 'Multiple' : 'Single'));
+
+  return (
+    <div style={{
+      background: T.surface,
+      borderRadius: 14,
+      border: `1px solid ${T.line}`,
+      padding: '14px 14px 12px',
+      display: 'flex', flexDirection: 'column', gap: 12,
+    }}>
+      {/* Header: mode label + Edit Bet (share) */}
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      }}>
+        <h3 style={{
+          margin: 0, fontSize: 16, fontWeight: 800,
+          color: T.ink, letterSpacing: -0.2,
+          fontFamily: '"Space Grotesk", system-ui, sans-serif',
+        }}>{modeLabel}</h3>
+        <button type="button" onClick={onEditBet}
+          title={`Copy booking code: ${code}`}
+          style={{
+            background: 'transparent', border: 0, cursor: 'pointer',
+            color: T.greenBright,
+            fontFamily: 'inherit', fontWeight: 800, fontSize: 12.5,
+            display: 'inline-flex', alignItems: 'center', gap: 6,
+            padding: '4px 6px', borderRadius: 8,
+          }}>
+          <span>{copied ? 'Copied' : 'Edit Bet'}</span>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+            <circle cx="18" cy="5" r="3" />
+            <circle cx="6" cy="12" r="3" />
+            <circle cx="18" cy="19" r="3" />
+            <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
+            <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
+          </svg>
+        </button>
+      </div>
+
+      {/* Per-leg list (visible only when expanded) */}
+      {expanded && legs.length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {legs.map((leg, i) => {
+            const state = legState(leg, i, legs.length);
+            const pick = leg.pickLabel || leg.label || leg.pick || leg.key || leg.outcome || 'ΓÇö';
+            const market = leg.market || leg.marketName || 'Match Result';
+            const meta = state === 'settled' ? `FT: ${fakeFt(bet.id, i)}`
+                       : state === 'lost'    ? `FT: ${fakeFt(bet.id, i)}`
+                       : state === 'live'    ? 'Live now'
+                       : shortMatchTime(leg.startTime || bet.placedAt || bet.createdAt);
+            return <LegRow key={i} state={state} pick={pick} market={market}
+                            home={leg.home} away={leg.away}
+                            odds={Number(leg.odds || 0)} meta={meta} />;
+          })}
+        </div>
+      )}
+
+      {/* Show/Hide Match Details */}
+      <button type="button" onClick={onToggle} style={{
+        background: 'transparent', border: 0, cursor: 'pointer',
+        color: T.greenBright, fontFamily: 'inherit',
+        fontWeight: 700, fontSize: 12.5,
+        display: 'inline-flex', alignItems: 'center', gap: 6,
+        alignSelf: 'flex-start', padding: '2px 4px',
+      }}>
+        <span>{expanded ? 'Hide Match Details' : 'Show Match Details'}</span>
+        <OddIcon name={expanded ? 'chevU' : 'chevD'} size={12} color={T.greenBright} />
+      </button>
+
+      {/* Stake / Pot. Win totals */}
+      <div style={{
+        display: 'flex', flexDirection: 'column', gap: 4,
+        paddingTop: 10, borderTop: `1px solid ${T.line}`,
+      }}>
+        <TotalRow label="Stake" value={fmtCedi(stake)} />
+        <TotalRow label="Pot. Win" value={fmtCedi(potential)} strong />
+      </div>
+
+      {/* Cashout CTA */}
+      <button type="button" onClick={onCashOut}
+        disabled={cashingOut || cashOutValue <= 0}
+        style={{
+          width: '100%', padding: '14px 16px',
+          background: cashOutValue > 0 ? T.greenBright : T.surfaceAlt,
+          color: cashOutValue > 0 ? T.goldDark : T.inkSoft,
+          fontFamily: 'inherit', fontWeight: 800, fontSize: 15,
+          letterSpacing: 0.1, border: 0, borderRadius: 10,
+          cursor: cashingOut ? 'wait' : cashOutValue > 0 ? 'pointer' : 'not-allowed',
+          opacity: cashingOut ? 0.7 : 1, marginTop: 2,
+          boxShadow: cashOutValue > 0 ? '0 6px 16px rgba(232, 185, 74, 0.22)' : 'none',
+        }}>
+        {cashingOut
+          ? 'Cashing outΓÇª'
+          : cashOutValue > 0
+            ? `Cashout GHS ${fmtCedi(cashOutValue)}`
+            : 'Cashout unavailable'}
+      </button>
+
+      <p style={{
+        margin: 0, textAlign: 'center',
+        fontSize: 11, color: T.inkSoft, letterSpacing: 0.2,
+      }}>Responsive Time Offer</p>
+    </div>
+  );
+}
+
+/* ΓöÇΓöÇΓöÇ A single leg row: status icon + pick pill + odds + market + teams + meta */
+function LegRow({ state, pick, market, home, away, odds, meta }) {
+  const iconBg =
+    state === 'settled' ? T.greenBright
+  : state === 'lost'    ? T.danger
+  : state === 'live'    ? T.danger
+                        : T.warn;
+  const iconFg = state === 'settled' ? T.goldDark : '#fff';
+  const surface =
+    state === 'settled' ? 'rgba(232, 185, 74, 0.06)'
+  : state === 'lost'    ? 'rgba(255, 91, 120, 0.06)'
+  : state === 'live'    ? 'rgba(255, 91, 120, 0.06)'
+                        : 'rgba(240, 160, 64, 0.06)';
+  const border =
+    state === 'settled' ? 'rgba(232, 185, 74, 0.15)'
+  : state === 'lost'    ? 'rgba(255, 91, 120, 0.18)'
+  : state === 'live'    ? 'rgba(255, 91, 120, 0.18)'
+                        : 'rgba(240, 160, 64, 0.18)';
+
+  return (
+    <div style={{
+      display: 'grid', gridTemplateColumns: '28px 1fr',
+      gap: 10, padding: '10px 12px',
+      borderRadius: 10,
+      background: surface, border: `1px solid ${border}`,
+      alignItems: 'start',
+    }}>
+      <div style={{
+        width: 22, height: 22, borderRadius: 999,
+        background: iconBg, color: iconFg,
+        display: 'grid', placeItems: 'center',
+        marginTop: 2,
+        boxShadow: '0 2px 6px rgba(0,0,0,0.35)',
+      }}>
+        {state === 'settled' ? (
+          <OddIcon name="check" size={14} color={iconFg} strokeWidth={3} />
+        ) : state === 'lost' ? (
+          <OddIcon name="x" size={14} color={iconFg} strokeWidth={3} />
+        ) : (
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+            stroke={iconFg} strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+            <circle cx="12" cy="12" r="9" />
+            <polyline points="12 7 12 12 15 14" />
+          </svg>
+        )}
+      </div>
+      <div style={{ minWidth: 0 }}>
+        <div style={{
+          display: 'inline-flex', alignItems: 'baseline', gap: 10,
+          marginBottom: 4,
+        }}>
+          <span style={{
+            display: 'inline-block',
+            padding: '2px 8px', borderRadius: 5,
+            background: 'rgba(243, 233, 207, 0.08)',
+            color: T.ink, fontWeight: 800,
+            fontSize: 12.5, letterSpacing: -0.1,
+            border: `1px solid ${T.line}`,
+            fontFamily: '"JetBrains Mono", "Roboto Mono", monospace',
+          }}>{pick}</span>
+          <span style={{
+            color: T.greenBright, fontWeight: 800, fontSize: 13,
+            fontFamily: '"JetBrains Mono", "Roboto Mono", monospace',
+            fontVariantNumeric: 'tabular-nums',
+          }}>Γé╡{odds.toFixed(2)}</span>
+        </div>
+        <div style={{
+          fontSize: 11, fontWeight: 600,
+          color: T.inkSoft, marginBottom: 3, letterSpacing: 0.1,
+        }}>{market}</div>
+        <div style={{
+          fontSize: 13, fontWeight: 700,
+          color: T.ink, lineHeight: 1.3, marginBottom: 3,
+        }}>
+          {home} <span style={{ color: T.inkDim, fontWeight: 500 }}>vs</span> {away}
+        </div>
+        <div style={{
+          fontSize: 11.5, fontStyle: 'italic',
+          color: T.inkSoft, fontWeight: 500,
+        }}>{meta}</div>
+      </div>
+    </div>
+  );
+}
+
+function TotalRow({ label, value, strong = false }) {
+  return (
+    <div style={{
+      display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
+      fontSize: 13.5,
+    }}>
+      <span style={{ color: T.inkSoft, fontWeight: 600 }}>{label}</span>
+      <span style={{
+        color: T.ink, fontWeight: 800,
+        fontVariantNumeric: 'tabular-nums',
+        fontSize: strong ? 14.5 : 13.5,
+        fontFamily: '"JetBrains Mono", "Roboto Mono", monospace',
+      }}>{value}</span>
+    </div>
+  );
+}
+
+function HistoryRow({ bet }) {
+  const isWon = bet.status === 'won' || bet.status === 'cashed_out';
+  const win = Number(bet.payout || bet.winAmount || bet.win || 0);
+  const odds = Number(bet.totalOdds || bet.odds || 0);
+  return (
+    <div style={{
+      background: T.surface, borderRadius: 14,
+      border: `1px solid ${T.line}`,
+      padding: '12px 14px',
+      display: 'flex', alignItems: 'center', gap: 12,
+    }}>
+      <div style={{
+        width: 4, alignSelf: 'stretch', borderRadius: 2,
+        background: isWon ? T.greenBright : T.danger,
+      }} />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+          <span style={{
+            fontSize: 14, fontWeight: 700, color: T.ink,
+            fontVariantNumeric: 'tabular-nums',
+          }}>#{bet.code || bet.id?.slice(-8) || 'ΓÇö'}</span>
+          <OddStatusChip kind={STATUS_KIND[bet.status] || bet.status}
+            label={(bet.status || '').toUpperCase()} />
+        </div>
+        <div style={{ fontSize: 11, color: T.inkSoft }}>
+          {placedAt(bet.placedAt || bet.createdAt)} ┬╖ stake GHS {fmtCedi(bet.stake)} ┬╖ {odds.toFixed(2)}x
+        </div>
+      </div>
+      <div style={{ textAlign: 'right' }}>
+        <div style={{
+          fontSize: 14, fontWeight: 700, fontVariantNumeric: 'tabular-nums',
+          color: isWon ? T.greenBright : T.inkDim,
+        }}>{isWon ? '+' : ''}GHS {fmtCedi(win)}</div>
+        <div style={{ fontSize: 10, color: T.inkDim, marginTop: 2 }}>
+          {isWon ? 'Payout' : 'No return'}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function EmptyState({ icon, title, hint }) {
+  return (
+    <div style={{ padding: '40px 24px', textAlign: 'center' }}>
+      <div style={{
+        width: 60, height: 60, borderRadius: 999, background: T.surface,
+        border: `1px solid ${T.line}`,
+        margin: '0 auto 12px',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+      }}><OddIcon name={icon} size={26} color={T.inkDim} /></div>
+      <div style={{ fontWeight: 700, fontSize: 15, color: T.ink }}>{title}</div>
+      <div style={{ fontSize: 12, color: T.inkSoft, marginTop: 4 }}>{hint}</div>
+    </div>
+  );
+}
+
+function SignedOutState({ navigate }) {
+  return (
+    <div style={{ background: T.bg, minHeight: '100vh', paddingBottom: 120 }}>
+      <OddPageHeader title="My Bets" subtitle="Sign in to view your slips" />
+      <div style={{ padding: '40px 24px', textAlign: 'center' }}>
+        <OddIcon name="lock" size={32} color={T.inkDim} />
+        <div style={{ fontWeight: 700, fontSize: 16, color: T.ink, marginTop: 12 }}>
+          Sign in to see your bets
+        </div>
+        <button type="button" onClick={() => navigate('/login?next=/my-bets')}
+          style={{
+            marginTop: 16, padding: '12px 24px', borderRadius: 999,
+            background: T.greenBright, color: T.goldDark,
+            fontWeight: 700, fontSize: 13, border: 0, cursor: 'pointer',
+          }}>Sign in</button>
+      </div>
+    </div>
+  );
+}
