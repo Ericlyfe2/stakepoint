@@ -1,5 +1,5 @@
 /**
- * Oddsify icon set — stroke-based, original SVG paths ported verbatim from
+ * Xenbet icon set — stroke-based, original SVG paths ported verbatim from
  * the Claude Design prototype's bits.jsx. Every glyph lives in a 24×24 box
  * and uses currentColor by default so callers can tint via CSS.
  *

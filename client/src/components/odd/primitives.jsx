@@ -1,5 +1,5 @@
 /**
- * Oddsify shared primitives — wordmark, odds tile, segmented toggle,
+ * Xenbet shared primitives — wordmark, odds tile, segmented toggle,
  * status chip, flag badge, page headers, payout marquee, league row,
  * category grid, promo banner, match card.
  *
@@ -11,8 +11,8 @@ import { useEffect, useState } from 'react';
 import { T, fmtCedi } from './tokens.js';
 import OddIcon from './Icon.jsx';
 
-/* ─── Oddsify wordmark ─────────────────────────────────────── */
-export function OddsifyWordmark({ size = 22, color = '#ffffff', accent = T.greenBright }) {
+/* ─── Xenbet wordmark ─────────────────────────────────────── */
+export function XenbetWordmark({ size = 22, color = '#ffffff', accent = T.greenBright }) {
   return (
     <div style={{
       display: 'inline-flex', alignItems: 'baseline', gap: 0,
@@ -21,8 +21,8 @@ export function OddsifyWordmark({ size = 22, color = '#ffffff', accent = T.green
       color, lineHeight: 1,
     }}>
       <span style={{ position: 'relative', display: 'inline-flex', alignItems: 'baseline' }}>
-        <span style={{ color: accent }}>O</span>
-        <span>ddsify</span>
+        <span style={{ color: accent }}>X</span>
+        <span>enbet</span>
         <span style={{
           position: 'absolute', right: -2, bottom: -2,
           width: 5, height: 5, borderRadius: 999, background: accent,
@@ -180,7 +180,7 @@ export function OddTopHeader({ user, onAuth, onSearch, onBalanceClick }) {
       borderBottom: '1px solid rgba(255,255,255,0.06)',
     }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <OddsifyWordmark size={22} accent={T.greenBright} />
+        <XenbetWordmark size={22} accent={T.greenBright} />
         {user ? (
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <button onClick={onSearch} type="button" style={{

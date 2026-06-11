@@ -16,7 +16,7 @@ export default class ErrorBoundary extends Component {
 
   componentDidCatch(error, info) {
     if (typeof console !== 'undefined') {
-      console.error('[oddsify] uncaught render error:', error, info?.componentStack);
+      console.error('[xenbet] uncaught render error:', error, info?.componentStack);
     }
   }
 

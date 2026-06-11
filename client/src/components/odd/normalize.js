@@ -1,7 +1,7 @@
 /**
  * Server-match → design-match adapter.
  *
- * The Oddsify backend returns matches with a nested markets shape:
+ * The Xenbet backend returns matches with a nested markets shape:
  *   match.markets['1X2'].selections[] = [{ key:'1', odds:1.42 }, ...]
  *
  * The design components (ported from Oddsify.html) expect a flat shape:

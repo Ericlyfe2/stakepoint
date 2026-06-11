@@ -63,7 +63,7 @@ export default function ProfilePage() {
         <div style={{ padding: '40px 24px', textAlign: 'center' }}>
           <OddIcon name="user" size={32} color={T.inkDim} />
           <div style={{ fontWeight: 700, fontSize: 16, color: T.ink, marginTop: 12 }}>
-            Sign in to Oddsify
+            Sign in to Xenbet
           </div>
           <div style={{ fontSize: 12, color: T.inkSoft, marginTop: 6 }}>
             Track balance, deposits and bets in one place.

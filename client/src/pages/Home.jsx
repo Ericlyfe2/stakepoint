@@ -16,7 +16,7 @@ import { useSlip } from '../providers/SlipProvider.jsx';
 import {
   T,
   OddTopHeader, OddPayoutTicker, OddPromoBanner, OddCategoryGrid,
-  OddLeagueRow, OddMatchCard, OddsifyWordmark, OddIcon,
+  OddLeagueRow, OddMatchCard, XenbetWordmark, OddIcon,
 } from '../components/odd/primitives.jsx';
 import { flattenLeagues } from '../components/odd/normalize.js';
 
@@ -100,7 +100,7 @@ export default function Home() {
         emptyLabel="Nothing scheduled yet." />
 
       <div style={{ padding: '24px 16px 60px', textAlign: 'center' }}>
-        <OddsifyWordmark size={18} color={T.ink} accent={T.greenBright} />
+        <XenbetWordmark size={18} color={T.ink} accent={T.greenBright} />
         <div style={{
           fontSize: 10, color: T.inkDim, marginTop: 8, letterSpacing: 0.4,
         }}>18+ ┬╖ BET RESPONSIBLY ┬╖ LICENSED GHA</div>

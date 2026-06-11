@@ -1,5 +1,5 @@
 /**
- * Oddsify design tokens — JS mirror of the CSS custom properties in
+ * Xenbet design tokens — JS mirror of the CSS custom properties in
  * styles/app.css. Imported by inline-styled components ported from the
  * Claude Design Oddsify.html prototype so token changes happen in one place.
  *

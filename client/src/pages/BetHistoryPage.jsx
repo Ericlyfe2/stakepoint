@@ -1,5 +1,5 @@
 /**
- * Bet History ΓÇö Oddsify port of the SportyBet-style Open Bets card.
+ * Bet History ΓÇö Xenbet port of the SportyBet-style Open Bets card.
  *
  * Top: page header with balance pill.
  * Tabs: Open bets / Bet History (full-width segmented).
@@ -121,7 +121,7 @@ export default function BetHistoryPage() {
   // path) and any future consumer can read it without re-fetching.
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      window.__oddsifyOpenCount = bets.filter(b => b.status === 'open').length;
+      window.__xenbetOpenCount = bets.filter(b => b.status === 'open').length;
     }
   }, [bets]);
 
@@ -295,7 +295,7 @@ function OpenBetsFilters({ value, onChange }) {
   );
 }
 
-/* ΓöÇΓöÇΓöÇ The Open Bet card (image-matched, Oddsify-themed) ΓöÇΓöÇΓöÇ */
+/* ΓöÇΓöÇΓöÇ The Open Bet card (image-matched, Xenbet-themed) ΓöÇΓöÇΓöÇ */
 function OpenBetCard({ bet, expanded, onToggle, onEditBet, copied, onCashOut, cashingOut }) {
   const legs = bet.legs || bet.selections || [];
   const code = bet.bookingCode || bet.code || bet.id?.slice(-8) || 'ΓÇö';

@@ -84,7 +84,7 @@ app.use((req, res, next) => {
 app.get('/api/health', (_req, res) => {
   res.json({
     ok: true,
-    service: 'oddsify-api',
+    service: 'xenbet-api',
     version: '1.0.0',
     google: GOOGLE.enabled,
     smtp: SMTP.enabled,
@@ -159,7 +159,7 @@ async function boot() {
   }
 
   await new Promise((resolve) => server.listen(PORT, resolve));
-  log.info(`Oddsify API listening on http://127.0.0.1:${PORT}`);
+  log.info(`Xenbet API listening on http://127.0.0.1:${PORT}`);
 
   try {
     startSettlementLoop();

@@ -1,4 +1,4 @@
-/** Oddsify fixture book — static fallback + live merge from The Odds API */
+/** Xenbet fixture book — static fallback + live merge from The Odds API */
 import { fetchSportSnapshot } from './services/oddsApi.js';
 
 export const BONUS_RATE = 0.08;
@@ -551,9 +551,9 @@ export function lookupSelection({ matchId, market, outcome }) {
 /* --------- Casino, Virtuals, Jackpot, Promotions data (unchanged) --------- */
 
 export const CASINO_GAMES = [
-  { id: 'dice',      title: 'Dice',      provider: 'Oddsify Originals', category: 'Instant', rtp: 99.0, hot: true,  hue: '#22c55e', route: '/casino/dice',      tagline: 'Pick a target. Roll the dice.' },
-  { id: 'spin2win',  title: 'Spin2Win',  provider: 'Oddsify Originals', category: 'Instant', rtp: 97.3, hot: true,  hue: '#c81e1e', route: '/casino/spin2win',  tagline: 'Roulette-style number grid.'   },
-  { id: 'red-black', title: 'Red Black', provider: 'Oddsify Originals', category: 'Instant', rtp: 98.0,             hue: '#0ea5e9', route: '/casino/red-black', tagline: 'Flip the card. Pays 2x.'       },
+  { id: 'dice',      title: 'Dice',      provider: 'Xenbet Originals', category: 'Instant', rtp: 99.0, hot: true,  hue: '#22c55e', route: '/casino/dice',      tagline: 'Pick a target. Roll the dice.' },
+  { id: 'spin2win',  title: 'Spin2Win',  provider: 'Xenbet Originals', category: 'Instant', rtp: 97.3, hot: true,  hue: '#c81e1e', route: '/casino/spin2win',  tagline: 'Roulette-style number grid.'   },
+  { id: 'red-black', title: 'Red Black', provider: 'Xenbet Originals', category: 'Instant', rtp: 98.0,             hue: '#0ea5e9', route: '/casino/red-black', tagline: 'Flip the card. Pays 2x.'       },
 ];
 
 export const VIRTUAL_LEAGUES = [

@@ -9,8 +9,9 @@ import './styles/login.css';
 import './styles/admin.css';
 import './styles/games.css';
 
-// Carry forward any persisted preferences from the pre-rebrand `xenbet_*`
-// localStorage keys to their `oddsify_*` counterparts. One-time, idempotent.
+// Carry forward any preferences persisted under the (rolled-back) rebrand's
+// `oddsify_*` localStorage keys to their `xenbet_*` counterparts. One-time,
+// idempotent.
 migrateLegacyStorage();
 
 ReactDOM.createRoot(document.getElementById('root')).render(

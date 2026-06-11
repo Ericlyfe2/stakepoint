@@ -1,5 +1,5 @@
 /**
- * SlipProvider — global bet slip state for the Oddsify design port.
+ * SlipProvider — global bet slip state for the Xenbet design port.
  *
  * Replaces the per-page slip that lived inside the old Home.jsx. Any screen
  * that renders <OddsTile>s talks to this provider (togglePick / removePick /

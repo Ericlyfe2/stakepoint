@@ -14,31 +14,31 @@ const env = process.env;
 
 const DEFAULTS = [
   {
-    email: (env.ADMIN_EMAIL || 'admin@oddsify.gh').toLowerCase(),
+    email: (env.ADMIN_EMAIL || 'admin@xenbet.gh').toLowerCase(),
     password: env.ADMIN_PASSWORD || 'Admin@12345',
     displayName: 'Platform Owner',
     adminRole: 'super_admin',
   },
   {
-    email: 'finance@oddsify.gh',
+    email: 'finance@xenbet.gh',
     password: 'Finance@12345',
     displayName: 'Finance Lead',
     adminRole: 'finance_admin',
   },
   {
-    email: 'odds@oddsify.gh',
+    email: 'odds@xenbet.gh',
     password: 'Odds@12345',
     displayName: 'Trading Desk',
     adminRole: 'odds_manager',
   },
   {
-    email: 'support@oddsify.gh',
+    email: 'support@xenbet.gh',
     password: 'Support@12345',
     displayName: 'Support Agent',
     adminRole: 'support',
   },
   {
-    email: 'mod@oddsify.gh',
+    email: 'mod@xenbet.gh',
     password: 'Moderator@12345',
     displayName: 'Risk Moderator',
     adminRole: 'moderator',

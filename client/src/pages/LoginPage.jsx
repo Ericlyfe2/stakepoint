@@ -185,7 +185,7 @@ export default function LoginPage() {
           displayName: fullName || idValue,
           country,
         });
-        toast(`Welcome to Oddsify, ${data.account?.displayName || data.account?.email}!`);
+        toast(`Welcome to Xenbet, ${data.account?.displayName || data.account?.email}!`);
         routeAfterLogin(data);
       } else {
         const data = await login({
@@ -235,7 +235,7 @@ export default function LoginPage() {
           </div>
 
           <h1 className="auth-h1">
-            {mode === 'signin' ? 'Sign in to Oddsify' : 'Create your account'}
+            {mode === 'signin' ? 'Sign in to Xenbet' : 'Create your account'}
           </h1>
           <p className="auth-sub">
             {mode === 'signin' ? 'Use your phone or email and password.' : 'Sign up in 30 seconds and claim a GHS 50 starter bonus.'}
@@ -371,7 +371,7 @@ export default function LoginPage() {
 
             <p className="auth-foot">
               {mode === 'signin'
-                ? <>New to Oddsify? <a className="link" onClick={() => { setMode('register'); reset(); }}>Create an account</a></>
+                ? <>New to Xenbet? <a className="link" onClick={() => { setMode('register'); reset(); }}>Create an account</a></>
                 : <>Already have an account? <a className="link" onClick={() => { setMode('signin'); reset(); }}>Sign in</a></>}
             </p>
           </form>
