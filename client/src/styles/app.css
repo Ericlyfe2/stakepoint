@@ -1,22 +1,19 @@
 :root {
-  /* Snapped to the Claude Design "Oddsify.html" black + gold tokens. */
-  --bg: #0a0a0a;
-  --bg-soft: #0f0e0c;        /* header / hero "greenDeep" */
-  --surface: #161513;        /* card surfaces */
-  --surface-2: #211f1a;      /* alt panels, inputs */
-  --line: rgba(243, 233, 207, 0.08);
-  --line-strong: rgba(243, 233, 207, 0.16);
-  --text: #f3e9cf;           /* warm cream "ink" */
-  --text-soft: #9c9277;
-  --text-dim: #5f5848;
-  --header-bg: rgba(15, 14, 12, 0.86);
-  --accent: #e8b94a;         /* gold — primary CTA / brand */
-  --accent-warm: #f7c948;    /* brighter gold — cash-out, best odds */
-  --accent-hot: #ff5b78;     /* pink-red — LIVE, danger, alerts */
-  --accent-cool: #6ad0ff;    /* informational, kept for back-compat */
-  --gold: #f7c948;
-  --gold-ink: #1a1300;       /* dark text for use on gold */
-  --gold-soft: rgba(232, 185, 74, 0.16);
+  --bg: #0a0d0c;
+  --bg-soft: #0f1413;
+  --surface: #131a18;
+  --surface-2: #1a2421;
+  --line: rgba(255, 255, 255, 0.06);
+  --line-strong: rgba(255, 255, 255, 0.12);
+  --text: #ecf0ee;
+  --text-soft: #a0a8a4;
+  --text-dim: #5d6764;
+  --header-bg: rgba(10, 13, 12, 0.78);
+  --accent: #c5ff3d;       /* electric lime */
+  --accent-warm: #ffb547;  /* amber for live */
+  --accent-hot: #ff4d3d;   /* alert red */
+  --accent-cool: #6ad0ff;  /* sky for picks */
+  --gold: #d4a857;
   --r-sm: 6px;
   --r: 10px;
   --r-lg: 18px;
@@ -24,54 +21,21 @@
 
 /* === Light mode === */
 html[data-theme="light"] {
-  --bg: #f4f1e8;
+  --bg: #f6f7f5;
   --bg-soft: #ffffff;
   --surface: #ffffff;
-  --surface-2: #ece6d4;
-  --line: rgba(28, 22, 8, 0.08);
-  --line-strong: rgba(28, 22, 8, 0.18);
-  --text: #1a160a;
-  --text-soft: #5a5145;
-  --text-dim: #8a8275;
-  --header-bg: rgba(255, 252, 244, 0.82);
-  --accent: #b8860b;
-  --accent-warm: #c89400;
-  --accent-hot: #d6263f;
+  --surface-2: #eef0ec;
+  --line: rgba(20, 28, 24, 0.08);
+  --line-strong: rgba(20, 28, 24, 0.16);
+  --text: #0f1413;
+  --text-soft: #4a5650;
+  --text-dim: #7a8480;
+  --header-bg: rgba(255, 255, 255, 0.82);
+  --accent: #58a300;
+  --accent-warm: #c87f00;
+  --accent-hot: #d63a2c;
   --accent-cool: #1f8dd0;
   --gold: #b48a2d;
-  --gold-ink: #1a1300;
-  --gold-soft: rgba(184, 134, 11, 0.18);
-}
-
-/* ===== Design-system primitives shared across new pages (Oddsify.html port).
-   These are utility classes for the new mobile-first screens that live in
-   client/src/components/odd/. Page-level layouts use inline styles for
-   one-off composition; reusable bits (keyframes, scrollbar hiding, font
-   helpers) sit here so the Vite build can dead-code-eliminate unused JS. */
-.odd-noscroll { overflow: hidden; }
-.odd-mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
-.odd-display { font-family: 'Space Grotesk', system-ui, -apple-system, sans-serif; }
-.odd-body { font-family: 'Inter', system-ui, -apple-system, sans-serif; }
-
-/* Hide native scrollbars inside the design's scroll panes — matches Oddsify.html. */
-.odd-pane::-webkit-scrollbar { width: 0; height: 0; }
-.odd-pane { scrollbar-width: none; }
-
-@keyframes odd-toast-in {
-  from { transform: translate(-50%, 12px); opacity: 0; }
-  to   { transform: translate(-50%, 0);    opacity: 1; }
-}
-@keyframes odd-marquee {
-  0%   { transform: translateX(0); }
-  100% { transform: translateX(-50%); }
-}
-@keyframes odd-pulse {
-  0%, 100% { box-shadow: 0 0 0 0 currentColor; opacity: 1; }
-  50%      { box-shadow: 0 0 0 6px transparent; opacity: 0.5; }
-}
-@keyframes odd-slip-in {
-  from { transform: translateY(100%); }
-  to   { transform: translateY(0); }
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -86,7 +50,7 @@ html, body {
 }
 body {
   background:
-    radial-gradient(900px 500px at 85% -10%, rgba(255, 184, 0, 0.08), transparent 60%),
+    radial-gradient(900px 500px at 85% -10%, rgba(197, 255, 61, 0.08), transparent 60%),
     radial-gradient(700px 400px at -10% 30%, rgba(106, 208, 255, 0.05), transparent 60%),
     var(--bg);
   min-height: 100vh;
@@ -218,16 +182,17 @@ html[data-theme="light"] .skl {
 }
 .logo-mark {
   width: 32px; height: 32px;
-  background: var(--bg-soft);
-  border: 1px solid var(--line-strong);
+  background: var(--accent);
   border-radius: 8px;
   display: grid; place-items: center;
-  color: var(--accent);
+  color: #000;
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 700;
+  font-size: 16px;
   transform: rotate(-6deg);
-  box-shadow: 0 0 20px rgba(255, 184, 0, 0.3);
-  overflow: hidden;
+  box-shadow: 0 0 20px rgba(197, 255, 61, 0.3);
 }
-.logo-mark svg { transform: rotate(6deg); display: block; }
+.logo-mark span { transform: rotate(6deg); }
 .logo-text em {
   font-family: 'Instrument Serif', serif;
   font-style: italic;
@@ -293,7 +258,7 @@ nav a .live-dot {
 }
 .btn-primary:hover {
   background: #d4ff5a;
-  box-shadow: 0 8px 28px rgba(255, 184, 0, 0.4);
+  box-shadow: 0 8px 28px rgba(197, 255, 61, 0.4);
   transform: translateY(-1px);
 }
 
@@ -321,7 +286,7 @@ nav a .live-dot {
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(circle at 90% 80%, rgba(255, 184, 0, 0.18), transparent 50%),
+    radial-gradient(circle at 90% 80%, rgba(197, 255, 61, 0.18), transparent 50%),
     url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 800 400'><g stroke='rgba(255,255,255,0.04)' fill='none' stroke-width='1'><circle cx='400' cy='200' r='80'/><line x1='400' y1='0' x2='400' y2='400'/><line x1='0' y1='200' x2='800' y2='200'/><rect x='100' y='100' width='200' height='200'/><rect x='500' y='100' width='200' height='200'/></g></svg>");
   background-size: cover;
   background-position: center;
@@ -332,8 +297,8 @@ nav a .live-dot {
   align-items: center;
   gap: 8px;
   padding: 6px 12px;
-  background: rgba(255, 53, 84, 0.15);
-  border: 1px solid rgba(255, 53, 84, 0.3);
+  background: rgba(255, 77, 61, 0.15);
+  border: 1px solid rgba(255, 77, 61, 0.3);
   border-radius: 999px;
   font-family: 'JetBrains Mono', monospace;
   font-size: 11px;
@@ -439,7 +404,7 @@ nav a .live-dot {
   background: var(--accent);
   color: #000;
   border-color: var(--accent);
-  box-shadow: 0 0 0 2px rgba(255, 184, 0, 0.25);
+  box-shadow: 0 0 0 2px rgba(197, 255, 61, 0.25);
 }
 .odd-pill.selected .label { color: rgba(0,0,0,0.7); }
 
@@ -461,7 +426,7 @@ nav a .live-dot {
 }
 .promo-1 {
   background: linear-gradient(135deg, var(--accent) 0%, #9be800 100%);
-  color: #000000;
+  color: #0a0d0c;
 }
 .promo-1::after {
   content: '×₂';
@@ -518,7 +483,7 @@ nav a .live-dot {
   border-radius: 999px;
   background: rgba(0,0,0,0.15);
 }
-.promo-2 .promo-cta { background: rgba(252, 198, 0, 0.15); color: var(--accent-warm); }
+.promo-2 .promo-cta { background: rgba(255, 181, 71, 0.15); color: var(--accent-warm); }
 .promo-2 h3 { color: var(--text); }
 
 /* ===== SPORTS TABS ===== */
@@ -732,8 +697,8 @@ nav a .live-dot {
   transform: translateX(2px);
 }
 .match.live {
-  background: linear-gradient(90deg, rgba(255, 53, 84, 0.06) 0%, var(--surface) 50%);
-  border-color: rgba(255, 53, 84, 0.15);
+  background: linear-gradient(90deg, rgba(255, 77, 61, 0.06) 0%, var(--surface) 50%);
+  border-color: rgba(255, 77, 61, 0.15);
 }
 .match-time {
   font-family: 'JetBrains Mono', monospace;
@@ -799,7 +764,7 @@ nav a .live-dot {
   color: #000;
   font-weight: 800;
   box-shadow:
-    inset 0 0 0 2px #000000,
+    inset 0 0 0 2px #0a0d0c,
     0 0 0 2px var(--accent);
 }
 .odd-btn.selected::before {
@@ -809,7 +774,7 @@ nav a .live-dot {
   left: 5px;
   font-size: 10px;
   font-weight: 900;
-  color: #000000;
+  color: #0a0d0c;
   line-height: 1;
 }
 .odd-btn .ol { font-size: 9px; opacity: 0.6; display: block; }
@@ -917,21 +882,18 @@ nav a .live-dot {
 .selection {
   background: var(--surface-2);
   border: 1px solid var(--line);
-  border-radius: 10px;
-  padding: 12px 14px;
+  border-radius: 8px;
+  padding: 12px;
   position: relative;
 }
 .selection .x {
   position: absolute;
   top: 8px; right: 8px;
-  width: 20px; height: 20px;
+  width: 18px; height: 18px;
   border-radius: 50%;
   display: grid; place-items: center;
-  background: rgba(229, 72, 72, 0.16);
-  color: var(--accent-hot);
-  font-size: 12px;
-  font-weight: 800;
-  line-height: 1;
+  color: var(--text-dim);
+  font-size: 11px;
   transition: all .15s;
 }
 .selection .x:hover { background: var(--accent-hot); color: #fff; }
@@ -959,9 +921,9 @@ nav a .live-dot {
 }
 .sel-odds-val {
   font-family: 'JetBrains Mono', monospace;
-  font-weight: 800;
+  font-weight: 700;
   color: var(--accent);
-  font-size: 15px;
+  font-size: 14px;
 }
 .sel-trend {
   font-family: 'JetBrains Mono', monospace;
@@ -1068,7 +1030,7 @@ nav a .live-dot {
 }
 .place-bet:hover {
   background: #d4ff5a;
-  box-shadow: 0 12px 32px rgba(255, 184, 0, 0.4);
+  box-shadow: 0 12px 32px rgba(197, 255, 61, 0.4);
   transform: translateY(-1px);
 }
 .place-bet .arrow {
@@ -1078,172 +1040,6 @@ nav a .live-dot {
   border-radius: 50%;
   display: grid; place-items: center;
   font-size: 14px;
-}
-
-/* ----- SportyBet-style bet slip extensions ----- */
-
-/* Filter-row slip icon */
-.sb-chip-slip {
-  position: relative;
-}
-.sb-chip-badge {
-  position: absolute;
-  top: -4px;
-  right: -4px;
-  min-width: 16px;
-  height: 16px;
-  padding: 0 4px;
-  border-radius: 999px;
-  background: var(--accent);
-  color: #0a0d0c;
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 10px;
-  font-weight: 800;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: 2px solid var(--bg);
-  box-sizing: content-box;
-}
-
-/* Slip header — count pill + balance pill */
-.slip-ct-badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 22px;
-  height: 22px;
-  padding: 0 7px;
-  margin-left: 6px;
-  border-radius: 999px;
-  background: var(--accent);
-  color: #0a0d0c;
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 11px;
-  font-weight: 800;
-}
-.slip-balance {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--text-soft);
-  background: rgba(30, 200, 81, 0.12);
-  padding: 5px 9px;
-  border-radius: 999px;
-  white-space: nowrap;
-}
-.slip-balance strong {
-  color: #1ec851;
-  font-weight: 800;
-  font-family: 'JetBrains Mono', monospace;
-}
-
-/* Slip utility row (My Selections + trash) */
-.slip-utility-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 8px 0 4px;
-  margin: 0 0 10px;
-  border-bottom: 1px solid var(--line);
-}
-.slip-utility-row .lbl {
-  font-size: 11px;
-  letter-spacing: .12em;
-  text-transform: uppercase;
-  color: var(--text-dim);
-  font-weight: 700;
-}
-.slip-trash {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--text-soft);
-  border: 0;
-  cursor: pointer;
-  transition: background .15s, color .15s;
-}
-.slip-trash:hover {
-  background: rgba(229, 72, 72, 0.12);
-  color: var(--accent-hot);
-}
-
-/* Selection card — new top row layout */
-.sel-row-top {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 4px;
-}
-.sel-row-top .sel-pick {
-  flex: 1;
-  margin-bottom: 0;
-}
-.sel-row-top .sel-odds-val {
-  font-family: 'JetBrains Mono', monospace;
-  font-weight: 800;
-  color: var(--accent);
-  font-size: 16px;
-  white-space: nowrap;
-}
-
-/* CTA pill */
-.slip-cta-pill {
-  margin: 8px 0 10px;
-  padding: 10px 14px;
-  background: linear-gradient(135deg, rgba(30, 200, 81, 0.16), rgba(30, 200, 81, 0.08));
-  border: 1px solid rgba(30, 200, 81, 0.32);
-  color: #1ec851;
-  border-radius: 999px;
-  font-size: 12px;
-  font-weight: 700;
-  text-align: center;
-  letter-spacing: .01em;
-}
-
-/* Total stake horizontal row */
-.stake-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-.stake-row-label {
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--text-soft);
-  letter-spacing: .04em;
-  white-space: nowrap;
-}
-.stake-row .stake-input {
-  flex: 1;
-  margin: 0;
-}
-
-/* Place Bet — stacked main + sub label */
-.place-bet-main {
-  display: block;
-  font-size: 14px;
-  font-weight: 800;
-  letter-spacing: .02em;
-  text-transform: uppercase;
-  line-height: 1.1;
-}
-.place-bet-sub {
-  display: block;
-  margin-top: 2px;
-  font-size: 11px;
-  font-weight: 700;
-  opacity: .7;
-  text-transform: none;
-  letter-spacing: 0;
-  font-family: 'JetBrains Mono', monospace;
 }
 
 /* ===== STATS STRIP ===== */
@@ -1428,19 +1224,9 @@ footer {
   color: var(--text);
   border: 1px solid var(--line);
   border-radius: var(--r-lg);
-  padding: 24px;
+  padding: 28px;
   max-width: 420px;
   width: calc(100vw - 40px);
-  max-height: 85vh;
-  display: flex;
-  flex-direction: column;
-  outline: none;
-}
-.bv-dialog-content {
-  flex: 1;
-  overflow-y: auto;
-  margin-bottom: 16px;
-  padding-right: 4px;
 }
 .bv-dialog::backdrop {
   background: rgba(0, 0, 0, 0.72);
@@ -2038,14 +1824,14 @@ nav a:active { transform: scale(.96); }
   padding: 16px 20px;
   margin-bottom: 16px;
   border-radius: 14px;
-  background: linear-gradient(135deg, rgba(255, 53, 84, .12), rgba(252, 198, 0, .08));
-  border: 1px solid rgba(255, 53, 84, .35);
+  background: linear-gradient(135deg, rgba(255, 77, 61, .12), rgba(255, 181, 71, .08));
+  border: 1px solid rgba(255, 77, 61, .35);
   overflow: hidden;
 }
 .live-banner-pulse {
   position: absolute; left: -40px; top: 50%;
   width: 140px; height: 140px; border-radius: 50%;
-  background: radial-gradient(circle, rgba(255, 53, 84, .35), transparent 60%);
+  background: radial-gradient(circle, rgba(255, 77, 61, .35), transparent 60%);
   transform: translateY(-50%);
   animation: liveBannerPulse 2.4s ease-in-out infinite;
   pointer-events: none;
@@ -2063,12 +1849,12 @@ nav a:active { transform: scale(.96); }
 .live-banner-text h2 .live-dot {
   width: 9px; height: 9px; border-radius: 50%;
   background: var(--accent-hot);
-  box-shadow: 0 0 0 4px rgba(255, 53, 84, .18);
+  box-shadow: 0 0 0 4px rgba(255, 77, 61, .18);
   animation: livePulse 1.4s ease-in-out infinite;
 }
 @keyframes livePulse {
-  0%, 100% { box-shadow: 0 0 0 4px rgba(255, 53, 84, .18); }
-  50%      { box-shadow: 0 0 0 9px rgba(255, 53, 84, .06); }
+  0%, 100% { box-shadow: 0 0 0 4px rgba(255, 77, 61, .18); }
+  50%      { box-shadow: 0 0 0 9px rgba(255, 77, 61, .06); }
 }
 .live-banner-text p {
   margin: 4px 0 0; font-size: 13px; color: var(--text-soft);
@@ -2165,8 +1951,8 @@ nav a:active { transform: scale(.96); }
   display: inline-flex; align-items: center;
 }
 .sb-cta-join {
-  background: var(--accent); color: #000000;
-  box-shadow: 0 4px 14px rgba(255,184,0,.22);
+  background: var(--accent); color: #0a0d0c;
+  box-shadow: 0 4px 14px rgba(197,255,61,.22);
 }
 .sb-cta-login {
   background: transparent; color: var(--text);
@@ -2223,9 +2009,9 @@ nav a:active { transform: scale(.96); }
 .sb-sport-tab.active {
   background: var(--surface);
   color: var(--accent);
-  border-color: rgba(255,184,0,.25);
+  border-color: rgba(197,255,61,.25);
 }
-.sb-sport-tab.active .ct { color: var(--accent); background: rgba(255,184,0,.12); }
+.sb-sport-tab.active .ct { color: var(--accent); background: rgba(197,255,61,.12); }
 
 /* ----- secondary tabs ----- */
 .sb-sub-tabs {
@@ -2373,9 +2159,9 @@ nav a:active { transform: scale(.96); }
 .sb-odd:active { transform: scale(0.96); }
 .sb-odd.selected {
   background: var(--accent);
-  color: #000000;
+  color: #0a0d0c;
   border-color: var(--accent);
-  box-shadow: 0 0 0 1px var(--accent), 0 4px 14px rgba(255, 184, 0, 0.28);
+  box-shadow: 0 0 0 1px var(--accent), 0 4px 14px rgba(197, 255, 61, 0.28);
   animation: sb-odd-pulse 320ms cubic-bezier(.2,1.3,.4,1) 1;
 }
 @keyframes sb-odd-pulse {
@@ -2537,126 +2323,58 @@ nav a:active { transform: scale(.96); }
 .sb-winner .src { font-size: 11px; color: var(--text-soft); font-weight: 700; position: relative; z-index: 1; }
 .sb-winner .ago { font-size: 10px; color: var(--text-dim); margin-top: 4px; position: relative; z-index: 1; }
 
-/* ----- SportyBet-style home footer ----- */
-.sb-footer {
-  margin: 20px 0 0;
-  padding: 0 12px 24px;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
-.sb-footer .sb-gpw-slot {
-  margin: 0;
-}
-
-.sb-footer .sb-age-chip {
-  align-self: center;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 38px;
-  height: 38px;
-  border-radius: 999px;
-  border: 1.5px solid var(--accent-hot);
-  color: var(--accent-hot);
-  font-weight: 800;
-  font-size: 13px;
-  letter-spacing: .02em;
-}
-
-/* Sponsor card — intentionally always white to read as a SportyBet-style brand card on both themes */
-.sb-sponsor-card {
-  background: #ffffff;
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  padding: 18px 14px 16px;
+/* ----- compliance / sponsor strip ----- */
+.sb-compliance {
+  margin: 18px 12px 12px;
+  padding: 14px;
   text-align: center;
-  color: #111;
-  box-shadow: 0 1px 0 rgba(0, 0, 0, .04);
-}
-.sb-sponsor-brand {
-  font-size: 18px;
-  font-weight: 900;
-  letter-spacing: .01em;
-  color: #e30613;
-  line-height: 1;
-}
-.sb-sponsor-sub {
-  margin-top: 4px;
-  font-size: 10.5px;
-  letter-spacing: .12em;
-  text-transform: uppercase;
-  color: #444;
-  font-weight: 700;
-}
-.sb-sponsor-logos {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 18px;
-  margin: 14px 0 12px;
-}
-.sb-logo-rm {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 44px;
-  height: 52px;
-  border-radius: 6px 6px 22px 22px;
-  background: #ffffff;
-  border: 1.5px solid #0a1d6b;
-  color: #0a1d6b;
-  font-weight: 900;
-  font-size: 13px;
-  letter-spacing: .02em;
-  font-family: 'JetBrains Mono', monospace;
-}
-.sb-logo-laliga {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 6px 12px;
-  border-radius: 999px;
-  background: linear-gradient(135deg, #e30613 0%, #b30410 100%);
-  color: #ffffff;
-  font-weight: 900;
-  font-size: 13px;
-  letter-spacing: .02em;
-}
-.sb-sponsor-tag {
-  font-size: 13px;
-  font-weight: 800;
-  color: #111;
-}
-
-/* Payslip card */
-.sb-payslip {
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 12px;
-  padding: 14px;
-  text-align: center;
 }
-.sb-payslip-label {
-  font-size: 10.5px;
-  letter-spacing: .14em;
-  color: var(--text-dim);
-  text-transform: uppercase;
+.sb-compliance .badge18 {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 30px; height: 30px;
+  border-radius: 999px;
+  border: 1.5px solid var(--accent-hot);
+  color: var(--accent-hot);
+  font-weight: 800; font-size: 11px;
+  margin: 0 auto 8px;
+}
+.sb-compliance .legal {
+  font-size: 10.5px; color: var(--text-dim);
+  margin-bottom: 10px;
+}
+.sb-compliance .sponsors {
+  display: flex; align-items: center; justify-content: center; gap: 16px;
   margin-bottom: 6px;
 }
-.sb-payslip-code {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 24px;
-  font-weight: 800;
-  color: var(--accent-hot);
-  letter-spacing: .04em;
-  margin-bottom: 12px;
+.sb-compliance .sponsor {
+  font-size: 10px; color: var(--text-soft);
+  text-transform: uppercase; letter-spacing: .12em;
+  padding: 4px 10px; border-radius: 6px;
+  background: var(--surface-2);
+}
+.sb-compliance .tagline {
+  font-size: 12px; color: var(--text-soft);
+}
+
+/* ----- payslip code input ----- */
+.sb-payslip {
+  margin: 0 12px 14px;
+  padding: 14px;
+  text-align: center;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+.sb-payslip-label {
+  font-size: 10.5px; letter-spacing: .14em;
+  color: var(--text-dim); text-transform: uppercase;
+  margin-bottom: 6px;
 }
 .sb-payslip-input {
-  display: flex;
-  align-items: center;
-  gap: 0;
+  display: flex; align-items: center; gap: 0;
   background: var(--bg);
   border: 1px solid var(--line-strong);
   border-radius: 10px;
@@ -2665,12 +2383,10 @@ nav a:active { transform: scale(.96); }
 .sb-payslip-input input {
   flex: 1;
   background: transparent;
-  border: 0;
-  outline: 0;
+  border: 0; outline: 0;
   padding: 12px 14px;
   font-family: 'JetBrains Mono', monospace;
-  font-size: 14px;
-  letter-spacing: .08em;
+  font-size: 14px; letter-spacing: .08em;
   color: var(--accent-cool);
   text-align: center;
 }
@@ -2679,103 +2395,12 @@ nav a:active { transform: scale(.96); }
   padding: 12px 16px;
   background: var(--accent);
   color: #0a0d0c;
-  font-weight: 800;
-  font-size: 13px;
-  border: 0;
-  cursor: pointer;
+  font-weight: 800; font-size: 13px;
 }
 .sb-payslip-foot {
   margin-top: 8px;
-  font-size: 11px;
-  color: var(--text-dim);
+  font-size: 11px; color: var(--text-dim);
 }
-
-/* Payment methods */
-.sb-payment {
-  text-align: center;
-}
-.sb-payment-label {
-  font-size: 10.5px;
-  letter-spacing: .14em;
-  color: var(--text-dim);
-  text-transform: uppercase;
-  margin-bottom: 8px;
-}
-.sb-payment-row {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 8px;
-}
-.sb-pay-chip {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 64px;
-  padding: 6px 12px;
-  border-radius: 6px;
-  font-weight: 900;
-  font-size: 12px;
-  letter-spacing: .02em;
-  font-family: 'JetBrains Mono', monospace;
-}
-.sb-pay-mtn    { background: #ffcc00; color: #111; }
-.sb-pay-telecel{ background: #e30613; color: #fff; text-transform: lowercase; }
-.sb-pay-visa   { background: #1a1f71; color: #f7b600; letter-spacing: .14em; }
-.sb-pay-gtbank { background: #e95a0c; color: #fff; }
-
-/* Legal block */
-.sb-legal {
-  text-align: center;
-  padding: 6px 4px 0;
-}
-.sb-legal-brand {
-  font-size: 11px;
-  font-weight: 800;
-  color: var(--text-soft);
-  margin-bottom: 6px;
-  letter-spacing: .04em;
-}
-.sb-legal-text {
-  font-size: 10.5px;
-  line-height: 1.55;
-  color: var(--text-dim);
-  margin-bottom: 10px;
-}
-.sb-legal-links {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  align-items: center;
-  gap: 8px;
-  font-size: 11px;
-  color: var(--text-soft);
-}
-.sb-legal-links a {
-  color: var(--text-soft);
-  text-decoration: none;
-}
-.sb-legal-links a:hover {
-  color: var(--accent);
-}
-.sb-legal-links .sep {
-  color: var(--text-dim);
-}
-
-/* Back to top */
-.sb-totop {
-  margin-top: 6px;
-  width: 100%;
-  padding: 14px;
-  background: #ffffff;
-  color: #111;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  font-weight: 800;
-  font-size: 13px;
-  cursor: pointer;
-}
-.sb-totop:hover { background: #f1f1f1; }
 
 /* ----- floating slip pill ----- */
 .sb-slip-pill {
@@ -2786,14 +2411,14 @@ nav a:active { transform: scale(.96); }
   display: inline-flex; align-items: center; gap: 10px;
   padding: 10px 18px;
   background: var(--accent);
-  color: #000000;
+  color: #0a0d0c;
   border-radius: 999px;
-  box-shadow: 0 12px 28px rgba(0,0,0,.4), 0 4px 12px rgba(255,184,0,.3);
+  box-shadow: 0 12px 28px rgba(0,0,0,.4), 0 4px 12px rgba(197,255,61,.3);
   font-weight: 800; font-size: 13px;
   animation: sbPillIn .25s ease both;
 }
 .sb-slip-pill .ct {
-  background: #000000;
+  background: #0a0d0c;
   color: var(--accent);
   padding: 2px 8px;
   border-radius: 999px;
@@ -2899,25 +2524,11 @@ nav a:active { transform: scale(.96); }
   margin: 10px auto 6px;
 }
 .sb-sheet-head {
-  display: flex;
-  flex-direction: column;
-  padding: 12px 16px 4px;
-  gap: 4px;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 6px 16px 12px;
+  border-bottom: 1px solid var(--line);
 }
-.sb-sheet-head .slip-head-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  width: 100%;
-}
-.sb-sheet-head h3 {
-  font-size: 15px;
-  font-weight: 800;
-  margin: 0;
-  display: inline-flex;
-  align-items: center;
-}
+.sb-sheet-head h3 { font-size: 15px; font-weight: 800; margin: 0; }
 .sb-sheet-close {
   background: var(--surface);
   border: 1px solid var(--line);
@@ -3060,8 +2671,8 @@ nav a:active { transform: scale(.96); }
 .sb-quick-action:hover .sb-qa-icon,
 .sb-quick-action.active .sb-qa-icon {
   color: var(--accent);
-  border-color: rgba(255, 184, 0, 0.3);
-  background: rgba(255, 184, 0, 0.08);
+  border-color: rgba(197, 255, 61, 0.3);
+  background: rgba(197, 255, 61, 0.08);
 }
 .sb-quick-action span:last-child {
   font-size: 10px;
@@ -3113,7 +2724,7 @@ nav a:active { transform: scale(.96); }
 }
 .sb-category-pill.active {
   background: var(--accent);
-  color: #000000;
+  color: #0a0d0c;
   border-color: var(--accent);
 }
 
@@ -3249,10 +2860,10 @@ nav a:active { transform: scale(.96); }
   color: var(--accent);
   border-right: 1px solid var(--line);
 }
-.sb-code-share:hover { background: rgba(255, 184, 0, 0.06); }
+.sb-code-share:hover { background: rgba(197, 255, 61, 0.06); }
 .sb-code-add {
   background: var(--accent);
-  color: #000000;
+  color: #0a0d0c;
 }
 .sb-code-add:hover {
   background: #d4ff5a;
@@ -3279,7 +2890,7 @@ nav a:active { transform: scale(.96); }
     padding: 0 14px;
     font-size: 13px;
     border-radius: 6px;
-    box-shadow: 0 4px 14px rgba(255, 184, 0, 0.25);
+    box-shadow: 0 4px 14px rgba(197, 255, 61, 0.25);
   }
   .sb-cta-login {
     height: 34px;
@@ -3370,19 +2981,14 @@ nav a:active { transform: scale(.96); }
   .sb-winner .amt {
     font-size: 13px;
   }
-  .sb-footer {
-    margin: 16px 0 0;
-    padding: 0 10px 20px;
-    gap: 12px;
-  }
-  .sb-sponsor-card {
-    padding: 16px 12px 14px;
+  .sb-compliance {
+    margin: 14px 10px 8px;
+    padding: 14px;
+    border-radius: 12px;
   }
   .sb-payslip {
-    padding: 12px;
-  }
-  .sb-payslip-code {
-    font-size: 22px;
+    margin: 0 10px 12px;
+    border-radius: 12px;
   }
 }
 
@@ -3394,8 +3000,8 @@ nav a:active { transform: scale(.96); }
   align-items: center;
   gap: 4px;
   padding: 3px 8px;
-  background: rgba(255, 53, 84, 0.15);
-  border: 1px solid rgba(255, 53, 84, 0.25);
+  background: rgba(255, 77, 61, 0.15);
+  border: 1px solid rgba(255, 77, 61, 0.25);
   border-radius: 4px;
   font-size: 10px;
   font-weight: 800;

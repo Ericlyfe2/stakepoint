@@ -64,9 +64,7 @@ export default function AdminShell() {
       {/* Sidebar */}
       <aside className={`adm-side ${mobileOpen ? 'open' : ''}`}>
         <div className="adm-brand">
-          <div className="mark" aria-hidden="true">
-            <svg width="22" height="22" viewBox="0 0 22 22" fill="none"><circle cx="11" cy="11" r="8" stroke="currentColor" strokeWidth="2.2"/><circle cx="11" cy="11" r="3.5" stroke="currentColor" strokeWidth="1.8"/><circle cx="11" cy="11" r="1.2" fill="currentColor"/></svg>
-          </div>
+          <div className="mark">X</div>
           <div className="text">
             <div className="name">Xenbet</div>
             <div className="sub">Admin OS</div>

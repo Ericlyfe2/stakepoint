@@ -61,7 +61,7 @@ export default function PromotionsAdmin() {
       {!promos ? <Spinner /> : promos.length === 0 ? (
         <Empty title="No promotions yet" subtitle="Create your first to feature it on the storefront." />
       ) : (
-        <div className="adm-grid c2" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 320px), 1fr))' }}>
+        <div className="adm-grid c2" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))' }}>
           {promos.map((p) => (
             <PromoCard key={p.id} p={p}
                        onEdit={() => setEditing(p)}

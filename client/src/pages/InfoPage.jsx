@@ -54,7 +54,7 @@ export default function InfoPage() {
           By creating a Xenbet account and placing wagers you agree to the following terms.
           You must be 18 years or older and physically located in a jurisdiction where online
           sports wagering is lawful. Xenbet operates under Ghana Gaming Commission licence
-          <strong> #ODSGH-2026</strong>. Last updated <strong>20 May 2026</strong>.
+          <strong> #XBGH-2026</strong>. Last updated <strong>20 May 2026</strong>.
         </p>
         <ul style={ulStyle}>
           <li>Only one account is permitted per individual. Accounts may be registered using either an email address or a mobile phone number — the identifier provided is the sole login credential.</li>
@@ -123,7 +123,7 @@ export default function InfoPage() {
         <h2 style={h2Style}>Licence Information</h2>
         <p style={pStyle}>
           Xenbet is operated by Xenbet Gaming Limited and licensed by the Gaming Commission
-          of Ghana under reference <strong>#ODSGH-2026</strong>. All wagering is governed
+          of Ghana under reference <strong>#XBGH-2026</strong>. All wagering is governed
           by Ghanaian law. Operator compliance reports are published quarterly and audited
           by an independent third party.
         </p>

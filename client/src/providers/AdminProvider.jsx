@@ -92,7 +92,7 @@ export function AdminGuard({ children }) {
 
   useEffect(() => {
     if (!loading && !admin) {
-      navigate(`/admin/login?next=${encodeURIComponent(loc.pathname)}`, { replace: true });
+      navigate(`/login?next=${encodeURIComponent(loc.pathname)}`, { replace: true });
     }
   }, [admin, loading, navigate, loc.pathname]);
 

@@ -210,8 +210,8 @@ export default function LoginPage() {
       <div className="auth-shell">
         <aside className="auth-aside">
           <div className="logo">
-            <div className="logo-mark"><svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden="true"><circle cx="11" cy="11" r="8" stroke="currentColor" strokeWidth="2.2"/><circle cx="11" cy="11" r="3.5" stroke="currentColor" strokeWidth="1.8"/><circle cx="11" cy="11" r="1.2" fill="currentColor"/></svg></div>
-            <div className="logo-text">Odd<em>sify</em></div>
+            <div className="logo-mark"><span>X</span></div>
+            <div className="logo-text">Xen<em>bet</em></div>
           </div>
           <h2 className="auth-tagline">
             {mode === 'signin' ? 'Welcome back. Your slip is waiting.' : 'Join thousands betting smarter.'}

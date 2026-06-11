@@ -149,7 +149,7 @@ function pushTx(userId, tx) {
   return entry;
 }
 
-export function settleNow() {
+export async function settleNow() {
   const fixtures = adminListFixtures();
   // Pre-warm results for fixtures that are due
   for (const fx of fixtures) {
@@ -237,10 +237,10 @@ export function settleNow() {
 export function startSettlementLoop() {
   if (timer) return;
   // first sweep on boot
-  try { settleNow(); } catch (e) { log.error('settle initial', e?.message); }
-  timer = setInterval(() => {
+  settleNow().catch((e) => log.error('settle initial', e?.message));
+  timer = setInterval(async () => {
     try {
-      const r = settleNow();
+      const r = await settleNow();
       if (r.settledWins + r.settledLoss + r.settledVoid > 0) {
         log.info(`auto-settle ${r.settledWins}w / ${r.settledLoss}l / ${r.settledVoid}v`);
       }

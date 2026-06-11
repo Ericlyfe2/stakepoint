@@ -287,17 +287,17 @@ router.post('/fixtures/:id/result',
     if (!view) return next(notFound('Fixture not found'));
     setResult(req.params.id, req.body.scoreHome, req.body.scoreAway, 'manual');
     let settled = null;
-    if (req.body.autoSettle !== false) settled = settleNow();
+    if (req.body.autoSettle !== false) settled = await settleNow();
     audit(req, { action: 'sports.result', target: req.params.id, targetType: 'fixture', severity: 'warning', meta: { ...req.body, settled } });
     res.json({ ok: true, settled });
   })
 );
 
-router.post('/fixtures/:id/settle', requireAdmin, requireRole('odds_manager'), (req, res) => {
-  const settled = settleNow();
+router.post('/fixtures/:id/settle', requireAdmin, requireRole('odds_manager'), asyncHandler(async (req, res) => {
+  const settled = await settleNow();
   audit(req, { action: 'sports.settle', target: req.params.id, targetType: 'fixture', meta: settled });
   res.json({ ok: true, settled });
-});
+}));
 
 /* ------------ market management (custom fixtures only) ------------ */
 

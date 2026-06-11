@@ -478,8 +478,8 @@ export default function AppProviders({ children }) {
                         disabled={!canSubmit}
                         style={{
                           width: '100%', padding: '14px 0', borderRadius: 10, border: 'none',
-                          background: canSubmit ? 'linear-gradient(135deg, var(--accent), #ffcc33)' : 'var(--surface-2)',
-                          color: canSubmit ? '#000000' : 'var(--text-dim)',
+                          background: canSubmit ? 'linear-gradient(135deg, var(--accent), #b0e82d)' : 'var(--surface-2)',
+                          color: canSubmit ? '#0a0d0c' : 'var(--text-dim)',
                           fontWeight: 800, fontSize: 16, cursor: canSubmit ? 'pointer' : 'not-allowed', marginBottom: 18,
                         }}
                       >

@@ -2,7 +2,7 @@
  * One-time localStorage key migration back to the Xenbet brand.
  *
  * The 2026-05-26 rebrand moved `xenbet_*` keys to `oddsify_*`; that rebrand
- * has been rolled back, so this shim now copies any persisted `oddsify_*`
+ * has been rolled back, so this shim copies any persisted `oddsify_*`
  * value to the matching `xenbet_*` key, then deletes the original.
  * Idempotent: once the `oddsify_*` keys are gone, the function is a fast
  * no-op on every subsequent load.

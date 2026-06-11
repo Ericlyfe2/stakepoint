@@ -466,11 +466,11 @@ export default function WithdrawPage() {
                   style={{
                     padding: '12px 0',
                     background: balance >= MIN_WITHDRAW
-                      ? 'linear-gradient(135deg, var(--accent), #ffcc33)'
+                      ? 'linear-gradient(135deg, var(--accent), #b0e82d)'
                       : 'var(--surface)',
                     border: '1px solid var(--line)',
                     borderRadius: 8,
-                    color: balance >= MIN_WITHDRAW ? '#000000' : 'var(--text-dim)',
+                    color: balance >= MIN_WITHDRAW ? '#0a0d0c' : 'var(--text-dim)',
                     fontWeight: 800,
                     fontSize: 14,
                     cursor: balance >= MIN_WITHDRAW ? 'pointer' : 'not-allowed',
@@ -482,13 +482,13 @@ export default function WithdrawPage() {
               </div>
 
               {overBalance && (
-                <div style={{ background: 'rgba(255,53,84,0.08)', border: '1px solid rgba(255,53,84,0.2)', color: 'var(--danger, #ff5d5d)', padding: '10px 14px', borderRadius: 10, fontSize: 12, marginBottom: 12 }}>
+                <div style={{ background: 'rgba(255,77,61,0.08)', border: '1px solid rgba(255,77,61,0.2)', color: 'var(--danger, #ff5d5d)', padding: '10px 14px', borderRadius: 10, fontSize: 12, marginBottom: 12 }}>
                   Insufficient balance — you have GHS {fmt(balance)}.
                 </div>
               )}
 
               {err && (
-                <div style={{ background: 'rgba(255,53,84,0.08)', border: '1px solid rgba(255,53,84,0.2)', color: 'var(--danger, #ff5d5d)', padding: '10px 14px', borderRadius: 10, fontSize: 12, marginBottom: 12 }}>
+                <div style={{ background: 'rgba(255,77,61,0.08)', border: '1px solid rgba(255,77,61,0.2)', color: 'var(--danger, #ff5d5d)', padding: '10px 14px', borderRadius: 10, fontSize: 12, marginBottom: 12 }}>
                   {err}
                 </div>
               )}
@@ -498,8 +498,8 @@ export default function WithdrawPage() {
                 disabled={!isAmountValid || busy}
                 style={{
                   width: '100%', padding: '14px 0', borderRadius: 10, border: 'none',
-                  background: isAmountValid && !busy ? 'linear-gradient(135deg, var(--accent), #ffcc33)' : 'var(--surface-2)',
-                  color: isAmountValid && !busy ? '#000000' : 'var(--text-dim)',
+                  background: isAmountValid && !busy ? 'linear-gradient(135deg, var(--accent), #b0e82d)' : 'var(--surface-2)',
+                  color: isAmountValid && !busy ? '#0a0d0c' : 'var(--text-dim)',
                   fontWeight: 800, fontSize: 16, cursor: isAmountValid && !busy ? 'pointer' : 'not-allowed', marginBottom: 18,
                 }}
               >

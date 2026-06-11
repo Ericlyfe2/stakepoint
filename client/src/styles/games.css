@@ -3,7 +3,7 @@
    ─────────────────────────────────────────────────────────── */
 
 .cv2 {
-  --cv-bg: #000000;
+  --cv-bg: #0a0d0c;
   --cv-felt: #0c4a2a;
   --cv-felt-2: #093d22;
   --cv-gold: #ffd166;
@@ -24,7 +24,7 @@
     radial-gradient(1200px 600px at 20% -10%, rgba(255, 209, 102, 0.10), transparent 60%),
     radial-gradient(900px 600px at 110% 20%, rgba(239, 59, 59, 0.10), transparent 65%),
     radial-gradient(700px 500px at 50% 110%, rgba(20, 184, 122, 0.12), transparent 70%),
-    linear-gradient(180deg, #000000 0%, #0c1411 60%, #08120d 100%);
+    linear-gradient(180deg, #0a0d0c 0%, #0c1411 60%, #08120d 100%);
   overflow: hidden;
 }
 html[data-theme="light"] .cv2 {
