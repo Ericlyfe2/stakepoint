@@ -202,11 +202,32 @@ router.get('/leagues/:leagueId/matches', asyncHandler(async (req, res) => {
 /* ------------ authenticated bet operations ------------ */
 
 router.get('/code/:code', (req, res, next) => {
-  const code = String(req.params.code || '').toUpperCase();
-  const bet = Object.values(betsStore.all()).find((b) => b.bookingCode === code);
-  if (!bet) return next(notFound('Booking code not found'));
-  const { userId, ...publicBet } = bet;
-  res.json({ bet: publicBet });
+  const raw = String(req.params.code || '').trim().toUpperCase();
+  if (!raw || raw.length < 3 || raw.length > 20) {
+    return next(badRequest('Invalid booking code format.'));
+  }
+  const bet = Object.values(betsStore.all()).find((b) => b.bookingCode === raw);
+  if (!bet) return next(notFound('Booking code not found. Double-check and try again.'));
+  // Only return the slip data needed to rebuild the betslip — no user info.
+  const { userId, legsResolved, cashOutHistory, activity, ...slip } = bet;
+  const safe = {
+    id: slip.id,
+    legs: (slip.legs || []).map((l) => ({
+      matchId: l.matchId,
+      market: l.market,
+      outcome: l.outcome,
+      odds: l.odds,
+      home: l.home,
+      away: l.away,
+      marketName: l.marketName || l.market,
+    })),
+    totalOdds: slip.totalOdds,
+    mode: slip.mode,
+    stake: slip.stake,
+    potentialWin: slip.potentialWin,
+    bookingCode: slip.bookingCode,
+  };
+  res.json({ bet: safe });
 });
 
 router.post('/place',

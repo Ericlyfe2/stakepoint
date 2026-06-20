@@ -137,25 +137,10 @@ async function boot() {
   // synchronous get/set in route handlers is safe.
   await initStores();
 
-  // Seeds are ONLY run when stores are empty, and only in development.
+  // Seed one super admin from env vars if no admins exist (dev only).
   if (!isProd) {
     const { seedAdmins } = await import('./db/seedAdmins.js');
-    const { seedDemoData } = await import('./db/seedDemo.js');
-    const { seedPromotionsIfEmpty } = await import('./db/promotions.js');
     await seedAdmins();
-    const promoCount = seedPromotionsIfEmpty((PROMOTIONS || []).map((p, i) => ({
-      title: p.title || p.name || 'Offer',
-      body: p.body || p.subtitle || '',
-      badge: p.badge || 'OFFER',
-      cta: p.cta || 'View',
-      accent: p.accent || '#7c5cff',
-      image: p.image || '',
-      eligibility: 'all',
-      bonusRate: p.bonusRate || 0,
-      active: true,
-      order: i,
-    })));
-    if (promoCount) log.info(`Seeded ${promoCount} promotions (dev only).`);
   }
 
   await new Promise((resolve) => server.listen(PORT, resolve));

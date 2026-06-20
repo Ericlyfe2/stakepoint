@@ -103,7 +103,7 @@ function loadFromFile(file, fallback) {
 
 function persistFile(file, data) {
   const tmp = `${file}.tmp`;
-  fs.writeFileSync(tmp, JSON.stringify(data, null, 2));
+  fs.writeFileSync(tmp, JSON.stringify(data, null, 2), 'utf8');
   fs.renameSync(tmp, file);
 }
 
@@ -204,15 +204,20 @@ export function createStore(name, fallback = {}) {
     list() { ensureLoaded(); return Object.values(state.data); },
     flush,
 
-    /** Critical write — flushes immediately and awaits the result. */
+    /** Critical write — flushes immediately and awaits the result. No debounce. */
     async setCritical(k, v) {
       ensureLoaded();
       state.data[k] = v;
       if (useDb) {
         await upsertPg(name, k, v);
       } else {
-        markDirty(k);
-        flushFile();
+        try {
+          state.data[k] = v;
+          persistFile(file, state.data);
+        } catch (e) {
+          log.error(`persist failed for "${name}"/"${k}":`, e.message);
+          throw e;
+        }
       }
       return v;
     },
@@ -224,8 +229,13 @@ export function createStore(name, fallback = {}) {
       if (useDb) {
         await deletePg(name, k);
       } else {
-        markDirty(k, true);
-        flushFile();
+        try {
+          delete state.data[k];
+          persistFile(file, state.data);
+        } catch (e) {
+          log.error(`persist delete failed for "${name}"/"${k}":`, e.message);
+          throw e;
+        }
       }
     },
 

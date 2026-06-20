@@ -778,46 +778,44 @@ export default function Home({ initialChip }) {
           ))}
         </div>
 
-        {/* Booking-code loader — visible on Featured and Load Code tabs */}
-        {(featuredTab === 'featured' || featuredTab === 'codes') && (
-          <form
-            onSubmit={onFeaturedCodeLoad}
+        {/* Booking-code loader — always visible on every tab */}
+        <form
+          onSubmit={onFeaturedCodeLoad}
+          style={{
+            display: 'flex', gap: 8, padding: '10px 12px 4px',
+            alignItems: 'stretch',
+          }}
+        >
+          <input
+            type="text"
+            value={featuredCode}
+            onChange={(e) => setFeaturedCode(e.target.value.toUpperCase().replace(/\s+/g, ''))}
+            placeholder="Enter booking code (e.g. ME94621)"
+            maxLength={12}
+            autoCapitalize="characters"
+            spellCheck={false}
             style={{
-              display: 'flex', gap: 8, padding: '10px 12px 4px',
-              alignItems: 'stretch',
+              flex: 1, padding: '12px 14px', borderRadius: 10,
+              border: '1px solid var(--surface-border, #2a2a2a)',
+              background: 'var(--surface, #161616)',
+              color: 'var(--text, #fff)',
+              fontSize: 14, fontWeight: 700, letterSpacing: '0.06em',
+              outline: 'none',
+            }}
+          />
+          <button
+            type="submit"
+            disabled={!featuredCode.trim()}
+            style={{
+              padding: '0 18px', borderRadius: 10, border: 'none',
+              background: featuredCode.trim() ? '#116f43' : '#2a2a2a',
+              color: '#fff', fontWeight: 800, fontSize: 13, cursor: featuredCode.trim() ? 'pointer' : 'not-allowed',
+              whiteSpace: 'nowrap',
             }}
           >
-            <input
-              type="text"
-              value={featuredCode}
-              onChange={(e) => setFeaturedCode(e.target.value.toUpperCase().replace(/\s+/g, ''))}
-              placeholder="Enter booking code (e.g. ME94621)"
-              maxLength={12}
-              autoCapitalize="characters"
-              spellCheck={false}
-              style={{
-                flex: 1, padding: '12px 14px', borderRadius: 10,
-                border: '1px solid var(--surface-border, #2a2a2a)',
-                background: 'var(--surface, #161616)',
-                color: 'var(--text, #fff)',
-                fontSize: 14, fontWeight: 700, letterSpacing: '0.06em',
-                outline: 'none',
-              }}
-            />
-            <button
-              type="submit"
-              disabled={!featuredCode.trim()}
-              style={{
-                padding: '0 18px', borderRadius: 10, border: 'none',
-                background: featuredCode.trim() ? '#116f43' : '#2a2a2a',
-                color: '#fff', fontWeight: 800, fontSize: 13, cursor: featuredCode.trim() ? 'pointer' : 'not-allowed',
-                whiteSpace: 'nowrap',
-              }}
-            >
-              Load Slip
-            </button>
-          </form>
-        )}
+            Load Slip
+          </button>
+        </form>
 
         <div className="sb-featured-body">
           {featuredTab === 'codes' && featuredCards.length === 0 && (
