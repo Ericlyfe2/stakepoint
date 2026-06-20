@@ -186,11 +186,15 @@ export async function settleNow() {
     let credit = 0;
     if (status === 'won')  credit = bet.potentialWin;
     if (status === 'void') credit = bet.stake;
+    const totalReturn = status === 'won' ? bet.potentialWin
+                      : status === 'void' ? bet.stake
+                      : 0;
     const updated = {
       ...bet,
       status,
       settledAt: new Date().toISOString(),
       settledBy: 'auto',
+      totalReturn: Number(totalReturn.toFixed(2)),
       legsResolved: legResults.map((r) => ({ matchId: r.leg.matchId, market: r.leg.market, outcome: r.leg.outcome, won: r.won, scoreHome: r.res.scoreHome, scoreAway: r.res.scoreAway })),
       ...(status === 'won' ? { wonNotAcknowledged: true } : {}),
     };

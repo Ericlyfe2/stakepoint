@@ -67,13 +67,16 @@ function listUserBets(userId) {
     .map(attachCashoutOffer);
 }
 
-/** Attach the cash-out display value consistent with what the server would offer. */
+function computeCashoutEstimate(bet) {
+  if (bet.mode === 'system')
+    return Number((bet.stake * bet.totalOdds * 0.6).toFixed(2));
+  return Number((bet.stake * bet.totalOdds * (1 - LIVE_BETTING.houseMargin)).toFixed(2));
+}
+
 function attachCashoutOffer(bet) {
   if (bet.status !== 'open') return bet;
   if (bet.lastCashOutOffer?.amount != null) return bet;
-  const cashoutOffer = bet.mode === 'system'
-    ? Number((bet.stake * bet.totalOdds * 0.6).toFixed(2))
-    : Number((bet.stake * (1 - LIVE_BETTING.houseMargin)).toFixed(2));
+  const cashoutOffer = computeCashoutEstimate(bet);
   return { ...bet, cashoutOffer };
 }
 
