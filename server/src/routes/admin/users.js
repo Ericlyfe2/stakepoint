@@ -10,7 +10,7 @@
 import { Router } from 'express';
 import { randomBytes } from 'node:crypto';
 import { z } from 'zod';
-import { allUsers, getUserById, updateUser, createUser, deleteUser, findByEmail, publicUser, logActivity } from '../../db/users.js';
+import { allUsers, getUserById, updateUser, adjustBalance, createUser, deleteUser, findByEmail, publicUser, logActivity } from '../../db/users.js';
 import { createStore } from '../../db/store.js';
 import { requireAdmin, requireRole, audit } from '../../middleware/adminAuth.js';
 import { validate } from '../../middleware/validate.js';
@@ -230,19 +230,17 @@ router.patch('/:id/wallet',
     delta: z.number().refine((n) => n !== 0, 'Non-zero delta required'),
     reason: z.string().min(2).max(500),
   })),
-  (req, res, next) => {
+  asyncHandler(async (req, res) => {
     const u = getUserById(req.params.id);
-    if (!u) return next(notFound('User not found'));
-    const newBal = Number((u.balance + req.body.delta).toFixed(2));
-    if (newBal < 0) return next(badRequest('Adjustment would create a negative balance.'));
-    const next_ = updateUser(u.id, { balance: newBal });
+    if (!u) throw notFound('User not found');
+    const next_ = await adjustBalance(u.id, req.body.delta, { allowNegative: req.body.delta < 0 });
     // mirror into transactions
-    const tx = { id: `adj-${Date.now()}`, userId: u.id, at: new Date().toISOString(), kind: 'admin_adjust', amount: req.body.delta, status: 'completed', balanceAfter: newBal, reason: req.body.reason, adminId: req.admin.id };
+    const tx = { id: `adj-${Date.now()}`, userId: u.id, at: new Date().toISOString(), kind: 'admin_adjust', amount: req.body.delta, status: 'completed', balanceAfter: next_.balance, reason: req.body.reason, adminId: req.admin.id };
     const list = txStore.get(u.id) || [];
     txStore.set(u.id, [tx, ...list].slice(0, 500));
-    audit(req, { action: 'user.wallet.adjust', target: u.id, targetType: 'user', severity: 'warning', meta: { delta: req.body.delta, balanceAfter: newBal, reason: req.body.reason } });
+    audit(req, { action: 'user.wallet.adjust', target: u.id, targetType: 'user', severity: 'warning', meta: { delta: req.body.delta, balanceAfter: next_.balance, reason: req.body.reason } });
     res.json({ user: expandUser(next_), transaction: tx });
-  }
+  })
 );
 
 router.patch('/:id/tags',

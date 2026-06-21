@@ -4,7 +4,7 @@ import { requireAdmin, requireRole, audit } from '../../middleware/adminAuth.js'
 import { validate } from '../../middleware/validate.js';
 import { asyncHandler } from '../../utils/asyncHandler.js';
 import { badRequest, notFound } from '../../utils/httpError.js';
-import { getUserById, updateUser, logActivity } from '../../db/users.js';
+import { getUserById, updateUser, adjustBalance, withUserLock, logActivity } from '../../db/users.js';
 import { createStore } from '../../db/store.js';
 import { emitToUser, emitAdmin } from '../../services/realtime.js';
 import { recordAudit } from '../../db/audit.js';
@@ -12,6 +12,14 @@ import { STAGE_PROMOTE_THRESHOLD, STAGE3_UNBLOCK_THRESHOLD } from '../wallet.js'
 
 const txStore = createStore('transactions', {});
 const router = Router();
+
+function pushTx(userId, tx) {
+  const id = `tx-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+  const entry = { id, userId, at: new Date().toISOString(), ...tx };
+  const list = txStore.get(userId) || [];
+  txStore.set(userId, [entry, ...list].slice(0, 500));
+  return entry;
+}
 
 router.get('/pending', requireAdmin, requireRole('finance_admin'), (req, res) => {
   const all = txStore.all() || {};
@@ -87,7 +95,7 @@ router.post('/:id/approve',
       autoUnblocked = true;
     }
 
-    const updated = await updateUser(foundUserId, patch);
+    const updated = await withUserLock(foundUserId, () => updateUser(foundUserId, patch));
 
     const userTxs = txStore.get(foundUserId) || [];
     const updatedTxs = userTxs.map((t) =>
@@ -123,6 +131,15 @@ router.post('/:id/approve',
         meta: { trigger: 'deposit_approval', singleDeposit: amount, threshold: STAGE3_UNBLOCK_THRESHOLD },
       });
       emitToUser(foundUserId, 'account:unblocked', { trigger: 'deposit_approval' });
+    }
+
+    // Referral bonus: on first deposit, credit the referrer 10% of the amount.
+    if (updated.totalDeposited === amount && updated.referredBy) {
+      const REFERRAL_BONUS_RATE = 0.10;
+      const bonus = Number((amount * REFERRAL_BONUS_RATE).toFixed(2));
+      await adjustBalance(updated.referredBy, bonus, { allowNegative: true });
+      pushTx(updated.referredBy, { kind: 'referral_bonus', amount: bonus, status: 'completed', ref: foundUserId });
+      logActivity(updated.referredBy, { kind: 'referral_bonus', amount: bonus, ref: foundUserId });
     }
 
     audit(req, { action: 'deposit.approve', target: foundUserId, targetType: 'user', severity: 'info', meta: { amount, transactionId: txId } });

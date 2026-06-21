@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import {
-  findByEmail, findByGoogleId, getUserById, createUser, updateUser, publicUser, logActivity,
+  findByEmail, findByGoogleId, getUserById, createUser, updateUser, publicUser, safeUser, logActivity,
 } from '../db/users.js';
 import { hashPassword, verifyPassword, passwordIssues } from '../services/password.js';
 import {
@@ -37,12 +37,14 @@ const registerSchema = z.object({
   password: z.string(),
   displayName: z.string().trim().max(60).optional(),
   country,
+  captchaToken: z.string().optional(), // TODO: validate server-side when Turnstile/reCAPTCHA is integrated
 });
 
 const loginSchema = z.object({
   email: emailLike,
   password: z.string().min(1, 'Password is required.'),
   country: country.optional(),
+  captchaToken: z.string().optional(), // TODO: validate server-side when Turnstile/reCAPTCHA is integrated
 });
 
 const changePwSchema = z.object({
@@ -79,7 +81,7 @@ router.get('/config', (_req, res) => {
   });
 });
 
-/** Register — creates account, immediately signs in (no OTP). */
+/** Register — creates account, immediately signs in, sends verification OTP. */
 router.post('/register',
   registerLimiter,
   validate(registerSchema),
@@ -96,12 +98,34 @@ router.post('/register',
       passwordHash,
       balance: 0,
       country: countryCode,
-      emailVerified: true,
+      emailVerified: false,
     });
+    // Send verification OTP (swallow failure so signup still works if SMTP is down).
+    try {
+      await issueOtp(email, 'register');
+      log.info(`verification OTP sent for ${email}`);
+    } catch (e) {
+      log.warn(`could not send verification OTP for ${email}: ${e.message}`);
+    }
     logActivity(user.id, { kind: 'register', ip: req.ip, country: countryCode });
     log.info(`registered ${email} (${countryCode})`);
     const session = issueSession(user, req);
     res.status(201).json({ ok: true, kind: 'user', account: publicUser(user), ...session });
+  })
+);
+
+/** Verify email with OTP. */
+router.post('/verify-email',
+  validate(z.object({ email: z.string().email(), code: z.string().min(1) })),
+  asyncHandler(async (req, res) => {
+    const { email, code } = req.body;
+    checkOtp(email, 'register', code);
+    const user = findByEmail(email);
+    if (!user) throw badRequest('User not found.');
+    await updateUser(user.id, { emailVerified: true });
+    consumeOtp(email, 'register');
+    log.info(`email verified for ${email}`);
+    res.json({ ok: true });
   })
 );
 
@@ -139,6 +163,7 @@ router.post('/login',
     const ok = await verifyPassword(password, user.passwordHash);
     if (!ok) {
       logActivity(user.id, { kind: 'login_failed', ip: req.ip });
+      recordAudit({ actorId: user.id, action: 'user.login.failed', severity: 'warning', ip: req.ip, meta: { email } });
       throw unauthorized('Incorrect email or password.');
     }
     if (user.suspended) throw unauthorized('Account suspended. Contact support.');
@@ -155,6 +180,7 @@ router.post('/login',
     const fresh = patch ? await updateUser(user.id, patch) : user;
 
     logActivity(fresh.id, { kind: 'login_success', ip: req.ip, userAgent: req.get('user-agent') });
+    recordAudit({ actorId: fresh.id, action: 'user.login.success', ip: req.ip, meta: { email } });
     const session = issueSession(fresh, req);
     res.json({ ok: true, kind: 'user', account: publicUser(fresh), ...session });
   })
@@ -178,8 +204,10 @@ router.post('/logout', asyncHandler(async (req, res) => {
   const record = token ? lookupRefresh(token) : null;
   if (record) {
     logActivity(record.accountId, { kind: 'logout', ip: req.ip, userAgent: req.get('user-agent') });
+    recordAudit({ actorId: record.accountId, action: 'user.logout', ip: req.ip });
   } else if (req.user?.id) {
     logActivity(req.user.id, { kind: 'logout', ip: req.ip, userAgent: req.get('user-agent') });
+    recordAudit({ actorId: req.user.id, action: 'user.logout', ip: req.ip });
   }
   if (token) revokeRefreshToken(token);
   res.json({ ok: true });
@@ -202,6 +230,7 @@ router.post('/change-password',
     await updateUser(user.id, { passwordHash });
     revokeAllForAccount(user.id);
     logActivity(user.id, { kind: 'password_changed', ip: req.ip });
+    recordAudit({ actorId: user.id, action: 'user.password.changed', severity: 'warning', ip: req.ip });
     res.json({ ok: true, message: 'Password changed. Other sessions were signed out.' });
   })
 );
@@ -276,13 +305,14 @@ router.post('/reset-password',
     consumeOtp(email, 'reset');
     revokeAllForAccount(user.id);
     logActivity(user.id, { kind: 'password_reset', ip: req.ip });
+    recordAudit({ actorId: user.id, action: 'user.password.reset', severity: 'warning', ip: req.ip, meta: { email } });
     log.info(`password reset completed for ${email}`);
     res.json({ ok: true, message: 'Password changed. Please sign in with your new password.' });
   })
 );
 
 router.get('/me', requireAuth, (req, res) => {
-  res.json({ account: publicUser(req.user) });
+  res.json({ account: safeUser(req.user) });
 });
 
 router.get('/activity', requireAuth, (req, res) => {

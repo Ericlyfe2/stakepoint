@@ -345,15 +345,17 @@ export default function Home({ initialChip }) {
         const match = snapshot.leagues
           .flatMap((lg) => lg.matches)
           .find((m) => m.id === s.matchId);
-        if (!match) { changed = true; return null; } // match finished or removed
+        // Don't nullify selections on temporary snapshot gaps — keep stale
+        // odds so the slip doesn't vanish during polling transitions.
+        if (!match) return { ...s, stale: true };
         const mkt = match.markets?.[s.market];
-        if (!mkt || mkt.suspended) { changed = true; return null; } // market closed
+        if (!mkt || mkt.suspended) return { ...s, stale: true };
         const sel = mkt.selections?.find((x) => x.key === s.outcome);
-        if (!sel || sel.suspended) { changed = true; return null; } // selection closed
-        if (sel.odds === s.odds) return s;
+        if (!sel || sel.suspended) return { ...s, stale: true };
+        if (sel.odds === s.odds) return { ...s, stale: false };
         changed = true;
-        return { ...s, odds: sel.odds, trend: sel.odds > s.odds ? '↑' : '↓' };
-      }).filter(Boolean); // actually remove the nulls
+        return { ...s, odds: sel.odds, trend: sel.odds > s.odds ? '↑' : '↓', stale: false };
+      });
       return changed ? next : prev;
     });
   }, [snapshot]);
@@ -441,7 +443,7 @@ export default function Home({ initialChip }) {
     const linePrice = parseStake(stake);
     if (linePrice <= 0) { setSlipErr('Enter a stake amount.'); return; }
     const cost = betMode === 'system' ? linePrice * linesCount : linePrice;
-    if (cost < 300) { setSlipErr(`Minimum bet is GHS 300 (this ticket costs GHS ${formatAmt(cost)}).`); return; }
+    if (cost < 2) { setSlipErr(`Minimum stake is GHS 2 (this ticket costs GHS ${formatAmt(cost)}).`); return; }
     if (!account) { 
       setSlipOpen(false);
       navigate('/login?next=/');
@@ -1143,22 +1145,7 @@ export default function Home({ initialChip }) {
         <div className="tagline">The world's sharper betting platform</div>
       </div>
 
-      {/* ─── Payslip ─── */}
-      <form className="sb-payslip" onSubmit={onPayslip}>
-        <div className="sb-payslip-label">Payslip</div>
-        <div className="sb-payslip-input">
-          <input
-            placeholder="*711+222#"
-            value={payslip}
-            onChange={(e) => setPayslip(e.target.value.toUpperCase())}
-            inputMode="text"
-            autoComplete="off"
-            spellCheck={false}
-          />
-          <button type="submit">Check</button>
-        </div>
-        <div className="sb-payslip-foot">Enter a booking code to view a slip</div>
-      </form>
+      {/* ─── Featured section continues ─── */}
 
       {/* ─── Floating slip pill (mobile only via CSS) ─── */}
       {selections.length > 0 && (

@@ -1,8 +1,45 @@
 import crypto from 'crypto';
 import { createStore } from './store.js';
 import { log } from '../utils/logger.js';
+import { badRequest } from '../utils/httpError.js';
 
 const users = createStore('users', {});
+const locks = {};
+const LOCK_TIMEOUT_MS = 10_000;
+
+/**
+ * Acquire a per-user mutex so two concurrent balance writes never collide
+ * (read → compute → write race).  Releases automatically after fn resolves
+ * or if a timeout is hit (safety net — should never fire in practice).
+ * Must be *awaited* inside route handlers.
+ */
+async function withBalanceLock(id, fn) {
+  const key = String(id);
+  while (locks[key]) {
+    await Promise.race([
+      locks[key],
+      new Promise((_, reject) => setTimeout(() => reject(new Error('balance lock timeout')), LOCK_TIMEOUT_MS)),
+    ]);
+  }
+  let resolveLock;
+  locks[key] = new Promise((resolve) => { resolveLock = resolve; });
+  try {
+    return await fn();
+  } finally {
+    delete locks[key];
+    resolveLock();
+  }
+}
+
+/**
+ * Execute arbitrary code under a per-user mutex.  Use this when you need to
+ * atomically update multiple fields (e.g., balance + stage + totalDeposited).
+ * A plain `updateUser` call nested inside `withUserLock` is safe because the
+ * lock serialises all access to that user's record.
+ */
+export async function withUserLock(id, fn) {
+  return withBalanceLock(id, fn);
+}
 
 /**
  * Map: email → userId for fast lookup.
@@ -58,6 +95,25 @@ export function findByGoogleId(googleId) {
   return users.list().find((u) => u.googleId === googleId);
 }
 
+/** Generate a short referral code from user id and email. */
+function generateReferralCode(id, email) {
+  const hash = crypto.createHash('sha256').update(`${id}${email}`).digest('hex');
+  return hash.slice(0, 8).toUpperCase();
+}
+
+/** Find a user by their referral code. */
+export function findByReferralCode(code) {
+  if (!code) return null;
+  const upper = String(code).toUpperCase();
+  return users.list().find((u) => u.referralCode === upper) || null;
+}
+
+/** Count how many users were referred by a given user id. */
+export function countReferred(userId) {
+  if (!userId) return 0;
+  return users.list().filter((u) => u.referredBy === userId).length;
+}
+
 export async function createUser(record) {
   const normEmail = String(record.email || '').toLowerCase().trim();
   if (!normEmail) throw new Error('user requires email');
@@ -86,6 +142,8 @@ export async function createUser(record) {
     picture: record.picture || null,
     twoFactorEnabled: false,
     activity: [],
+    referralCode: record.referralCode || generateReferralCode(id, normEmail),
+    referredBy: record.referredBy || null,
   };
   await users.setCritical(id, user);
   await emailIndex.setCritical(normEmail, id);
@@ -110,6 +168,24 @@ export async function updateUser(id, patch) {
   return users.get(id);
 }
 
+/**
+ * Atomically adjust a user's balance by `delta` (positive = credit, negative =
+ * debit).  Uses a per-user mutex to prevent the read-modify-write race when
+ * concurrent requests touch the same account.  Throws if balance would go
+ * negative (pass allowNegative: true to skip that check for admin ops).
+ */
+export async function adjustBalance(id, delta, opts = {}) {
+  const { allowNegative = false } = opts;
+  return withBalanceLock(id, async () => {
+    const u = users.get(id);
+    if (!u) throw badRequest('User not found.');
+    const newBalance = Number((u.balance + delta).toFixed(2));
+    if (!allowNegative && newBalance < 0) throw badRequest('Insufficient balance.');
+    await users.setCritical(id, { ...u, balance: newBalance, updatedAt: new Date().toISOString() });
+    return { ...u, balance: newBalance };
+  });
+}
+
 export function logActivity(id, entry) {
   const u = users.get(id);
   if (!u) return;
@@ -121,6 +197,21 @@ export function publicUser(u) {
   if (!u) return null;
   const { passwordHash, googleId, activity, ...safe } = u;
   return safe;
+}
+
+/** Stripped-down view — only what the frontend absolutely needs. */
+export function safeUser(u) {
+  if (!u) return null;
+  return {
+    id: u.id,
+    email: u.email,
+    displayName: u.displayName,
+    balance: typeof u.balance === 'number' ? u.balance : 0,
+    country: u.country || null,
+    phone: u.phone || null,
+    role: u.role || 'user',
+    createdAt: u.createdAt || null,
+  };
 }
 
 export async function deleteUser(id) {

@@ -118,7 +118,7 @@ function HistoryBetCard({ bet, onRemix, onOpen, expanded, onToggle }) {
             <>
               <div>
                 <dt>Total Odds</dt>
-                <dd className="bh-hodds">{totalOdds.toFixed(2)}</dd>
+                <dd className="bh-hodds">{bet.mode === 'system' ? 'System' : totalOdds.toFixed(2)}</dd>
               </div>
               {totalReturn > 0 && bet.stake > 0 && (() => {
                 const profit = totalReturn - Number(bet.stake);
@@ -220,74 +220,6 @@ function stableHash(key) {
   x ^= x << 13; x ^= x >>> 17; x ^= x << 5;
   return Math.abs(x);
 }
-// Build a deterministic FT score that *actually matches* the leg's
-// won/lost outcome — so the displayed score, pick, outcome label, and
-// status icon all agree (no more "0:1, picked Home, marked WON" bugs).
-function fakeLegScore(bet, leg, idx, wantedResult) {
-  const seed = stableHash(`${bet.id}-${leg.matchId || idx}-${idx}`);
-  const a = (seed)            & 0xff;
-  const b = (seed >>> 8)      & 0xff;
-  const c = (seed >>> 16)     & 0xff;
-  // Helpers to pick small numbers from the seed.
-  const small = (x, max = 4) => x % max;                 // 0..max-1
-  const win   = (x) => 1 + (x % 3);                      // 1..3 (winning side)
-  const lose  = (x) => x % 2;                            // 0..1 (losing side)
-  let home = small(a), away = small(b);
-
-  const wants = wantedResult || 'won';
-  const market = leg.market;
-  const pick = leg.outcome;
-
-  if (market === '1X2') {
-    if (wants === 'won') {
-      if (pick === '1') { home = win(a); away = lose(b); }
-      else if (pick === '2') { home = lose(a); away = win(b); }
-      else if (pick === 'X') { const v = 1 + small(a, 3); home = v; away = v; }
-    } else {
-      if (pick === '1') { home = 0; away = win(b); }
-      else if (pick === '2') { home = win(a); away = 0; }
-      else if (pick === 'X') { home = win(a); away = home + 1 + small(b, 2); }
-    }
-  } else if (market === 'OU25' || market === 'OU15' || market === 'OU35') {
-    if (wants === 'won') {
-      if (pick === 'Over')  { home = 2 + small(a, 2); away = 1 + small(b, 2); }
-      else if (pick === 'Under') { home = 0; away = small(b, 2); }
-    } else {
-      if (pick === 'Over')  { home = 0; away = small(b, 2); }
-      else if (pick === 'Under') { home = 2 + small(a, 2); away = 1 + small(b, 2); }
-    }
-  } else if (market === 'BTTS') {
-    if (wants === 'won') {
-      if (pick === 'Yes') { home = 1 + small(a, 3); away = 1 + small(b, 3); }
-      else if (pick === 'No')  { home = small(a, 3); away = 0; }
-    } else {
-      if (pick === 'Yes') { home = small(a, 3); away = 0; }
-      else if (pick === 'No')  { home = 1 + small(a, 3); away = 1 + small(b, 3); }
-    }
-  } else if (market === 'DC') {
-    if (wants === 'won') {
-      if (pick === '1X') { home = win(a); away = lose(b); }
-      else if (pick === 'X2') { home = lose(a); away = win(b); }
-      else if (pick === '12') { home = win(a); away = 0; }
-    } else {
-      if (pick === '1X') { home = 0; away = win(b); }
-      else if (pick === 'X2') { home = win(a); away = 0; }
-      else if (pick === '12') { home = 0; away = 0; }
-    }
-  } else if (market === 'CS') {
-    const parts = pick.split('-');
-    if (parts.length === 2) {
-      const ph = parseInt(parts[0], 10);
-      const pa = parseInt(parts[1], 10);
-      if (Number.isFinite(ph) && Number.isFinite(pa)) {
-        if (wants === 'won') { home = ph; away = pa; }
-        else { home = pa; away = ph; }
-      }
-    }
-  }
-  return { home, away, str: `${home}:${away}` };
-}
-
 // What actually happened on the pitch, derived from the score.
 function actualOutcomeOf(score, market) {
   if (!score) return null;
@@ -518,7 +450,7 @@ function TicketDetails({ bet, onClose, onRemix, onShare }) {
               </div>
               <div className="td-summary-item">
                 <span className="td-summary-item-label">Total Odds</span>
-                <strong className="td-summary-item-value td-summary-odds">{totalOdds.toFixed(2)}</strong>
+                <strong className="td-summary-item-value td-summary-odds">{bet.mode === 'system' ? 'System' : totalOdds.toFixed(2)}</strong>
               </div>
               <div className="td-summary-item">
                 <span className="td-summary-item-label">Potential Win</span>
@@ -574,9 +506,7 @@ function TicketDetails({ bet, onClose, onRemix, onShare }) {
             {(bet.legs || []).map((leg, i) => {
               const res = legResult(i);
               const resolved = resolvedScore(i);
-              const score = resolved || (bet.status === 'open' || bet.status === 'void'
-                ? null
-                : fakeLegScore(bet, leg, i, res));
+              const score = resolved || null;
               const pick = PICK_LABEL[leg.outcome] || leg.outcome || '—';
               const market = leg.marketName || MARKET_LABEL[leg.market] || leg.market || '—';
 
@@ -702,6 +632,7 @@ export default function BetHistoryPage() {
   // reload without losing the user's intent. { [betId]: number }
   const [autoTargets, setAutoTargets] = useState(() => loadAutoTargets());
   const autoFiredRef = useRef({}); // dedupe so we only auto-fire once per bet.
+  const cashingOutRef = useRef({}); // lock: prevents concurrent cash-out attempts for the same bet
 
   // Confirmation dialog state for tapped cash-outs.
   const [confirmCashOut, setConfirmCashOut] = useState(null); // { id, amount, code, bet }
@@ -819,10 +750,11 @@ export default function BetHistoryPage() {
       const target = Number(autoTargets[b.id] || 0);
       if (target <= 0) continue;
       const cur = computeOffer(b);
-      if (cur >= target && !autoFiredRef.current[b.id]) {
+      if (cur >= target && !autoFiredRef.current[b.id] && !cashingOutRef.current[b.id]) {
         autoFiredRef.current[b.id] = true;
+        cashingOutRef.current[b.id] = true;
         toast(`Auto cash-out triggered at GHS ${fmt(cur)}.`);
-        performCashOut(b.id, cur);
+        performCashOut(b.id, cur).finally(() => { cashingOutRef.current[b.id] = false; });
       }
     }
   }, [openBets, autoTargets, performCashOut, toast]);
@@ -1078,7 +1010,7 @@ export default function BetHistoryPage() {
                   <div className="bh-stats">
                     <div className="bh-stat">
                       <span className="lbl">Total Odds</span>
-                      <strong>{Number(b.totalOdds || 0).toFixed(2)}</strong>
+                      <strong>{b.mode === 'system' ? 'System' : Number(b.totalOdds || 0).toFixed(2)}</strong>
                     </div>
                     <div className="bh-stat">
                       <span className="lbl">Stake</span>

@@ -10,11 +10,12 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { createStore } from '../../db/store.js';
-import { allUsers, getUserById, updateUser, logActivity } from '../../db/users.js';
+import { allUsers, getUserById, updateUser, adjustBalance, logActivity } from '../../db/users.js';
 import { requireAdmin, requireRole, audit } from '../../middleware/adminAuth.js';
 import { validate } from '../../middleware/validate.js';
 import { asyncHandler } from '../../utils/asyncHandler.js';
 import { badRequest, conflict, notFound } from '../../utils/httpError.js';
+import * as cashOutEngine from '../../services/cashOutEngine.js';
 
 const router = Router();
 
@@ -128,7 +129,7 @@ router.post('/:id/settle',
 
     let updatedUser = user;
     if (credit > 0) {
-      updatedUser = await updateUser(user.id, { balance: Number((user.balance + credit).toFixed(2)) });
+      updatedUser = await adjustBalance(user.id, credit, { allowNegative: true });
       pushTx(user.id, { kind: result === 'won' ? 'bet_won' : 'bet_void_refund', amount: credit, status: 'completed', balanceAfter: updatedUser.balance, ref: bet.id });
     }
     logActivity(user.id, { kind: `bet_${result}`, betId: bet.id, credit });
@@ -153,10 +154,11 @@ router.post('/:id/cancel',
     const refund = bet.status === 'open' ? bet.stake : 0;
     const updatedBet = { ...bet, status: 'cancelled', cancelledAt: new Date().toISOString(), cancelledBy: req.admin.email, cancelReason: req.body.reason };
     betsStore.set(bet.id, updatedBet);
+    cashOutEngine.unregisterBet(bet.id);
 
     let updatedUser = user;
     if (refund > 0) {
-      updatedUser = await updateUser(user.id, { balance: Number((user.balance + refund).toFixed(2)) });
+      updatedUser = await adjustBalance(user.id, refund, { allowNegative: true });
       pushTx(user.id, { kind: 'bet_cancel_refund', amount: refund, status: 'completed', balanceAfter: updatedUser.balance, ref: bet.id });
     }
     logActivity(user.id, { kind: 'bet_cancelled', betId: bet.id, refund });
@@ -252,7 +254,7 @@ router.post('/bulk',
           const updatedBet = { ...bet, status: r, settledAt: new Date().toISOString(), settledBy: req.admin.email, settleReason: reason || null, settledPayout: credit };
           betsStore.set(bet.id, updatedBet);
           if (credit > 0) {
-            const updatedUser = await updateUser(user.id, { balance: Number((user.balance + credit).toFixed(2)) });
+            const updatedUser = await adjustBalance(user.id, credit, { allowNegative: true });
             pushTx(user.id, { kind: r === 'won' ? 'bet_won' : 'bet_void_refund', amount: credit, status: 'completed', balanceAfter: updatedUser.balance, ref: bet.id });
           }
           logActivity(user.id, { kind: `bet_${r}`, betId: bet.id, credit });
@@ -265,8 +267,9 @@ router.post('/bulk',
           const refund = bet.status === 'open' ? bet.stake : 0;
           const updatedBet = { ...bet, status: 'cancelled', cancelledAt: new Date().toISOString(), cancelledBy: req.admin.email, cancelReason: reason || 'Bulk cancel' };
           betsStore.set(bet.id, updatedBet);
+          cashOutEngine.unregisterBet(bet.id);
           if (refund > 0) {
-            const updatedUser = await updateUser(user.id, { balance: Number((user.balance + refund).toFixed(2)) });
+            const updatedUser = await adjustBalance(user.id, refund, { allowNegative: true });
             pushTx(user.id, { kind: 'bet_cancel_refund', amount: refund, status: 'completed', balanceAfter: updatedUser.balance, ref: bet.id });
           }
           logActivity(user.id, { kind: 'bet_cancelled', betId: bet.id, refund });

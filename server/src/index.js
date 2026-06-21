@@ -137,6 +137,27 @@ async function boot() {
   // synchronous get/set in route handlers is safe.
   await initStores();
 
+  // Re-register open bets in the cash-out engine so offers work after restart.
+  try {
+    const { createStore } = await import('./db/store.js');
+    const { registerBet } = await import('./services/cashOutEngine.js');
+    const betsStore = createStore('bets', {});
+    for (const bet of Object.values(betsStore.all() || {})) {
+      if (bet.status === 'open') registerBet(bet);
+    }
+  } catch (e) {
+    log.warn('Could not rebuild cash-out engine state:', e.message);
+  }
+
+  // Sweep expired refresh tokens every 15 minutes.
+  try {
+    const { sweepExpiredTokens } = await import('./services/token.js');
+    await sweepExpiredTokens(); // immediate first pass
+    setInterval(() => sweepExpiredTokens().catch((e) => log.warn('token sweep error:', e.message)), 15 * 60_000);
+  } catch (e) {
+    log.warn('Could not start token sweep:', e.message);
+  }
+
   // Seed one super admin from env vars if no admins exist (dev only).
   if (!isProd) {
     const { seedAdmins } = await import('./db/seedAdmins.js');
@@ -150,6 +171,10 @@ async function boot() {
     startSettlementLoop();
     startAggregator();
     startLiveTrack();
+    // Jackpot settlement tick.
+    const { settleJackpotEntries } = await import('./routes/bet.js');
+    settleJackpotEntries().catch(() => {});
+    setInterval(() => settleJackpotEntries().catch((e) => log.warn('jackpot settle error:', e.message)), 60_000);
   } catch (e) {
     log.error('post-boot error', e?.message || e);
   }

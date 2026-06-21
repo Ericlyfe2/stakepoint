@@ -15,8 +15,9 @@ if (SMTP.enabled) {
 
 export async function sendMail({ to, subject, text, html }) {
   if (!transporter) {
-    // Dev fallback — print so OTPs are visible during development.
-    log.info(`[email-dev] To: ${to}\n  Subject: ${subject}\n  Body: ${text}`);
+    // Dev fallback — log only masked info, never the full OTP.
+    const masked = String(text || '').replace(/\d{6,}/g, (m) => m.slice(0, 2) + '••••' + m.slice(-1));
+    log.info(`[email-dev] To: ${to}\n  Subject: ${subject}\n  Body: ${masked}`);
     return { dev: true };
   }
   const info = await transporter.sendMail({ from: SMTP.from, to, subject, text, html });

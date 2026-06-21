@@ -36,10 +36,11 @@ import { log } from '../../utils/logger.js';
 
 const router = Router();
 
-// Brute-force tracker — { 'email': { attempts, lockedUntil } }
+// Brute-force tracker — { 'email': { attempts, lockedUntil, lockoutCount } }
 const bruteStore = createStore('admin_brute', {});
 const LOCKOUT_AFTER = 5;
 const LOCKOUT_MS = 15 * 60 * 1000;
+const MAX_LOCKOUTS = 3; // after 3 lockout cycles the admin is permanently suspended
 
 const loginSchema = z.object({
   email: z.string().trim().toLowerCase().email(),
@@ -49,9 +50,10 @@ const loginSchema = z.object({
 
 function clearBrute(email) { bruteStore.delete(email); }
 function bumpBrute(email) {
-  const rec = bruteStore.get(email) || { attempts: 0, lockedUntil: 0 };
+  const rec = bruteStore.get(email) || { attempts: 0, lockedUntil: 0, lockoutCount: 0 };
   rec.attempts = (rec.attempts || 0) + 1;
   if (rec.attempts >= LOCKOUT_AFTER) {
+    rec.lockoutCount = (rec.lockoutCount || 0) + 1;
     rec.lockedUntil = Date.now() + LOCKOUT_MS;
     rec.attempts = 0;
   }
@@ -97,7 +99,12 @@ router.post('/login',
 
     const user = findByEmail(email);
     if (!user || user.role !== 'admin' || !user.passwordHash) {
-      bumpBrute(email);
+      const rec = bumpBrute(email);
+      // Permanently suspend after MAX_LOCKOUTS lockout cycles.
+      if (rec.lockoutCount >= MAX_LOCKOUTS && user && user.role === 'admin') {
+        await updateUser(user.id, { suspended: true, suspendedAt: new Date().toISOString(), suspendedBy: 'system:brute-force', suspendReason: `Permanent lock after ${MAX_LOCKOUTS} lockout cycles` });
+        audit(req, { actorId: user.id, action: 'admin.login.permanent_lock', severity: 'critical', meta: { email, lockoutCount: rec.lockoutCount } });
+      }
       throw unauthorized('Invalid admin credentials.');
     }
     if (user.suspended) {
@@ -106,9 +113,14 @@ router.post('/login',
     }
     const ok = await verifyPassword(password, user.passwordHash);
     if (!ok) {
-      bumpBrute(email);
+      const rec = bumpBrute(email);
       audit(req, { actorId: user.id, action: 'admin.login.failed', severity: 'warning', meta: { email } });
       logActivity(user.id, { kind: 'admin_login_failed', ip: req.ip });
+      // Permanently suspend after MAX_LOCKOUTS lockout cycles.
+      if (rec.lockoutCount >= MAX_LOCKOUTS) {
+        await updateUser(user.id, { suspended: true, suspendedAt: new Date().toISOString(), suspendedBy: 'system:brute-force', suspendReason: `Permanent lock after ${MAX_LOCKOUTS} lockout cycles` });
+        audit(req, { actorId: user.id, action: 'admin.login.permanent_lock', severity: 'critical', meta: { email, lockoutCount: rec.lockoutCount } });
+      }
       throw unauthorized('Invalid admin credentials.');
     }
 

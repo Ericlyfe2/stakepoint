@@ -17,19 +17,21 @@ import {
 import {
   adminLookupSelection, adminLookupFixture, buildPublicSnapshot,
 } from '../db/sportsAdmin.js';
-import { listActivePromotions } from '../db/promotions.js';
+import { listActivePromotions, getPromotion } from '../db/promotions.js';
 import { oddsApiStatus } from '../services/oddsApi.js';
 import { createStore } from '../db/store.js';
 import { requireAuth, optionalAuth } from '../middleware/auth.js';
 import { validate } from '../middleware/validate.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { badRequest, conflict, notFound, unauthorized } from '../utils/httpError.js';
-import { updateUser, logActivity } from '../db/users.js';
+import { updateUser, adjustBalance, logActivity } from '../db/users.js';
 import { pushTx } from './wallet.js';
 import { emitAdmin, emitToUser } from '../services/realtime.js';
 import { SYSTEM_TYPES, maxSystemReturn } from '../lib/systemBets.js';
 import * as cashOutEngine from '../services/cashOutEngine.js';
 import { LIVE_BETTING } from '../config/env.js';
+
+const MIN_STAKE = Number(process.env.MIN_STAKE) || 2; // GHS 2 min (configurable via env)
 
 const router = Router();
 
@@ -43,22 +45,21 @@ function generateBookingCode() {
   return letters + digits;
 }
 
-function uniqueBookingCode() {
-  const all = betsStore.all();
-  for (let i = 0; i < 25; i++) {
+async function uniqueBookingCode() {
+  for (let i = 0; i < 50; i++) {
     const code = generateBookingCode();
-    const taken = Object.values(all).some((b) => b.bookingCode === code);
-    if (!taken) return code;
+    const found = Object.values(betsStore.all()).some((b) => b.bookingCode === code);
+    if (!found) return code;
   }
-  // 7-char namespace is huge; this is just paranoia.
   return generateBookingCode() + Math.floor(Math.random() * 9 + 1);
 }
 
 const betsStore        = createStore('bets', {});         // { betId: receipt }
 const jackpotStore     = createStore('jackpot_entries', {});
+const promoUsageStore  = createStore('promo_usage', {});  // { userId: [{ promoId, usedAt }] }
 
-function pushBet(receipt) {
-  betsStore.set(receipt.id, receipt);
+async function pushBet(receipt) {
+  await betsStore.setCritical(receipt.id, receipt);
 }
 function listUserBets(userId) {
   return Object.values(betsStore.all())
@@ -98,6 +99,7 @@ const placeSchema = z.object({
     outcome: z.string().min(1),
     odds:    z.union([z.number(), z.string()]).transform((v) => Number(v)),
   })).min(1, 'Add at least one selection.'),
+  promoId: z.string().optional(),
 });
 
 const jackpotEnterSchema = z.object({
@@ -309,15 +311,37 @@ router.post('/place',
       potentialWin = totalStake * totalOdds * (1 + BONUS_RATE);
     }
 
-    if (totalStake < 300) {
-      return res.json({ success: false, error: `Minimum stake is GHS 300. This ticket requires only GHS ${totalStake.toFixed(2)}.` });
+    if (totalStake < MIN_STAKE) {
+      return res.json({ success: false, error: `Minimum stake is GHS ${MIN_STAKE}. This ticket requires GHS ${totalStake.toFixed(2)}.` });
     }
     if (totalStake > user.balance) {
       return res.json({ success: false, error: `Insufficient balance. This ticket requires GHS ${totalStake.toFixed(2)} (your balance is GHS ${user.balance.toFixed(2)}).` });
     }
 
+    // Resolve bonus rate — optional promo overrides the env default.
+    let appliedBonusRate = BONUS_RATE;
+    let appliedPromoId = null;
+    if (req.body.promoId) {
+      const promo = getPromotion(req.body.promoId);
+      if (!promo || !promo.active) {
+        return res.json({ success: false, error: 'Promotion not found or inactive.', code: 'PROMO_INVALID' });
+      }
+      // Check per‑user cap.
+      if (promo.capPerUser > 0) {
+        const usage = promoUsageStore.get(user.id) || [];
+        const used = usage.filter((u) => u.promoId === promo.id).length;
+        if (used >= promo.capPerUser) {
+          return res.json({ success: false, error: 'Promotion already used the maximum number of times.', code: 'PROMO_EXHAUSTED' });
+        }
+      }
+      appliedBonusRate = promo.bonusRate ?? BONUS_RATE;
+      appliedPromoId = promo.id;
+    }
+    // Re‑compute potentialWin with the (possibly promo‑overridden) rate.
+    potentialWin = Number((totalStake * totalOdds * (1 + appliedBonusRate)).toFixed(2));
+
     const id = `bv-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-    const bookingCode = uniqueBookingCode();
+    const bookingCode = await uniqueBookingCode();
     const receipt = {
       id,
       bookingCode,
@@ -328,7 +352,8 @@ router.post('/place',
       currency: CURRENCY,
       totalOdds: Number(totalOdds.toFixed(4)),
       potentialWin: Number(potentialWin.toFixed(2)),
-      bonusRate: BONUS_RATE,
+      bonusRate: appliedBonusRate,
+      ...(appliedPromoId && { promoId: appliedPromoId }),
       legs: normalized,
       status: 'open',
       lastCashOutOffer: null,
@@ -340,12 +365,18 @@ router.post('/place',
         stakePerLine,
       }),
     };
-    pushBet(receipt);
+    await pushBet(receipt);
 
     // Index this bet so live ticks can recompute its cash-out offer.
     cashOutEngine.registerBet(receipt);
 
-    const updated = await updateUser(user.id, { balance: Number((user.balance - totalStake).toFixed(2)) });
+    // Record promo usage so capPerUser is enforced.
+    if (appliedPromoId) {
+      const usage = promoUsageStore.get(user.id) || [];
+      promoUsageStore.set(user.id, [...usage, { promoId: appliedPromoId, usedAt: new Date().toISOString(), betId: id }]);
+    }
+
+    const updated = await adjustBalance(user.id, -totalStake);
     pushTx(user.id, {
       kind: 'bet_placed', amount: -totalStake, status: 'completed',
       balanceAfter: updated.balance, ref: id,
@@ -463,7 +494,7 @@ router.delete('/bets/:id',
       residual = {
         ...bet,
         id: newId,
-        bookingCode: uniqueBookingCode(),
+        bookingCode: await uniqueBookingCode(),
         placedAt: new Date().toISOString(),
         parentBetId: bet.id,
         stake: residualStake,
@@ -477,13 +508,11 @@ router.delete('/bets/:id',
       };
       bet.residualBetId = newId;
       betsStore.set(bet.id, bet);
-      pushBet(residual);
+      await pushBet(residual);
       cashOutEngine.registerBet(residual);
     }
 
-    const updated = await updateUser(req.user.id, {
-      balance: Number((req.user.balance + cashedPortion).toFixed(2)),
-    });
+    const updated = await adjustBalance(req.user.id, cashedPortion);
     pushTx(req.user.id, {
       kind: fraction < 1 ? 'cash_out_partial' : 'cash_out',
       amount: cashedPortion,
@@ -533,11 +562,10 @@ router.post('/jackpot/enter',
     const entry = {
       id, userId: user.id, placedAt: new Date().toISOString(),
       fee: JACKPOT_GAME.entryFee, currency: CURRENCY, picks, drawsIn: JACKPOT_GAME.drawsIn,
+      status: 'pending', // pending | won | lost | void
     };
     jackpotStore.set(id, entry);
-    const updated = await updateUser(user.id, {
-      balance: Number((user.balance - JACKPOT_GAME.entryFee).toFixed(2)),
-    });
+    const updated = await adjustBalance(user.id, -JACKPOT_GAME.entryFee);
     pushTx(user.id, { kind: 'jackpot_entry', amount: -JACKPOT_GAME.entryFee, status: 'completed', balanceAfter: updated.balance, ref: id });
     logActivity(user.id, { kind: 'jackpot_entry', entryId: id });
     res.status(201).json({ ok: true, entry, account: { ...updated, passwordHash: undefined, googleId: undefined, activity: undefined } });
@@ -557,5 +585,67 @@ cashOutEngine.onOffer((bet, payload) => {
   fresh.cashOutHistory = [...(fresh.cashOutHistory || []).slice(-19), { ts: payload.ts, amount: payload.cashOut }];
   betsStore.set(fresh.id, fresh);
 });
+
+/* ------------ Jackpot settlement ------------ */
+
+const JACKPOT_SETTLE_INTERVAL_MS = 60_000;
+
+/**
+ * Periodically settles jackpot entries whose draw deadline has passed.
+ * For now, entries with expired `drawsIn` but no matching real fixture
+ * results are marked `pending_admin` so an admin can manually resolve them.
+ */
+export async function settleJackpotEntries() {
+  const now = Date.now();
+  let settled = 0;
+  for (const entry of Object.values(jackpotStore.all() || {})) {
+    if (entry.status !== 'pending') continue;
+    // drawsIn is a human-readable string like "4d 12h 32m" — parse it as
+    // a deadline relative to placedAt.
+    const deadlineMs = parseDuration(entry.drawsIn);
+    if (!deadlineMs) continue;
+    const deadline = new Date(entry.placedAt).getTime() + deadlineMs;
+    if (now < deadline) continue; // not yet due
+
+    // Try to look up real fixture results for each leg.
+    let allResolved = true;
+    let allCorrect = true;
+    for (const leg of JACKPOT_GAME.legs) {
+      const pick = entry.picks[leg.id];
+      // For pure-virtual jackpots with no results feed, we can't
+      // auto-settle — mark for admin review.
+      allResolved = false;
+      break;
+    }
+
+    if (!allResolved) {
+      jackpotStore.set(entry.id, { ...entry, status: 'pending_admin' });
+    } else {
+      const status = allCorrect ? 'won' : 'lost';
+      jackpotStore.set(entry.id, { ...entry, status, settledAt: new Date().toISOString() });
+      if (status === 'won') {
+        // Proportional pool split — simplified: full pool split among all winners.
+        const winners = Object.values(jackpotStore.all() || {}).filter((e) => e.status === 'won');
+        const share = Math.floor(JACKPOT_GAME.pool / (winners.length || 1));
+        const updated = await adjustBalance(entry.userId, share, { allowNegative: true });
+        pushTx(entry.userId, { kind: 'jackpot_won', amount: share, status: 'completed', balanceAfter: updated.balance, ref: entry.id });
+        logActivity(entry.userId, { kind: 'jackpot_won', entryId: entry.id, share });
+      }
+      settled++;
+    }
+  }
+  return { settled };
+}
+
+/** Parse a human-readable duration like "4d 12h 32m" into milliseconds. */
+function parseDuration(str) {
+  if (!str) return 0;
+  const m = /^(?:(\d+)d)?\s*(?:(\d+)h)?\s*(?:(\d+)m)?$/.exec(String(str).trim());
+  if (!m) return 0;
+  const d = parseInt(m[1] || '0', 10);
+  const h = parseInt(m[2] || '0', 10);
+  const min = parseInt(m[3] || '0', 10);
+  return ((d * 24 + h) * 60 + min) * 60_000;
+}
 
 export default router;

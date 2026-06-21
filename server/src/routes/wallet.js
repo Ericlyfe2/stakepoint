@@ -4,7 +4,7 @@ import { requireAuth } from '../middleware/auth.js';
 import { validate } from '../middleware/validate.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { badRequest } from '../utils/httpError.js';
-import { updateUser, logActivity } from '../db/users.js';
+import { updateUser, adjustBalance, logActivity } from '../db/users.js';
 import { createStore } from '../db/store.js';
 import { emitToUser, emitAdmin } from '../services/realtime.js';
 
@@ -51,7 +51,11 @@ function pushTx(userId, tx) {
 const router = Router();
 
 router.get('/transactions', requireAuth, (req, res) => {
-  res.json({ transactions: txStore.get(req.user.id) || [] });
+  const all = txStore.get(req.user.id) || [];
+  const offset = Math.max(0, parseInt(req.query.offset, 10) || 0);
+  const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 20));
+  const page = all.slice(offset, offset + limit);
+  res.json({ transactions: page, total: all.length, offset, limit });
 });
 
 router.get('/rules', requireAuth, (req, res) => {
@@ -79,6 +83,15 @@ router.post('/withdraw', requireAuth, validate(withdrawSchema), asyncHandler(asy
   const { amount, method = 'momo' } = req.body;
   const user = req.user;
 
+  // Require email verification before any withdrawal.
+  if (!user.emailVerified) throw badRequest('Verify your email before making a withdrawal.');
+
+  // Stage-based minimum withdrawal (enforced server-side).
+  const stageMinWithdraw = { 0: MIN_WITHDRAW, 1: 500, 2: 300, 3: 200, 4: 100 }[user.stage ?? 0] ?? MIN_WITHDRAW;
+  if (amount < stageMinWithdraw) {
+    throw badRequest(`Minimum withdrawal for your stage is GHS ${stageMinWithdraw.toLocaleString('en-US')}.`);
+  }
+
   const required = Number((amount * WITHDRAW_DEPOSIT_RATIO).toFixed(2));
   const totalDeposited = Number(user.totalDeposited || 0);
   if (totalDeposited < required) {
@@ -89,7 +102,7 @@ router.post('/withdraw', requireAuth, validate(withdrawSchema), asyncHandler(asy
   }
   if (amount > user.balance) throw badRequest('Insufficient balance.');
 
-  const updated = await updateUser(user.id, { balance: Number((user.balance - amount).toFixed(2)) });
+  const updated = await adjustBalance(user.id, -amount);
   const tx = pushTx(user.id, { kind: 'withdraw', amount, method, status: 'completed', balanceAfter: updated.balance });
   logActivity(user.id, { kind: 'withdraw', amount, method });
   emitToUser(user.id, 'wallet:update', { balance: updated.balance, delta: -amount, reason: 'withdraw', method });

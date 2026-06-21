@@ -3,9 +3,8 @@ import { z } from 'zod';
 import { requireAuth } from '../middleware/auth.js';
 import { validate } from '../middleware/validate.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
-import { updateUser, publicUser, logActivity } from '../db/users.js';
-
-const router = Router();
+import { updateUser, publicUser, findByReferralCode, countReferred, logActivity } from '../db/users.js';
+import { badRequest, notFound } from '../utils/httpError.js';
 
 // Ghana mobile or full international format. Allow an empty string so the
 // user can clear the field; we'll normalise to null below.
@@ -42,5 +41,24 @@ router.patch('/', requireAuth, validate(profileSchema), asyncHandler(async (req,
   logActivity(req.user.id, { kind: 'profile_update' });
   res.json({ account: publicUser(updated) });
 }));
+
+/** Claim a referral code (sets referredBy on the claiming user). */
+router.post('/referral/claim', requireAuth, validate(z.object({ code: z.string().trim().min(4).max(20) })), asyncHandler(async (req, res) => {
+  const referrer = findByReferralCode(req.body.code);
+  if (!referrer) throw notFound('Invalid referral code.');
+  if (referrer.id === req.user.id) throw badRequest('Cannot refer yourself.');
+  const user = req.user;
+  if (user.referredBy) throw badRequest('Referral already claimed.');
+  await updateUser(user.id, { referredBy: referrer.id });
+  logActivity(user.id, { kind: 'referral_claimed', referrerId: referrer.id });
+  res.json({ ok: true, message: 'Referral applied!' });
+}));
+
+/** Get the current user's referral code and stats. */
+router.get('/referral', requireAuth, (req, res) => {
+  const code = req.user.referralCode || null;
+  const totalReferred = countReferred(req.user.id);
+  res.json({ code, totalReferred });
+});
 
 export default router;

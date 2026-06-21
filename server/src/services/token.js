@@ -84,6 +84,20 @@ export function revokeAllForAccount(accountId) {
   }
 }
 
+/** Sweep expired / revoked tokens to prevent store bloat. */
+export async function sweepExpiredTokens() {
+  const now = Date.now();
+  let removed = 0;
+  const entries = refreshStore.list();
+  for (const r of entries) {
+    if (r.revokedAt || new Date(r.expiresAt).getTime() < now) {
+      await refreshStore.deleteCritical(r.id);
+      removed++;
+    }
+  }
+  return removed;
+}
+
 function hashToken(token) {
   return crypto.createHash('sha256').update(token).digest('hex');
 }
