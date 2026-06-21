@@ -129,7 +129,7 @@ if (isProd) {
       res.sendFile(path.join(dist, 'index.html'), (err) => err && next(err));
     });
   } catch {
-    logger.warn(`client/dist not found at ${dist} — skipping client serving`);
+    log.warn(`client/dist not found at ${dist} — skipping client serving`);
   }
 }
 
