@@ -434,4 +434,31 @@ router.post('/:id/impersonate',
   })
 );
 
+/* ─── Super admin: delete ALL non-admin users ─── */
+router.post('/delete-all',
+  requireAdmin, requireRole(),
+  validate(z.object({ reason: z.string().max(500).optional() }).optional()),
+  asyncHandler(async (req, res) => {
+    const all = allUsers().filter((u) => u.role !== 'admin');
+    const ids = all.map((u) => u.id);
+    let removedBets = 0;
+    for (const u of all) {
+      revokeAllForAccount(u.id);
+      const allBets = betsStore.all() || {};
+      for (const [id, b] of Object.entries(allBets)) {
+        if (b.userId === u.id) { betsStore.delete(id); removedBets++; }
+      }
+      txStore.delete(u.id);
+      deleteUser(u.id);
+    }
+    audit(req, {
+      action: 'user.delete_all',
+      targetType: 'user',
+      severity: 'critical',
+      meta: { count: ids.length, reason: req.body?.reason },
+    });
+    res.json({ ok: true, deleted: ids.length, removedBets });
+  })
+);
+
 export default router;

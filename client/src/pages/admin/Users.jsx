@@ -14,6 +14,7 @@ import {
   adminListUsers, adminGetUser, adminUserBets, adminUserTx, adminUserLogins,
   adminUserStatus, adminUserKyc, adminUserWallet, adminUserTags, adminUserNotes,
   adminUserReset, adminImpersonate, adminDeleteUser, adminBulkDeleteUsers,
+  adminDeleteAllUsers,
   adminCreateUser, adminUserCredentials,
   adminUserStage, adminUserBlocked,
 } from '../../api/adminApi.js';
@@ -68,6 +69,7 @@ export default function UsersPage() {
   const [picked, setPicked] = useState(new Set()); // user ids ticked for bulk action
   const [bulkOpen, setBulkOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
+  const [deleteAllOpen, setDeleteAllOpen] = useState(false);
   const debounceRef = useRef(0);
   const isSuper = hasRole();
 
@@ -135,6 +137,18 @@ export default function UsersPage() {
     }
   }
 
+  async function deleteAll(reason) {
+    try {
+      const r = await adminDeleteAllUsers(reason);
+      showToast(`Deleted ${r.deleted} users and ${r.removedBets} bets.`);
+      setDeleteAllOpen(false);
+      setPicked(new Set());
+      load();
+    } catch (e) {
+      showToast(e.message || 'Delete all failed', 'error');
+    }
+  }
+
   function exportCsv() {
     if (!data?.users?.length) return;
     const headers = ['id', 'email', 'displayName', 'balance', 'kycStatus', 'suspended', 'createdAt'];
@@ -160,6 +174,9 @@ export default function UsersPage() {
           <button className="adm-btn" onClick={exportCsv}><IconDownload size={14} /> Export CSV</button>
           {isSuper && (
             <button className="adm-btn primary" onClick={() => setCreateOpen(true)}><IconUsers size={14} /> Add user</button>
+          )}
+          {isSuper && data?.total > 0 && (
+            <button className="adm-btn danger" onClick={() => setDeleteAllOpen(true)}><IconTrash size={14} /> Delete all</button>
           )}
         </div>
       </header>
@@ -332,6 +349,13 @@ export default function UsersPage() {
         }}
         showToast={showToast}
       />
+
+      <DeleteAllModal
+        open={deleteAllOpen}
+        count={data?.total || 0}
+        onClose={() => setDeleteAllOpen(false)}
+        onConfirm={deleteAll}
+      />
     </>
   );
 }
@@ -443,6 +467,55 @@ function BulkDeleteModal({ open, count, onClose, onConfirm }) {
           <button type="button" className="adm-btn ghost" onClick={onClose}>Cancel</button>
           <button type="submit" className="adm-btn danger" disabled={!ready}>
             <IconTrash size={14} /> Permanently delete
+          </button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
+function DeleteAllModal({ open, count, onClose, onConfirm }) {
+  const [reason, setReason] = useState('');
+  const [confirmText, setConfirmText] = useState('');
+  useEffect(() => { if (open) { setReason(''); setConfirmText(''); } }, [open]);
+  const phrase = `delete all ${count}`;
+  const ready = confirmText.trim().toLowerCase() === phrase;
+  return (
+    <Modal
+      open={open}
+      onClose={onClose}
+      title={`⚠ Permanently delete ALL ${count} users?`}
+      description="This removes EVERY user record, bet history, and transaction ledger. All sessions are revoked. This action is logged as critical in the audit log and CANNOT BE UNDONE."
+      footer={null}
+    >
+      <form
+        onSubmit={(e) => { e.preventDefault(); if (ready) onConfirm(reason || 'delete all'); }}
+        style={{ display: 'flex', flexDirection: 'column', gap: 12 }}
+      >
+        <div className="adm-field">
+          <label>Reason (recorded in audit log)</label>
+          <input
+            className="adm-input"
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            placeholder="e.g. test data cleanup, platform reset"
+            maxLength={500}
+            autoFocus
+          />
+        </div>
+        <div className="adm-field">
+          <label>Type <code style={{ fontFamily: 'var(--ff-mono)', background: 'var(--surface-soft, rgba(255,255,255,.05))', padding: '1px 6px', borderRadius: 4 }}>{phrase}</code> to confirm</label>
+          <input
+            className="adm-input"
+            value={confirmText}
+            onChange={(e) => setConfirmText(e.target.value)}
+            placeholder={phrase}
+          />
+        </div>
+        <div className="adm-modal-actions">
+          <button type="button" className="adm-btn ghost" onClick={onClose}>Cancel</button>
+          <button type="submit" className="adm-btn danger" disabled={!ready}>
+            <IconTrash size={14} /> Wipe all users
           </button>
         </div>
       </form>
