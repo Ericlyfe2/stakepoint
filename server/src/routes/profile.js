@@ -6,6 +6,8 @@ import { asyncHandler } from '../utils/asyncHandler.js';
 import { updateUser, publicUser, findByReferralCode, countReferred, logActivity } from '../db/users.js';
 import { badRequest, notFound } from '../utils/httpError.js';
 
+const router = Router();
+
 // Ghana mobile or full international format. Allow an empty string so the
 // user can clear the field; we'll normalise to null below.
 const phoneSchema = z.string().trim()
