@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import http from 'http';
+import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -120,11 +121,16 @@ app.use('/api', notFoundHandler);
 
 if (isProd) {
   const dist = path.join(__dirname, '../../client/dist');
-  app.use(express.static(dist));
-  app.get('*', (req, res, next) => {
-    if (req.path.startsWith('/api')) return next();
-    res.sendFile(path.join(dist, 'index.html'), (err) => err && next(err));
-  });
+  try {
+    fs.accessSync(dist, fs.constants.R_OK);
+    app.use(express.static(dist));
+    app.get('*', (req, res, next) => {
+      if (req.path.startsWith('/api')) return next();
+      res.sendFile(path.join(dist, 'index.html'), (err) => err && next(err));
+    });
+  } catch {
+    logger.warn(`client/dist not found at ${dist} — skipping client serving`);
+  }
 }
 
 app.use(errorHandler);
