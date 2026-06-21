@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { fetchMatches, fetchBetByCode } from '../api/betApi.js';
-import { useToast, useAccount } from '../layout/AppShell.jsx';
+import { useToast, useAccount } from '../providers/AccountProvider.jsx';
 import OddsGauge from '../components/OddsGauge.jsx';
 
 function formatAmt(n) {

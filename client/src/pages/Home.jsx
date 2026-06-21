@@ -9,6 +9,7 @@ import { useToast, useAccount } from '../layout/AppShell.jsx';
 import BetSuccessModal, { toBookingCode } from '../components/BetSuccessModal.jsx';
 import OddsGauge from '../components/OddsGauge.jsx';
 import NumericKeypad from '../components/NumericKeypad.jsx';
+import { saveRecentCode } from '../components/GlobalFAB.jsx';
 import { useFavouriteLeagues } from '../hooks/useFavourites.js';
 import { onLive, subscribeSports, unsubscribeSports } from '../api/socketClient.js';
 import {
@@ -259,6 +260,39 @@ export default function Home({ initialChip }) {
     if (slipOpen) setSlipErr(''); // clear error when reopening
   }, [slipOpen]);
 
+  // Listen for GlobalFAB events
+  useEffect(() => {
+    const onOpenSlip = () => setSlipOpen(true);
+    const onLoadCode = (e) => {
+      const { code: c, bet } = e.detail || {};
+      if (!bet?.legs?.length) return;
+      const hydrated = bet.legs.map((l, i) => ({
+        id: `sel-${Date.now()}-${i}`,
+        matchId: l.matchId,
+        market: l.market,
+        outcome: l.outcome,
+        odds: l.odds,
+        pickLabel: pickLabel(l.market, l.outcome, { home: l.home, away: l.away }),
+        marketLabel: l.marketName || `${l.market} · ${l.outcome}`,
+        meta: `${l.home} vs ${l.away}`,
+        home: l.home,
+        away: l.away,
+        trend: null,
+      }));
+      setSelections(hydrated);
+      setBetMode(hydrated.length === 1 ? 'single' : 'multiple');
+      setSlipOpen(true);
+      setSlipErr('');
+      if (c) saveRecentCode(c);
+    };
+    window.addEventListener('xenbet:open-slip', onOpenSlip);
+    window.addEventListener('xenbet:load-code', onLoadCode);
+    return () => {
+      window.removeEventListener('xenbet:open-slip', onOpenSlip);
+      window.removeEventListener('xenbet:load-code', onLoadCode);
+    };
+  }, []);
+
   const upsertSelection = useCallback((row) => {
     setSelections((prev) => {
       // Dedupe by (matchId, market, outcome) so the same odd can't appear
@@ -398,6 +432,15 @@ export default function Home({ initialChip }) {
     return stakePerLine * totalOdds * (1 + BONUS);
   }, [selections, stakePerLine, totalOdds, betMode, systemDef, systemType]);
 
+  // Broadcast slip state to GlobalFAB
+  useEffect(() => {
+    window.dispatchEvent(
+      new CustomEvent('xenbet:slip-update', {
+        detail: { count: selections.length, odds: totalOdds },
+      }),
+    );
+  }, [selections.length, totalOdds]);
+
   // Hydrate a booking code into the live slip — looks up the legs and replaces
   // the current selection list, then opens the slip.
   const loadFromCode = useCallback(async (rawCode) => {
@@ -475,6 +518,7 @@ export default function Home({ initialChip }) {
       setSelections([]);
       setSlipOpen(false);
       setSuccessBet(res.bet);
+      window.dispatchEvent(new CustomEvent('xenbet:bet-placed'));
     } catch (e) {
       // Revert optimistic update on failure
       adjustBalance(cost);

@@ -4,6 +4,7 @@ import { useAccount } from '../providers/AccountProvider.jsx';
 import { useTheme } from '../providers/ThemeProvider.jsx';
 import { fetchMatches } from '../api/betApi.js';
 import NotificationBell from '../components/NotificationBell.jsx';
+import GlobalFAB from '../components/GlobalFAB.jsx';
 export { useAccount, useToast } from '../providers/AccountProvider.jsx';
 
 function formatAmt(n) {
@@ -400,6 +401,7 @@ export default function AppShell() {
       </footer>
 
       <BottomNav openCount={openCount} />
+      <GlobalFAB />
 
       {/* === global search modal === */}
       <dialog ref={searchDlg} className="bv-dialog search-dialog">

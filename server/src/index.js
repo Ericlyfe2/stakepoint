@@ -31,6 +31,7 @@ import adminDepositsRouter  from './routes/admin/deposits.js';
 import adminSettingsRouter  from './routes/admin/settings.js';
 import adminSupportRouter   from './routes/admin/support.js';
 import { initStores } from './db/store.js';
+import { rebuildEmailIndex } from './db/users.js';
 import { getSettings } from './db/settings.js';
 import { PROMOTIONS } from './matchesData.js';
 import { startSettlementLoop } from './services/settlement.js';
@@ -142,6 +143,7 @@ async function boot() {
   // Load every KV store (Postgres or JSON files) into memory so that
   // synchronous get/set in route handlers is safe.
   await initStores();
+  rebuildEmailIndex();
 
   // Re-register open bets in the cash-out engine so offers work after restart.
   try {

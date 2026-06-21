@@ -48,8 +48,14 @@ export async function withUserLock(id, fn) {
  */
 const emailIndex = createStore('user_email_index', {});
 
-// One-time migration: populate email index for legacy users (keyed by email)
+// One-time migration: rebuild email index for any user missing from it.
+// Covers both legacy email-keyed users AND UUID-keyed users whose index
+// entries were lost (e.g. before the JSON.stringify fix for primitives).
 let migrationDone = false;
+export function rebuildEmailIndex() {
+  migrationDone = false;
+  migrateLegacyUsers();
+}
 function migrateLegacyUsers() {
   if (migrationDone) return;
   migrationDone = true;
@@ -57,17 +63,16 @@ function migrateLegacyUsers() {
     const all = users.all();
     if (!all || typeof all !== 'object') return;
     let migrated = 0;
-    for (const [key, u] of Object.entries(all)) {
-      if (!u || !u.email) continue;
+    for (const [, u] of Object.entries(all)) {
+      if (!u || !u.email || !u.id) continue;
       const normEmail = u.email.toLowerCase().trim();
-      // Check if this entry is keyed by email (legacy) or by UUID
-      if (key === normEmail && !emailIndex.get(normEmail)) {
+      if (!emailIndex.get(normEmail)) {
         emailIndex.set(normEmail, u.id);
         migrated++;
       }
     }
     if (migrated > 0) {
-      log.info(`Migrated ${migrated} legacy user entries to email index.`);
+      log.info(`Rebuilt email index for ${migrated} users.`);
     }
   } catch { /* best-effort migration */ }
 }
