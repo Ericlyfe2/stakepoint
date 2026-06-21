@@ -1,7 +1,6 @@
-// components/BetSuccessModal.jsx
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import OddsGauge from './OddsGauge.jsx';
 
-// Fallback derivation for older receipts that pre-date server-side codes.
 export function toBookingCode(id = '') {
   const s = String(id).replace(/[^a-z0-9]/gi, '').toUpperCase();
   if (!s) return 'XX00000';
@@ -14,12 +13,14 @@ function formatAmt(n) {
   return Number(n || 0).toLocaleString('en-GH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-export default function BetSuccessModal({ bet, onClose, onRebet, onConfirm }) {
+export default function BetSuccessModal({ bet, onClose, onRebet, onConfirm, recommendedCodes = [] }) {
   const dlg = useRef(null);
+  const [showWin, setShowWin] = useState(false);
 
   useEffect(() => {
     if (!bet || !dlg.current) return;
     if (!dlg.current.open) dlg.current.showModal();
+    setShowWin(false);
   }, [bet]);
 
   if (!bet) return null;
@@ -29,95 +30,152 @@ export default function BetSuccessModal({ bet, onClose, onRebet, onConfirm }) {
     try { await navigator.clipboard.writeText(code); } catch {/* ignore */}
   };
 
+  const totalOdds = bet.legs?.reduce((acc, l) => acc * (l.odds || 1), 1) || bet.totalOdds || 0;
+
   return (
     <dialog
       ref={dlg}
-      className="bv-dialog success-dlg"
+      className="bet-success-dialog"
       onClose={onClose}
-      style={{ 
-        maxWidth: 360, 
-        padding: '32px 24px 24px', 
-        border: 'none', 
-        borderRadius: 24, 
-        background: '#ffffff', 
-        color: '#000000',
-        boxShadow: '0 10px 40px rgba(0,0,0,0.2)'
-      }}
     >
-      <div style={{ textAlign: 'center', marginBottom: 24 }}>
-        <div
-          aria-hidden="true"
-          style={{
-            width: 96, height: 96, margin: '0 auto 16px',
-            borderRadius: '50%',
-            background: 'radial-gradient(circle at 30% 30%, #1eaf6a 0%, #116f43 70%)',
-            display: 'grid', placeItems: 'center',
-            boxShadow: '0 10px 24px rgba(17,111,67,0.35), inset 0 -3px 0 rgba(0,0,0,0.08)',
-            animation: 'bv-tick-pop 320ms cubic-bezier(.2,1.4,.4,1) both',
-          }}
-        >
-          <svg width="52" height="52" viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path
-              d="M12 27.5 L22 37 L41 16"
-              stroke="#ffffff"
-              strokeWidth="6"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              style={{
-                strokeDasharray: 60,
-                strokeDashoffset: 60,
-                animation: 'bv-tick-draw 420ms ease-out 120ms forwards',
-              }}
-            />
-          </svg>
-        </div>
-        <h3 style={{ margin: 0, fontSize: 24, fontWeight: 800, color: '#111', letterSpacing: '-0.01em' }}>
-          Congratulations!
-        </h3>
-        <p style={{ margin: '6px 0 0', fontSize: 14, color: '#444', fontWeight: 600 }}>
-          Bet placed
-        </p>
-      </div>
-      <style>{`
-        @keyframes bv-tick-pop {
-          0%   { transform: scale(0.4); opacity: 0; }
-          60%  { transform: scale(1.08); opacity: 1; }
-          100% { transform: scale(1);    opacity: 1; }
-        }
-        @keyframes bv-tick-draw {
-          to { stroke-dashoffset: 0; }
-        }
-      `}</style>
-
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 24 }}>
-        <div style={{ padding: '14px 16px', borderRadius: 14, border: '1px solid #f0f0f0', background: '#fafafa' }}>
-          <div style={{ fontSize: 11, color: '#888', marginBottom: 6 }}>Total Stake</div>
-          <div style={{ fontSize: 16, fontWeight: 800, color: '#111' }}>GHS {formatAmt(bet.stake)}</div>
-        </div>
-        <div style={{ padding: '14px 16px', borderRadius: 14, border: '1px solid #f0f0f0', background: '#fafafa' }}>
-          <div style={{ fontSize: 11, color: '#888', marginBottom: 6 }}>Potential Win</div>
-          <div style={{ fontSize: 16, fontWeight: 800, color: '#111' }}>GHS {formatAmt(bet.potentialWin)}</div>
-        </div>
-        <div style={{ padding: '14px 16px', borderRadius: 14, border: '1px solid #f0f0f0', background: '#fafafa', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div>
-            <div style={{ fontSize: 11, color: '#888', marginBottom: 6 }}>Booking Code</div>
-            <div style={{ fontSize: 16, fontWeight: 800, color: '#111' }}>{code}</div>
+      <div className="bet-success-scroll">
+        {/* Checkmark */}
+        <div className="bet-success-check">
+          <div className="bet-success-check-circle">
+            <svg width="52" height="52" viewBox="0 0 52 52" fill="none">
+              <path
+                d="M12 27.5 L22 37 L41 16"
+                stroke="#ffffff"
+                strokeWidth="6"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                style={{
+                  strokeDasharray: 60,
+                  strokeDashoffset: 60,
+                  animation: 'bv-tick-draw 420ms ease-out 120ms forwards',
+                }}
+              />
+            </svg>
           </div>
-          <button type="button" onClick={copy} style={{ background: 'none', border: 'none', color: '#116f43', fontWeight: 800, fontSize: 12, cursor: 'pointer', padding: '6px 12px', borderRadius: 8 }}>COPY</button>
+          <h3 className="bet-success-title">Bet Successful</h3>
         </div>
-      </div>
 
-      <div style={{ display: 'flex', gap: 12 }}>
-        <button
-          type="button"
-          onClick={() => { dlg.current?.close(); onRebet?.(); }}
-          style={{ flex: 1, padding: '15px 0', borderRadius: 12, border: 'none', background: '#f0f9f3', color: '#116f43', fontWeight: 800, cursor: 'pointer', fontSize: 15 }}
-        >Rebet</button>
-        <button
-          type="button"
-          onClick={() => { dlg.current?.close(); onConfirm?.(); }}
-          style={{ flex: 1, padding: '15px 0', borderRadius: 12, border: 'none', background: '#116f43', color: '#fff', fontWeight: 800, cursor: 'pointer', fontSize: 15 }}
-        >View Open Bet</button>
+        <style>{`
+          @keyframes bv-tick-pop {
+            0%   { transform: scale(0.4); opacity: 0; }
+            60%  { transform: scale(1.08); opacity: 1; }
+            100% { transform: scale(1);    opacity: 1; }
+          }
+          @keyframes bv-tick-draw {
+            to { stroke-dashoffset: 0; }
+          }
+        `}</style>
+
+        {/* Stats */}
+        <div className="bet-success-stats">
+          <div className="bet-success-stat">
+            <span className="bet-success-stat-label">Total Stake</span>
+            <span className="bet-success-stat-value">{formatAmt(bet.stake)}</span>
+          </div>
+          <div className="bet-success-stat">
+            <span className="bet-success-stat-label">Potential Win</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span className="bet-success-stat-value" style={{ filter: showWin ? 'none' : 'blur(6px)', cursor: 'pointer' }} onClick={() => setShowWin(true)}>
+                {formatAmt(bet.potentialWin)}
+              </span>
+              {!showWin && (
+                <button type="button" className="bet-success-publish" onClick={() => setShowWin(true)}>
+                  Publish
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Reward + Open Bets */}
+        <div className="bet-success-links">
+          <div className="bet-success-link-row">
+            <span>Reward Progress</span>
+            <button type="button" className="bet-success-view">View</button>
+          </div>
+          <div className="bet-success-link-row">
+            <span>Open Bets</span>
+            <button type="button" className="bet-success-view" onClick={() => { dlg.current?.close(); onConfirm?.(); }}>View</button>
+          </div>
+        </div>
+
+        {/* Booking code */}
+        <div className="bet-success-code-row">
+          <div>
+            <div className="bet-success-code-label">Booking Code</div>
+            <div className="bet-success-code-value">{code}</div>
+          </div>
+          <button type="button" className="bet-success-copy" onClick={copy}>COPY</button>
+        </div>
+
+        {/* Recommended codes */}
+        {recommendedCodes.length > 0 && (
+          <div className="bet-success-recommended">
+            <h4 className="bet-success-recommended-title">
+              Recommended Football Codes
+            </h4>
+
+            {recommendedCodes.slice(0, 2).map((card) => (
+              <div key={card.id} className="bet-success-rec-card">
+                <div className="bet-success-rec-header">
+                  <span className="bet-success-rec-code">{card.code}</span>
+                  <div className="bet-success-rec-meta">
+                    <span>Folds: <strong>{card.folds}</strong></span>
+                    <span>Odds: <strong>{formatAmt(card.odds)}</strong></span>
+                  </div>
+                </div>
+
+                {card.legs?.slice(0, 4).map((leg, i) => (
+                  <div key={i} className="bet-success-rec-leg">
+                    <span className="bet-success-rec-dot" />
+                    <div className="bet-success-rec-leg-info">
+                      <div className="bet-success-rec-pick">{leg.pick} | {leg.type}</div>
+                      <div className="bet-success-rec-match">{leg.match || leg.matchLabel}</div>
+                    </div>
+                    <span className="bet-success-rec-time">{leg.time}</span>
+                  </div>
+                ))}
+
+                <div className="bet-success-rec-actions">
+                  <button type="button" className="bet-success-rec-share">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
+                      <polyline points="16 6 12 2 8 6" />
+                      <line x1="12" y1="2" x2="12" y2="15" />
+                    </svg>
+                    Share
+                  </button>
+                  <button type="button" className="bet-success-rec-add">
+                    Add to Betslip
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Bottom actions */}
+        <div className="bet-success-actions">
+          <button
+            type="button"
+            className="bet-success-rebet"
+            onClick={() => { dlg.current?.close(); onRebet?.(); }}
+          >
+            Rebet
+          </button>
+          <button
+            type="button"
+            className="bet-success-ok"
+            onClick={() => { dlg.current?.close(); onConfirm?.(); }}
+          >
+            OK
+          </button>
+        </div>
       </div>
     </dialog>
   );

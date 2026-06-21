@@ -7,6 +7,8 @@ import {
 } from '../api/betApi.js';
 import { useToast, useAccount } from '../layout/AppShell.jsx';
 import BetSuccessModal, { toBookingCode } from '../components/BetSuccessModal.jsx';
+import OddsGauge from '../components/OddsGauge.jsx';
+import NumericKeypad from '../components/NumericKeypad.jsx';
 import { useFavouriteLeagues } from '../hooks/useFavourites.js';
 import { onLive, subscribeSports, unsubscribeSports } from '../api/socketClient.js';
 import {
@@ -146,6 +148,7 @@ export default function Home({ initialChip }) {
   const [activeCategory, setActiveCategory] = useState(null);
   const [slipErr, setSlipErr] = useState('');
   const [isPlacing, setIsPlacing] = useState(false);
+  const [showKeypad, setShowKeypad] = useState(false);
 
   const slipDlg     = useRef(null);
   const marketsDlg  = useRef(null);
@@ -1150,6 +1153,7 @@ export default function Home({ initialChip }) {
       {/* ─── Floating slip pill (mobile only via CSS) ─── */}
       {selections.length > 0 && (
         <button type="button" className="sb-slip-pill" onClick={() => setSlipOpen(true)}>
+          <OddsGauge odds={totalOdds} size={44} />
           <span className="ct">{selections.length}</span>
           <span>Bet slip</span>
           <span className="odds">@ {totalOdds.toFixed(2)}</span>
@@ -1249,7 +1253,7 @@ export default function Home({ initialChip }) {
             </div>
 
             <div className="stake-block">
-              <div className="stake-input">
+              <div className="stake-input" onClick={() => setShowKeypad(true)} style={{ cursor: 'pointer' }}>
                 <span>GHS</span>
                 <input
                   type="text"
@@ -1257,6 +1261,8 @@ export default function Home({ initialChip }) {
                   onChange={(e) => setStake(e.target.value)}
                   inputMode="decimal"
                   autoComplete="off"
+                  readOnly={showKeypad}
+                  onFocus={() => setShowKeypad(true)}
                 />
               </div>
               <div className="quick-stakes">
@@ -1283,6 +1289,21 @@ export default function Home({ initialChip }) {
                   ALL IN
                 </button>
               </div>
+              {showKeypad && (
+                <NumericKeypad
+                  onInput={(k) => {
+                    setStake((prev) => {
+                      const raw = prev === '0' || prev === '0.00' ? '' : prev.replace(/,/g, '');
+                      return raw + k;
+                    });
+                  }}
+                  onClear={() => setStake('0')}
+                  onDone={() => {
+                    setStake(formatAmt(parseStake(stake)));
+                    setShowKeypad(false);
+                  }}
+                />
+              )}
               <div className="summary">
                 {betMode === 'system' ? (
                   <>
@@ -1414,6 +1435,7 @@ export default function Home({ initialChip }) {
 
       <BetSuccessModal
         bet={successBet}
+        recommendedCodes={featuredCards}
         onClose={() => setSuccessBet(null)}
         onConfirm={() => { setSuccessBet(null); navigate('/my-bets'); }}
         onRebet={() => {

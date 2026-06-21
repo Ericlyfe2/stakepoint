@@ -151,6 +151,16 @@ function BottomNav({ openCount }) {
       ),
     },
     {
+      to: '/code-hub',
+      label: 'Code Hub',
+      active: is('/code-hub'),
+      icon: (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <path d="M16 18l6-6-6-6" /><path d="M8 6l-6 6 6 6" />
+        </svg>
+      ),
+    },
+    {
       to: '/my-bets',
       label: 'Bet slip',
       active: is('/my-bets'),

@@ -19,6 +19,7 @@ import JackpotPage from './pages/JackpotPage.jsx';
 import PromosPage from './pages/PromosPage.jsx';
 import InfoPage from './pages/InfoPage.jsx';
 import HelpPage from './pages/HelpPage.jsx';
+import CodeHubPage from './pages/CodeHubPage.jsx';
 
 import { AdminProvider, AdminGuard } from './providers/AdminProvider.jsx';
 import AdminShell from './layout/AdminShell.jsx';
@@ -87,6 +88,7 @@ export default function App() {
                 <Route path="/"          element={<Home />} />
                 <Route path="/live"      element={<Home initialChip="live" />} />
                 <Route path="/my-bets"   element={<BetHistoryPage />} />
+                <Route path="/code-hub"  element={<CodeHubPage />} />
                 <Route path="/casino"             element={<CasinoPage />} />
                 <Route path="/casino/dice"        element={<DicePage />} />
                 <Route path="/casino/spin2win"    element={<Spin2WinPage />} />
