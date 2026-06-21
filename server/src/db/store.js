@@ -75,10 +75,10 @@ async function loadFromPg(name) {
 async function upsertPg(name, key, data) {
   await getPool().query(
     `INSERT INTO kv_store (store_name, key, data, updated_at)
-       VALUES ($1, $2, $3, NOW())
+       VALUES ($1, $2, $3::jsonb, NOW())
      ON CONFLICT (store_name, key)
      DO UPDATE SET data = EXCLUDED.data, updated_at = NOW();`,
-    [name, key, data]
+    [name, key, JSON.stringify(data)]
   );
 }
 
