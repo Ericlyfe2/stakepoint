@@ -2275,6 +2275,20 @@ nav a:active { transform: scale(.96); }
   border-radius: 999px;
 }
 
+/* ----- bottom stack (winners + footer) ----- */
+.sb-bottom-stack {
+  margin-top: 20px;
+}
+.sb-bottom-stack .sb-winners {
+  margin: 0;
+  border-top: none;
+  border-bottom: none;
+  padding: 14px 0 10px;
+}
+.sb-bottom-stack .sb-compliance {
+  margin: 0 12px 12px;
+}
+
 /* ----- grand prize winners ----- */
 .sb-winners {
   margin: 14px 0;
@@ -3005,8 +3019,14 @@ nav a:active { transform: scale(.96); }
   .sb-winner .amt {
     font-size: 13px;
   }
+  .sb-bottom-stack {
+    margin-top: 14px;
+  }
+  .sb-bottom-stack .sb-winners {
+    padding: 12px 0 8px;
+  }
   .sb-compliance {
-    margin: 14px 10px 8px;
+    margin: 0 10px 8px;
     padding: 14px;
     border-radius: 12px;
   }

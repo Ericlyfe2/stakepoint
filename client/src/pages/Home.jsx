@@ -1187,13 +1187,15 @@ export default function Home({ initialChip }) {
                     })}
                   </div>
                 </section>
-
-                {lgIdx === 0 && <GrandPrizeWinners />}
               </Fragment>
             );
           })}
         </>
       )}
+
+      {/* ─── Bottom stack: Grand Prize Winners + footer ─── */}
+      <div className="sb-bottom-stack">
+        <GrandPrizeWinners />
 
       {/* ─── Compliance / sponsors ─── */}
       <div className="sb-compliance">
@@ -1204,6 +1206,7 @@ export default function Home({ initialChip }) {
           <span className="sponsor">LaLiga</span>
         </div>
         <div className="tagline">The world's sharper betting platform</div>
+      </div>
       </div>
 
       {/* ─── Featured section continues ─── */}
