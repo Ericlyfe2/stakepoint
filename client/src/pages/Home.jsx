@@ -149,6 +149,7 @@ export default function Home({ initialChip }) {
   const [slipErr, setSlipErr] = useState('');
   const [isPlacing, setIsPlacing] = useState(false);
   const [showKeypad, setShowKeypad] = useState(false);
+  const [betRealMode, setBetRealMode] = useState('REAL');
 
   const [codeModalOpen, setCodeModalOpen] = useState(false);
   const [codeInput, setCodeInput]         = useState('');
@@ -1218,21 +1219,65 @@ export default function Home({ initialChip }) {
       )}
 
       {/* ─── Slip bottom sheet ─── */}
-      <dialog ref={slipDlg} className="sb-sheet" onClose={() => setSlipOpen(false)}>
-        <div className="sb-sheet-grip" />
-        <div className="sb-sheet-head">
-          <h3>Bet slip · <span style={{ color: 'var(--accent)' }}>{selections.length}</span></h3>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginLeft: 'auto' }}>
-            {account && (
-              <span className="slip-balance" style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-soft)', background: 'rgba(30,200,81,0.1)', padding: '4px 8px', borderRadius: 6 }}>
-                Balance: <span style={{ color: '#1ec851' }}>₵{formatAmt(account.balance)}</span>
-              </span>
-            )}
-            <button type="button" className="sb-sheet-close" onClick={() => setSlipOpen(false)} aria-label="Close" style={{ position: 'static', margin: 0 }}>×</button>
+      <dialog ref={slipDlg} className="sb-sheet sporty-betslip-sheet" onClose={() => setSlipOpen(false)}>
+        <div className="sporty-sheet-header">
+          <div className="sporty-header-left">
+            <span className="sporty-count-circle">{selections.length}</span>
+            <div className="sporty-toggle-wrap">
+              <button 
+                type="button" 
+                className={`sporty-toggle-btn ${betRealMode === 'REAL' ? 'active' : ''}`}
+                onClick={() => setBetRealMode('REAL')}
+              >
+                REAL
+              </button>
+              <button 
+                type="button" 
+                className={`sporty-toggle-btn ${betRealMode === 'SIM' ? 'active' : ''}`}
+                onClick={() => setBetRealMode('SIM')}
+              >
+                SIM
+              </button>
+            </div>
+          </div>
+          
+          <button type="button" className="sporty-minimize-btn" onClick={() => setSlipOpen(false)} aria-label="Minimize">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
+          </button>
+          
+          <div className="sporty-header-right">
+            <span className="sporty-balance">GHS {formatAmt(account?.balance || 0)}</span>
           </div>
         </div>
-        <div className="sb-sheet-body">
-          <div className="betslip">
+
+        <div className="sb-sheet-body" style={{ padding: '0 0 max(80px, env(safe-area-inset-bottom))' }}>
+          <div className="sporty-pins-row">
+            <div className="sporty-pins-left">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: 6 }}>
+                <path d="M12 2a8 8 0 0 0-8 8c0 5.25 8 12 8 12s8-6.75 8-12a8 8 0 0 0-8-8z" />
+                <circle cx="12" cy="10" r="3" />
+              </svg>
+              My Pins
+            </div>
+            <div className="sporty-pins-right">
+              <button type="button" className="sporty-pin-action" onClick={clearSlip} title="Clear Slip">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                  <polyline points="3 6 5 6 21 6" />
+                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                </svg>
+              </button>
+              <button type="button" className="sporty-pin-action" title="Settings">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                  <circle cx="12" cy="12" r="3" />
+                  <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          <div className="betslip" style={{ padding: '0 12px 12px' }}>
             <div className="slip-mode">
               {(['single', 'multiple', 'system']).map((m) => (
                 <button key={m} type="button" className={`mode-btn${betMode === m ? ' active' : ''}`} onClick={() => setBetMode(m)}>
@@ -1241,111 +1286,87 @@ export default function Home({ initialChip }) {
               ))}
             </div>
 
-            {selections.length > 0 && (
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8, marginBottom: 4 }}>
-                <span style={{ fontSize: 11, color: 'var(--text-dim)', letterSpacing: '.1em', textTransform: 'uppercase' }}>
-                  {selections.length} selection{selections.length === 1 ? '' : 's'}
-                </span>
-                <button
-                  type="button"
-                  onClick={clearSlip}
-                  style={{ background: 'transparent', border: 'none', color: 'var(--text-soft)', fontSize: 11, fontWeight: 700, cursor: 'pointer', padding: '4px 8px' }}
-                >
-                  Clear all
-                </button>
-              </div>
-            )}
-
-            {betMode === 'system' && (
-              <div style={{ margin: '8px 0 4px', padding: '10px 12px', background: 'var(--surface-2)', border: '1px solid rgba(255,181,71,.18)', borderRadius: 10 }}>
-                {eligibleSystems.length === 0 ? (
-                  <p style={{ fontSize: 12, color: 'var(--text-soft)', margin: 0 }}>
-                    Pick {systemTypeHint(selections.length)} to unlock a system bet.
-                  </p>
-                ) : (
-                  <>
-                    <div style={{ fontSize: 10, letterSpacing: '.1em', color: 'var(--text-dim)', textTransform: 'uppercase', marginBottom: 6 }}>System type</div>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                      {eligibleSystems.map((sys) => (
-                        <button
-                          key={sys.key}
-                          type="button"
-                          onClick={() => setSystemType(sys.key)}
-                          className={`mode-btn${systemType === sys.key ? ' active' : ''}`}
-                          style={{ padding: '6px 10px', fontSize: 12 }}
-                        >
-                          {sys.label} <span style={{ opacity: .6, marginLeft: 2 }}>· {sys.totalLines}L</span>
-                        </button>
-                      ))}
-                    </div>
-                    {systemDef && (
-                      <div style={{ marginTop: 8, fontSize: 11.5, color: 'var(--text-soft)' }}>
-                        <strong style={{ color: 'var(--text)' }}>{systemDef.label}</strong> — {linesCount} line{linesCount > 1 ? 's' : ''} · total stake <strong style={{ color: 'var(--accent-warm)' }}>GHS {formatAmt(totalStake)}</strong>
-                      </div>
-                    )}
-                  </>
-                )}
-              </div>
-            )}
-
-            {selections.length === 0 && (
-              <p style={{ fontSize: 12, color: 'var(--text-dim)', padding: '12px 0' }}>
-                Tap any odds to add a selection. Mix markets across matches.
-              </p>
-            )}
-
-            <div className="selections">
-              {selections.map((s) => (
-                <div key={s.id} className="selection">
-                  <button type="button" className="x" aria-label="Remove" onClick={() => removeById(s.id)}>×</button>
-                  <div className="sel-pick">{s.pickLabel}</div>
-                  <div className="sel-market">{s.marketLabel}</div>
-                  <div className="sel-teams">{s.meta}</div>
-                  <div className="sel-odds">
-                    <span style={{ fontSize: 11, color: 'var(--text-dim)', fontFamily: 'JetBrains Mono, monospace' }}>@{s.odds.toFixed(2)}</span>
-                    <span className="sel-odds-val">{s.odds.toFixed(2)}</span>
-                  </div>
-                </div>
-              ))}
+            <div className="sporty-market-indicator">
+              {selections.length > 0 ? Array.from(new Set(selections.map(s => s.marketLabel))).join(', ') : '1X2'}
             </div>
 
-            <div className="stake-block">
-              <div className="stake-input" onClick={() => setShowKeypad(true)} style={{ cursor: 'pointer' }}>
-                <span>GHS</span>
-                <input
-                  type="text"
-                  value={stake}
-                  onChange={(e) => setStake(e.target.value)}
-                  inputMode="decimal"
-                  autoComplete="off"
-                  readOnly={showKeypad}
-                  onFocus={() => setShowKeypad(true)}
-                />
-              </div>
-              <div className="quick-stakes">
-                {[10, 50, 100].map((n) => (
-                  <button key={n} type="button" className="quick-stake" onClick={() => setStake(formatAmt(parseStake(stake) + n))}>+{n}</button>
+            <div className="sporty-banner-alert" onClick={() => toast('Recommendations loaded!')}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span className="emoji-flag">⛳</span> People also bet on...
+              </span>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="6 9 12 15 18 9" /></svg>
+            </div>
+
+            <div className="sporty-bonus-boost-banner">
+              Add more qualifying selections to boost your bonus
+            </div>
+
+            {selections.length === 0 ? (
+              <p style={{ fontSize: 12, color: 'var(--text-dim)', padding: '24px 0', textAlign: 'center' }}>
+                Tap any odds to add a selection. Mix markets across matches.
+              </p>
+            ) : (
+              <div className="selections" style={{ maxHeight: '180px', overflowY: 'auto', marginBottom: 12 }}>
+                {selections.map((s) => (
+                  <div key={s.id} className="selection" style={{ padding: '8px 10px', background: 'var(--surface-2)', border: '1px solid var(--line)', borderRadius: 8, marginBottom: 6 }}>
+                    <button type="button" className="x" aria-label="Remove" onClick={() => removeById(s.id)}>×</button>
+                    <div className="sel-pick" style={{ fontWeight: 800, color: 'var(--text)' }}>{s.pickLabel}</div>
+                    <div className="sel-market" style={{ fontSize: 11, color: 'var(--text-soft)' }}>{s.marketLabel}</div>
+                    <div className="sel-teams" style={{ fontSize: 11, color: 'var(--text-dim)' }}>{s.meta}</div>
+                    <div className="sel-odds">
+                      <span className="sel-odds-val" style={{ color: 'var(--accent)' }}>{s.odds.toFixed(2)}</span>
+                    </div>
+                  </div>
                 ))}
-                <button
-                  type="button"
-                  className="quick-stake"
-                  onClick={() => {
-                    const doubled = parseStake(stake) * 2;
-                    const cap = Number(account?.balance) || doubled;
-                    setStake(formatAmt(Math.min(doubled, cap)));
-                  }}
-                >
-                  2×
-                </button>
-                <button
-                  type="button"
-                  className="quick-stake all-in"
-                  onClick={() => setStake(formatAmt(account?.balance || 0))}
-                  title="Set stake to your full balance"
-                >
-                  ALL IN
-                </button>
               </div>
+            )}
+
+            <div className="stake-block" style={{ border: 'none', background: 'transparent', padding: 0 }}>
+              {/* Total Stake Input Area */}
+              <div className="sporty-stake-input-container">
+                <span className="sporty-stake-label">Total Stake</span>
+                <div className="sporty-stake-input-box-wrapper">
+                  <span className="currency-label">GHS</span>
+                  <div 
+                    className={`sporty-stake-input-box ${parseStake(stake) > (account?.balance || 0) && betRealMode === 'REAL' ? 'insufficient-border' : ''}`}
+                    onClick={() => setShowKeypad(true)}
+                  >
+                    <input
+                      type="text"
+                      value={stake}
+                      onChange={(e) => setStake(e.target.value)}
+                      inputMode="decimal"
+                      autoComplete="off"
+                      readOnly={showKeypad}
+                      onFocus={() => setShowKeypad(true)}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Insufficient Balance Message */}
+              {parseStake(stake) > (account?.balance || 0) && betRealMode === 'REAL' && (
+                <div className="sporty-insufficient-msg">
+                  You need a balance of GHS {formatAmt(parseStake(stake))} to place this bet. Please deposit an additional GHS {formatAmt(parseStake(stake) - (account?.balance || 0))}
+                  <a href="#deposit" className="deposit-link" onClick={(e) => { e.preventDefault(); setSlipOpen(false); openDeposit(); }}>
+                    Go to Deposit &gt;
+                  </a>
+                </div>
+              )}
+
+              {/* Quick stake buttons row */}
+              <div className="sporty-quick-stakes-row">
+                <div className="sporty-quick-stake-btns">
+                  <button type="button" className="sporty-quick-stake" onClick={() => setStake(formatAmt(parseStake(stake) + 3))}>+3</button>
+                  <button type="button" className="sporty-quick-stake" onClick={() => setStake(formatAmt(parseStake(stake) + 5))}>+5</button>
+                  <button type="button" className="sporty-quick-stake" onClick={() => setStake(formatAmt(parseStake(stake) + 10))}>+10</button>
+                </div>
+                <label className="sporty-default-stake-checkbox">
+                  <input type="checkbox" />
+                  <span>Update default stake</span>
+                </label>
+              </div>
+
               {showKeypad && (
                 <NumericKeypad
                   onInput={(k) => {
@@ -1355,41 +1376,76 @@ export default function Home({ initialChip }) {
                     });
                   }}
                   onClear={() => setStake('0')}
+                  onDelete={() => {
+                    setStake((prev) => {
+                      const raw = prev.replace(/,/g, '');
+                      if (raw.length <= 1) return '0';
+                      return raw.slice(0, -1);
+                    });
+                  }}
                   onDone={() => {
                     setStake(formatAmt(parseStake(stake)));
                     setShowKeypad(false);
                   }}
                 />
               )}
-              <div className="summary">
-                {betMode === 'system' ? (
-                  <>
-                    <div className="sum-row"><span className="lbl">Stake / line</span><span className="val">GHS {formatAmt(stakePerLine)}</span></div>
-                    <div className="sum-row"><span className="lbl">Lines</span><span className="val">{linesCount || '—'}</span></div>
-                    <div className="sum-row"><span className="lbl">Total stake</span><span className="val">GHS {formatAmt(totalStake)}</span></div>
-                    <div className="sum-row payout">
-                      <span className="lbl" style={{ color: 'var(--text)', fontWeight: 700 }}>Max return</span>
-                      <span className="val">{payout > 0 ? `GHS ${formatAmt(payout)}` : '—'}</span>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div className="sum-row"><span className="lbl">Total odds</span><span className="val">{selections.length ? totalOdds.toFixed(2) : '—'}</span></div>
-                    <div className="sum-row"><span className="lbl">Stake</span><span className="val">GHS {formatAmt(stakePerLine)}</span></div>
-                    {betMode === 'multiple' && (
-                      <div className="sum-row"><span className="lbl">Bonus boost</span><span className="val" style={{ color: 'var(--accent)' }}>+8%</span></div>
-                    )}
-                    <div className="sum-row payout">
-                      <span className="lbl" style={{ color: 'var(--text)', fontWeight: 700 }}>Potential win</span>
-                      <span className="val">{payout > 0 ? `GHS ${formatAmt(payout)}` : '—'}</span>
-                    </div>
-                  </>
-                )}
+
+              {/* sporty options row */}
+              <div className="sporty-options-row">
+                <span className="sporty-badge-insure">Insure <span className="info-mark">i</span></span>
+                <div className="sporty-options-list">
+                  <label className="sporty-option-checkbox">
+                    <input type="checkbox" />
+                    <span>Flexi</span>
+                  </label>
+                  <label className="sporty-option-checkbox">
+                    <input type="checkbox" />
+                    <span>1UP ▾</span>
+                  </label>
+                  <label className="sporty-option-checkbox">
+                    <input type="checkbox" disabled />
+                    <span style={{ opacity: 0.4 }}>EarlyGoals</span>
+                  </label>
+                  <span className="more-trigger">More ▾</span>
+                </div>
               </div>
-              {slipErr && <div style={{ color: 'var(--danger, #ff5d5d)', fontSize: 13, textAlign: 'center', marginBottom: 12, fontWeight: 700 }}>{slipErr}</div>}
-              <button type="button" className="place-bet" onClick={onPlaceBet} disabled={isPlacing}>
-                <span>{isPlacing ? 'Placing...' : 'Place bet'}</span><span className="arrow">→</span>
-              </button>
+
+              {/* summary block */}
+              <div className="sporty-summary-block">
+                <div className="sporty-summary-row">
+                  <span className="lbl">Total Odds</span>
+                  <span className="val">{selections.length ? totalOdds.toFixed(2) : '—'}</span>
+                </div>
+                <div className="sporty-summary-row">
+                  <span className="lbl">Potential Win</span>
+                  <span className="val highlight-win">GHS {payout > 0 ? formatAmt(payout) : '0.00'}</span>
+                </div>
+              </div>
+
+              {slipErr && <div style={{ color: 'var(--accent-hot)', fontSize: 12, textAlign: 'center', margin: '8px 0', fontWeight: 800 }}>{slipErr}</div>}
+
+              {/* action footer */}
+              <div className="sporty-footer-actions">
+                <button 
+                  type="button" 
+                  className="sporty-book-bet-btn" 
+                  onClick={() => {
+                    setSlipOpen(false);
+                    toast('Ticket booked! Code: ME' + Math.floor(100000 + Math.random() * 900000));
+                  }}
+                >
+                  Book Bet
+                </button>
+                <button 
+                  type="button" 
+                  className="sporty-place-bet-btn"
+                  onClick={onPlaceBet}
+                  disabled={isPlacing || (parseStake(stake) > (account?.balance || 0) && betRealMode === 'REAL')}
+                >
+                  <div className="btn-label">{isPlacing ? 'Placing...' : 'Place Bet'}</div>
+                  <div className="btn-subtext">About to pay {formatAmt(totalStake)}</div>
+                </button>
+              </div>
             </div>
           </div>
         </div>
