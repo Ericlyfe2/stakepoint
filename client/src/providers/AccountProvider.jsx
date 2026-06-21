@@ -33,9 +33,40 @@ function formatAmt(n) {
   return Number(n || 0).toLocaleString('en-GH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+// ---------- session cache helpers ----------
+// Persist the last known account to localStorage so the user stays
+// visually logged in across page reloads and brief server hibernation.
+const ACCOUNT_CACHE_KEY = 'sp_account_v1';
+function readAccountCache() {
+  try {
+    const raw = typeof localStorage !== 'undefined' ? localStorage.getItem(ACCOUNT_CACHE_KEY) : null;
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
+}
+function writeAccountCache(acct) {
+  try {
+    if (typeof localStorage !== 'undefined') {
+      if (acct) localStorage.setItem(ACCOUNT_CACHE_KEY, JSON.stringify(acct));
+      else localStorage.removeItem(ACCOUNT_CACHE_KEY);
+    }
+  } catch { /* storage quota */ }
+}
+
 export default function AppProviders({ children }) {
   const navigate = useNavigate();
-  const [account, setAccount] = useState(null);
+
+  // Seed state from cache so the UI renders the user as logged-in
+  // immediately on page load, before the /auth/me response comes back.
+  const [account, setAccountRaw] = useState(() => {
+    if (!getAccess()) return null;   // no token → definitely logged out
+    return readAccountCache();       // may be null if first ever visit
+  });
+
+  const setAccount = useCallback((acct) => {
+    setAccountRaw(acct);
+    writeAccountCache(acct);          // keep cache in sync
+  }, []);
+
   const [loading, setLoading] = useState(!!getAccess());
 
   const [toasts, setToasts] = useState([]);
@@ -103,36 +134,78 @@ export default function AppProviders({ children }) {
   }, [dismissToast]);
 
   const refresh = useCallback(async () => {
+    // No access token at all → user is genuinely logged out
     if (!getAccess()) { setAccount(null); setLoading(false); return null; }
     try {
       const data = await fetchMe();
       setAccount(data.account);
       return data.account;
     } catch (err) {
-      // Only sign the user out when the server actually rejects the token.
-      // Network glitches / 5xx leave the existing account state in place so
-      // the next tick (or the visibilitychange rehydrate below) can retry.
-      if (err?.status === 401 || err?.status === 403) {
-        clearTokens();
-        setAccount(null);
+      const status = err?.status;
+      // ─── Only clear the session when we are 100% certain the token is dead.
+      //
+      // The backend runs on Render's free tier which hibernates. On wake it
+      // can return 5xx, 0 (AbortError/network), or a garbled response before
+      // it is ready. We must NOT treat those as "logged out" — the refresh
+      // token is still valid and the user should stay logged in.
+      //
+      // We sign out ONLY when:
+      //   • The server explicitly returns 401 (token invalid/expired)
+      //   • AND there is no refresh token that could be used to get a new one
+      //     (if there IS a refresh token, betApi already attempted the token
+      //      swap inside rawFetch — a 401 here means even the refresh token
+      //      was rejected, i.e. a definitive "end of session").
+      if (status === 401 || status === 403) {
+        // betApi already consumed the refresh token in rawFetch before
+        // re-throwing. If tokens are gone, the session is truly dead.
+        if (!getAccess()) {
+          setAccount(null);
+        }
+        // If somehow an access token survived, leave account intact and let
+        // the next background refresh sort it out.
       }
+      // For 0 (network/timeout), 5xx, or any other transient failure:
+      // keep the cached account state — the user stays visually logged in.
       return null;
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [setAccount]);
 
   useEffect(() => { refresh(); }, [refresh]);
 
   // Re-hydrate when the tab returns from being hidden (laptop wake, mobile
-  // app switch). The access token may have expired silently while we were
-  // backgrounded; this fetch will trigger the refresh dance in betApi.
+  // switch). Add a short debounce so rapid focus/blur cycles don't spam the
+  // server, and silently swallow failures — a failed rehydration should
+  // NEVER log the user out.
   useEffect(() => {
     if (typeof document === 'undefined') return undefined;
-    const onVisible = () => { if (document.visibilityState === 'visible' && getAccess()) refresh(); };
+    let debounceTimer = null;
+    const onVisible = () => {
+      if (document.visibilityState !== 'visible') return;
+      if (!getAccess()) return;          // definitely logged out, skip
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        refresh().catch(() => { /* ignore — session stays intact */ });
+      }, 800);  // 800 ms debounce to avoid hammering on rapid tab switches
+    };
     document.addEventListener('visibilitychange', onVisible);
-    return () => document.removeEventListener('visibilitychange', onVisible);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible);
+      clearTimeout(debounceTimer);
+    };
   }, [refresh]);
+
+  // Listen for definitive force-logout events dispatched by betApi when the
+  // refresh token is explicitly rejected by the server (401/403 on /auth/refresh).
+  // This is the ONLY time we clear the account in-memory based on an API signal.
+  useEffect(() => {
+    const onForceLogout = () => {
+      setAccount(null);
+    };
+    window.addEventListener('xenbet:force-logout', onForceLogout);
+    return () => window.removeEventListener('xenbet:force-logout', onForceLogout);
+  }, [setAccount]);
 
   // Poll for freshly-settled wins the user hasn't seen.
   // (Realtime socket also pushes bet:won — poll is the safety net.)
@@ -268,10 +341,11 @@ export default function AppProviders({ children }) {
   const signOut = useCallback(async () => {
     try { await apiLogout(); } catch { /* ignore network */ }
     clearTokens();
+    writeAccountCache(null);   // clear the localStorage account cache
     setAccount(null);
     toast('Logged out.');
     navigate('/', { replace: true });
-  }, [toast, navigate]);
+  }, [toast, navigate, setAccount]);
 
   const adjustBalance = useCallback((delta, label) => {
     setAccount((prev) => prev ? { ...prev, balance: Number((prev.balance + delta).toFixed(2)) } : prev);

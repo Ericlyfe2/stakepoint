@@ -25,11 +25,9 @@ export const getAccess  = () => ls?.getItem(ACCESS_KEY)  || null;
 export const getRefresh = () => ls?.getItem(REFRESH_KEY) || null;
 export const clearTokens = () => { ls?.removeItem(ACCESS_KEY); ls?.removeItem(REFRESH_KEY); };
 
-// Render free-tier services hibernate after 15min and need ~30-60s to wake.
-// We give the first request a generous window, but anything beyond ~45s is
-// almost certainly a real outage — surfacing a clear error beats an infinite
-// spinner on the sign-in / sign-up screen.
-const REQUEST_TIMEOUT_MS = 45_000;
+// Render free-tier services hibernate after 15 min and need ~30-60 s to wake.
+// Give requests a generous window. Anything beyond ~60 s is a real outage.
+const REQUEST_TIMEOUT_MS = 60_000;
 
 async function rawFetch(path, opts = {}, retry = true) {
   const headers = new Headers(opts.headers || {});
@@ -57,11 +55,13 @@ async function rawFetch(path, opts = {}, retry = true) {
   if (timer) clearTimeout(timer);
   if (res.status !== 401 || !retry) return res;
 
-  // Try silent refresh exactly once. Only sign the user out when the refresh
-  // endpoint explicitly rejects the token (401/403). Network blips and 5xx
-  // responses leave the tokens intact so the next request can retry.
+  // Try silent refresh exactly once.
+  // IMPORTANT: Only clear tokens when the refresh endpoint *explicitly*
+  // rejects them (401 / 403). Network blips, 5xx, or AbortErrors during
+  // the refresh request must leave tokens intact — the user's session is
+  // still valid; we just couldn't reach the server right now.
   const refresh = getRefresh();
-  if (!refresh) return res;
+  if (!refresh) return res;   // no refresh token — return the 401 as-is
   try {
     refreshInflight = refreshInflight || (async () => {
       const r = await fetch(`${API_BASE}/auth/refresh`, {
@@ -80,7 +80,16 @@ async function rawFetch(path, opts = {}, retry = true) {
     })();
     await refreshInflight;
   } catch (e) {
-    if (e?.status === 401 || e?.status === 403) clearTokens();
+    // Only wipe session tokens on an explicit rejection from the auth server.
+    // For network failures (e.status === 0 or undefined), timeouts, or 5xx:
+    // leave the tokens where they are so the user stays logged in.
+    if (e?.status === 401 || e?.status === 403) {
+      clearTokens();
+      // Notify AccountProvider so it can clear the in-memory account too.
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('xenbet:force-logout'));
+      }
+    }
     return res;
   } finally {
     refreshInflight = null;
