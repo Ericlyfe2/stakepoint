@@ -9,7 +9,6 @@ import { useToast, useAccount } from '../layout/AppShell.jsx';
 import BetSuccessModal, { toBookingCode } from '../components/BetSuccessModal.jsx';
 import OddsGauge from '../components/OddsGauge.jsx';
 import NumericKeypad from '../components/NumericKeypad.jsx';
-import { saveRecentCode } from '../components/GlobalFAB.jsx';
 import { useFavouriteLeagues } from '../hooks/useFavourites.js';
 import { onLive, subscribeSports, unsubscribeSports } from '../api/socketClient.js';
 import {
@@ -151,8 +150,15 @@ export default function Home({ initialChip }) {
   const [isPlacing, setIsPlacing] = useState(false);
   const [showKeypad, setShowKeypad] = useState(false);
 
+  const [codeModalOpen, setCodeModalOpen] = useState(false);
+  const [codeInput, setCodeInput]         = useState('');
+  const [codeErr, setCodeErr]             = useState('');
+  const [codeLoading, setCodeLoading]     = useState(false);
+
   const slipDlg     = useRef(null);
   const marketsDlg  = useRef(null);
+  const codeDlg     = useRef(null);
+  const codeInputRef = useRef(null);
 
   // Initial sport from URL change
   useEffect(() => { setSportId(sportParam); }, [sportParam]);
@@ -259,39 +265,6 @@ export default function Home({ initialChip }) {
     if (!slipOpen && dlg.open) dlg.close();
     if (slipOpen) setSlipErr(''); // clear error when reopening
   }, [slipOpen]);
-
-  // Listen for GlobalFAB events
-  useEffect(() => {
-    const onOpenSlip = () => setSlipOpen(true);
-    const onLoadCode = (e) => {
-      const { code: c, bet } = e.detail || {};
-      if (!bet?.legs?.length) return;
-      const hydrated = bet.legs.map((l, i) => ({
-        id: `sel-${Date.now()}-${i}`,
-        matchId: l.matchId,
-        market: l.market,
-        outcome: l.outcome,
-        odds: l.odds,
-        pickLabel: pickLabel(l.market, l.outcome, { home: l.home, away: l.away }),
-        marketLabel: l.marketName || `${l.market} · ${l.outcome}`,
-        meta: `${l.home} vs ${l.away}`,
-        home: l.home,
-        away: l.away,
-        trend: null,
-      }));
-      setSelections(hydrated);
-      setBetMode(hydrated.length === 1 ? 'single' : 'multiple');
-      setSlipOpen(true);
-      setSlipErr('');
-      if (c) saveRecentCode(c);
-    };
-    window.addEventListener('xenbet:open-slip', onOpenSlip);
-    window.addEventListener('xenbet:load-code', onLoadCode);
-    return () => {
-      window.removeEventListener('xenbet:open-slip', onOpenSlip);
-      window.removeEventListener('xenbet:load-code', onLoadCode);
-    };
-  }, []);
 
   const upsertSelection = useCallback((row) => {
     setSelections((prev) => {
@@ -432,15 +405,6 @@ export default function Home({ initialChip }) {
     return stakePerLine * totalOdds * (1 + BONUS);
   }, [selections, stakePerLine, totalOdds, betMode, systemDef, systemType]);
 
-  // Broadcast slip state to GlobalFAB
-  useEffect(() => {
-    window.dispatchEvent(
-      new CustomEvent('xenbet:slip-update', {
-        detail: { count: selections.length, odds: totalOdds },
-      }),
-    );
-  }, [selections.length, totalOdds]);
-
   // Hydrate a booking code into the live slip — looks up the legs and replaces
   // the current selection list, then opens the slip.
   const loadFromCode = useCallback(async (rawCode) => {
@@ -476,6 +440,44 @@ export default function Home({ initialChip }) {
       return false;
     }
   }, [toast]);
+
+  const openCodeModal = useCallback(() => {
+    setCodeInput('');
+    setCodeErr('');
+    setCodeModalOpen(true);
+    requestAnimationFrame(() => {
+      codeDlg.current?.showModal();
+      codeInputRef.current?.focus();
+    });
+  }, []);
+
+  const closeCodeModal = useCallback(() => {
+    codeDlg.current?.close();
+    setCodeModalOpen(false);
+    setCodeErr('');
+  }, []);
+
+  const handleCodeLoad = useCallback(async (e) => {
+    e?.preventDefault();
+    const trimmed = codeInput.trim().toUpperCase();
+    if (!trimmed) { setCodeErr('Enter a booking code.'); return; }
+    if (trimmed.length < 4) { setCodeErr('Code is too short.'); return; }
+    setCodeLoading(true);
+    setCodeErr('');
+    const ok = await loadFromCode(trimmed);
+    setCodeLoading(false);
+    if (ok) {
+      try {
+        const stored = localStorage.getItem('xenbet_recent_codes');
+        let list = stored ? JSON.parse(stored) : [];
+        list = [trimmed, ...list.filter((c) => c !== trimmed)].slice(0, 8);
+        localStorage.setItem('xenbet_recent_codes', JSON.stringify(list));
+      } catch { /* ignore */ }
+      closeCodeModal();
+    } else {
+      setCodeErr('Booking code not found.');
+    }
+  }, [codeInput, loadFromCode, closeCodeModal]);
 
   const onPlaceBet = async () => {
     setSlipErr('');
@@ -518,7 +520,6 @@ export default function Home({ initialChip }) {
       setSelections([]);
       setSlipOpen(false);
       setSuccessBet(res.bet);
-      window.dispatchEvent(new CustomEvent('xenbet:bet-placed'));
     } catch (e) {
       // Revert optimistic update on failure
       adjustBalance(cost);
@@ -1168,6 +1169,18 @@ export default function Home({ initialChip }) {
                               <span className="sb-odd disabled">—</span>
                             </>
                           )}
+
+                          <button
+                            type="button"
+                            className="sb-match-code-btn"
+                            onClick={() => openCodeModal()}
+                            aria-label="Enter booking code"
+                            title="Booking code"
+                          >
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M16 18l6-6-6-6" /><path d="M8 6l-6 6 6 6" />
+                            </svg>
+                          </button>
                         </div>
                       );
                     })}
@@ -1493,7 +1506,86 @@ export default function Home({ initialChip }) {
           setSlipOpen(true);
         }}
       />
+
+      {/* ─── Booking code modal ─── */}
+      <dialog ref={codeDlg} className="gfab-modal" onClose={() => setCodeModalOpen(false)}>
+        <div className="gfab-modal-inner">
+          <div className="gfab-modal-header">
+            <h3 className="gfab-modal-title">Load Booking Code</h3>
+            <button type="button" className="gfab-modal-close" onClick={closeCodeModal} aria-label="Close">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
+          </div>
+          <p className="gfab-modal-desc">Enter your booking code to restore your selections.</p>
+          <form onSubmit={handleCodeLoad} className="gfab-modal-form">
+            <div className="gfab-input-wrap">
+              <input
+                ref={codeInputRef}
+                type="text"
+                value={codeInput}
+                onChange={(e) => { setCodeInput(e.target.value.toUpperCase().replace(/\s+/g, '')); setCodeErr(''); }}
+                placeholder="e.g. ABCD1234"
+                maxLength={16}
+                autoCapitalize="characters"
+                spellCheck={false}
+                autoComplete="off"
+                className="gfab-input"
+                aria-label="Booking code"
+                aria-invalid={!!codeErr}
+                disabled={codeLoading}
+              />
+              {codeInput && !codeLoading && (
+                <button type="button" className="gfab-input-clear"
+                  onClick={() => { setCodeInput(''); setCodeErr(''); codeInputRef.current?.focus(); }}
+                  aria-label="Clear input">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="10" /><line x1="15" y1="9" x2="9" y2="15" /><line x1="9" y1="9" x2="15" y2="15" />
+                  </svg>
+                </button>
+              )}
+            </div>
+            {codeErr && (
+              <div className="gfab-error" role="alert">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
+                </svg>
+                {codeErr}
+              </div>
+            )}
+            <div className="gfab-modal-actions">
+              <button type="button" className="gfab-btn-cancel" onClick={closeCodeModal} disabled={codeLoading}>Cancel</button>
+              <button type="submit" className="gfab-btn-load" disabled={!codeInput.trim() || codeLoading}>
+                {codeLoading ? <span className="gfab-spinner" /> : <>Load Ticket</>}
+              </button>
+            </div>
+          </form>
+          <RecentCodes onSelect={(c) => { setCodeInput(c); setCodeErr(''); }} />
+        </div>
+      </dialog>
     </>
+  );
+}
+
+function RecentCodes({ onSelect }) {
+  const [codes, setCodes] = useState([]);
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem('xenbet_recent_codes');
+      if (stored) setCodes(JSON.parse(stored).slice(0, 5));
+    } catch { /* ignore */ }
+  }, []);
+  if (!codes.length) return null;
+  return (
+    <div className="gfab-recent">
+      <div className="gfab-recent-title">Recent codes</div>
+      <div className="gfab-recent-list">
+        {codes.map((c) => (
+          <button key={c} type="button" className="gfab-recent-chip" onClick={() => onSelect(c)}>{c}</button>
+        ))}
+      </div>
+    </div>
   );
 }
 

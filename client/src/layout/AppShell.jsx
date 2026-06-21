@@ -4,7 +4,6 @@ import { useAccount } from '../providers/AccountProvider.jsx';
 import { useTheme } from '../providers/ThemeProvider.jsx';
 import { fetchMatches } from '../api/betApi.js';
 import NotificationBell from '../components/NotificationBell.jsx';
-import GlobalFAB from '../components/GlobalFAB.jsx';
 export { useAccount, useToast } from '../providers/AccountProvider.jsx';
 
 function formatAmt(n) {
@@ -134,65 +133,58 @@ function BottomNav({ openCount }) {
       label: 'Sports',
       active: is('/', true),
       icon: (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-          <circle cx="12" cy="12" r="9" />
-          <path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18" />
-        </svg>
-      ),
-    },
-    {
-      to: '/casino',
-      label: 'Casino',
-      active: is('/casino') || is('/virtuals') || is('/jackpot'),
-      icon: (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-          <rect x="3" y="7" width="18" height="11" rx="3" />
-          <path d="M8 12h3M9.5 10.5v3M15 11h.01M17 13h.01" />
-        </svg>
-      ),
-    },
-    {
-      to: '/code-hub',
-      label: 'Code Hub',
-      active: is('/code-hub'),
-      icon: (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-          <path d="M16 18l6-6-6-6" /><path d="M8 6l-6 6 6 6" />
-        </svg>
-      ),
-    },
-    {
-      to: '/my-bets',
-      label: 'Bet slip',
-      active: is('/my-bets'),
-      pip: openCount > 0 ? openCount : null,
-      isSpecial: true,
-      icon: (
-        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-          <path d="M3 4C3 3.44772 3.44772 3 4 3H20C20.5523 3 21 3.44772 21 4V8.5C21 8.77614 20.7761 9 20.5 9C19.6716 9 19 9.67157 19 10.5C19 11.3284 19.6716 12 20.5 12C20.7761 12 21 12.2239 21 12.5V20C21 20.5523 20.5523 21 20 21H4C3.44772 21 3 20.5523 3 20V12.5C3 12.2239 3.22386 12 3.5 12C4.32843 12 5 11.3284 5 10.5C5 9.67157 4.32843 9 3.5 9C3.22386 9 3 8.77614 3 8.5V4Z" />
-        </svg>
-      ),
-    },
-    {
-      to: account ? '/profile' : '/login',
-      label: account ? 'Me' : 'Log in',
-      active: is('/profile') || is('/wallet') || is('/login'),
-      icon: (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-          <circle cx="12" cy="8" r="4" />
-          <path d="M4 21a8 8 0 0 1 16 0" />
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <circle cx="12" cy="12" r="10" />
+          <path d="M12 2v4M12 18v4M2 12h4M18 12h4" />
+          <polygon points="12,8 15,10 14,14 10,14 9,10" />
+          <path d="M12 6v2M6 12h3M18 12h-3M10 14l-1.5 3.5M14 14l1.5 3.5" />
         </svg>
       ),
     },
     {
       to: '/info',
-      label: 'Menu',
+      label: 'A-Z Menu',
       active: is('/info'),
       icon: (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
           <line x1="3" y1="12" x2="21" y2="12" />
           <line x1="3" y1="6"  x2="21" y2="6" />
           <line x1="3" y1="18" x2="21" y2="18" />
+        </svg>
+      ),
+    },
+    {
+      to: '/casino',
+      label: 'Games',
+      active: is('/casino') || is('/virtuals') || is('/jackpot'),
+      isGames: true,
+      icon: (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <rect x="2" y="6" width="20" height="12" rx="3" />
+          <path d="M6 12h4M8 10v4M15 11h.01M17 13h.01" />
+        </svg>
+      ),
+    },
+    {
+      to: '/my-bets',
+      label: 'Open Bets',
+      active: is('/my-bets'),
+      pip: openCount > 0 ? openCount : null,
+      icon: (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l.73-.73" />
+          <path d="M12 8v8M14 9.5a1.5 1.5 0 0 0-1.5-1.5h-1A1.5 1.5 0 0 0 10 11.5v0A1.5 1.5 0 0 0 11.5 13h1A1.5 1.5 0 0 1 14 14.5v0A1.5 1.5 0 0 1 12.5 16h-1A1.5 1.5 0 0 1 10 14.5" />
+        </svg>
+      ),
+    },
+    {
+      to: account ? '/profile' : '/login',
+      label: account ? 'Me' : 'Me',
+      active: is('/profile') || is('/wallet') || is('/login'),
+      icon: (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+          <circle cx="12" cy="7" r="4" />
         </svg>
       ),
     },
@@ -204,11 +196,12 @@ function BottomNav({ openCount }) {
         <NavLink
           key={it.label}
           to={it.to}
-          className={`sb-nav-item${it.active ? ' active' : ''}${it.isSpecial ? ' special' : ''}`}
+          className={`sb-nav-item${it.active ? ' active' : ''}${it.isGames ? ' games-nav' : ''}`}
         >
           <div className="icon-wrap">{it.icon}</div>
-          <span>{it.label}</span>
+          <span className="nav-label">{it.label}</span>
           {it.pip != null && <span className="pip">{it.pip}</span>}
+          {it.active && <div className="active-indicator" />}
         </NavLink>
       ))}
     </nav>
@@ -401,7 +394,6 @@ export default function AppShell() {
       </footer>
 
       <BottomNav openCount={openCount} />
-      <GlobalFAB />
 
       {/* === global search modal === */}
       <dialog ref={searchDlg} className="bv-dialog search-dialog">
