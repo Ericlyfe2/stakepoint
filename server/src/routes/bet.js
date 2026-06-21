@@ -401,7 +401,8 @@ router.get('/history', requireAuth, (req, res) => {
 
 // IMPORTANT: this literal route must come BEFORE /bets/:id or Express will
 // match "unacknowledged" as an id.
-router.get('/bets/unacknowledged', requireAuth, (req, res) => {
+router.get('/bets/unacknowledged', optionalAuth, (req, res) => {
+  if (!req.user) return res.json({ bets: [] });
   const wins = Object.values(betsStore.all() || {}).filter((b) =>
     b.userId === req.user.id && b.wonNotAcknowledged
   );
