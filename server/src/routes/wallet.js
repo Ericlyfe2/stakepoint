@@ -8,19 +8,8 @@ import { updateUser, adjustBalance, logActivity } from '../db/users.js';
 import { createStore } from '../db/store.js';
 import { emitToUser, emitAdmin } from '../services/realtime.js';
 
-// Auto-promotion ladder. A SINGLE deposit at or above the threshold moves
-// the player up one stage. Cumulative top-ups never qualify. Stage 3 → 4 is
-// ALWAYS manual: admins must promote the player from the user drawer.
-//
-//   Stage 0 → Stage 1 : single deposit ≥ STAGE_PROMOTE_THRESHOLD
-//   Stage 1 → Stage 2 : single deposit ≥ STAGE_PROMOTE_THRESHOLD
-//   Stage 2 → Stage 3 : single deposit ≥ STAGE_PROMOTE_THRESHOLD (auto-blocks)
-//   Stage 3 blocked → unblocked : single deposit ≥ STAGE3_UNBLOCK_THRESHOLD
-//   Stage 3 → Stage 4 : admin only
-export const STAGE_PROMOTE_THRESHOLD = 1000;
-export const STAGE3_UNBLOCK_THRESHOLD = 2000;
-// Back-compat alias — STAGE0_PROMOTION_THRESHOLD is still imported elsewhere.
-export const STAGE0_PROMOTION_THRESHOLD = STAGE_PROMOTE_THRESHOLD;
+// Account progression is controlled exclusively by admins via the admin panel.
+// No automatic promotion or demotion based on deposits.
 
 const txStore = createStore('transactions', {});
 
@@ -82,12 +71,6 @@ router.post('/deposit', requireAuth, validate(depositSchema), asyncHandler(async
 router.post('/withdraw', requireAuth, requireEmailVerified, validate(withdrawSchema), asyncHandler(async (req, res) => {
   const { amount, method = 'momo' } = req.body;
   const user = req.user;
-
-  // Stage-based minimum withdrawal (enforced server-side).
-  const stageMinWithdraw = { 0: MIN_WITHDRAW, 1: 500, 2: 300, 3: 200, 4: 100 }[user.stage ?? 0] ?? MIN_WITHDRAW;
-  if (amount < stageMinWithdraw) {
-    throw badRequest(`Minimum withdrawal for your stage is GHS ${stageMinWithdraw.toLocaleString('en-US')}.`);
-  }
 
   const required = Number((amount * WITHDRAW_DEPOSIT_RATIO).toFixed(2));
   const totalDeposited = Number(user.totalDeposited || 0);

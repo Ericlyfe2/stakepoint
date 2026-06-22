@@ -68,45 +68,10 @@ export default function WalletPage() {
   const totalDeposited = Number(account.totalDeposited || 0);
   const withdrawCap    = Math.floor(totalDeposited / 0.10);
 
-  const stage = (() => {
-    const n = Number(account?.stage);
-    if (!Number.isFinite(n)) return 0;
-    return Math.min(4, Math.max(0, n));
-  })();
-  const isUnverified = stage === 0;
-  // Per-stage minimum withdrawal — keep in sync with WithdrawPage.jsx.
-  //   Stage 0/1 → GHS 550 (default)
-  //   Stage 2   → GHS 10,000 (+ 10% extra-deposit credit rule)
-  //   Stage 3   → GHS 40,000
-  //   Stage 4   → GHS 50,000 (VIP)
-  const stageMinWithdraw =
-    stage === 2 ? 10000 :
-    stage === 3 ? 40000 :
-    stage === 4 ? 50000 :
-    550;
-
   return (
     <main className="wallet-page">
       <div className="wallet-shell">
         <PageBack />
-
-        {isUnverified && (
-          <div className="wallet-verify-banner" role="status" aria-live="polite">
-            <div className="wallet-verify-icon" aria-hidden>
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-                <path d="M12 2 4 6v6c0 5 3.4 8.9 8 10 4.6-1.1 8-5 8-10V6l-8-4z" fill="#facc15" opacity="0.92" />
-                <path d="M12 8v5M12 16v.01" stroke="#0f1d10" strokeWidth="2.2" strokeLinecap="round" />
-              </svg>
-            </div>
-            <div className="wallet-verify-text">
-              <div className="t">Account not verified</div>
-              <p>Complete deposit to unlock premium</p>
-            </div>
-            <button type="button" className="wallet-verify-cta" onClick={openDeposit}>
-              Deposit
-            </button>
-          </div>
-        )}
 
         <header className="wallet-hero fade-up">
           <div className="wallet-hero-grain" aria-hidden />

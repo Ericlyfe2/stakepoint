@@ -7,8 +7,6 @@ import { badRequest, notFound } from '../../utils/httpError.js';
 import { getUserById, updateUser, adjustBalance, withUserLock, logActivity } from '../../db/users.js';
 import { createStore } from '../../db/store.js';
 import { emitToUser, emitAdmin } from '../../services/realtime.js';
-import { recordAudit } from '../../db/audit.js';
-import { STAGE_PROMOTE_THRESHOLD, STAGE3_UNBLOCK_THRESHOLD } from '../wallet.js';
 
 const txStore = createStore('transactions', {});
 const router = Router();
@@ -68,33 +66,6 @@ router.post('/:id/approve',
       totalDeposited: newTotal,
     };
 
-    const currentStage = Number(user.stage ?? 0);
-    const currentlyBlocked = !!user.blocked;
-    let autoPromoted = false;
-    let autoUnblocked = false;
-    let promotedFrom = null;
-    let promotedTo = null;
-
-    if (currentStage < 3 && amount >= STAGE_PROMOTE_THRESHOLD) {
-      const target = currentStage + 1;
-      patch.stage = target;
-      patch.stageUpdatedAt = new Date().toISOString();
-      patch.stageUpdatedBy = 'system:deposit-approval';
-      if (target === 3) {
-        patch.blocked = true;
-        patch.blockedAt = new Date().toISOString();
-        patch.blockedBy = 'system:deposit-approval';
-      }
-      autoPromoted = true;
-      promotedFrom = currentStage;
-      promotedTo = target;
-    } else if (currentStage === 3 && currentlyBlocked && amount >= STAGE3_UNBLOCK_THRESHOLD) {
-      patch.blocked = false;
-      patch.blockedAt = null;
-      patch.blockedBy = null;
-      autoUnblocked = true;
-    }
-
     const updated = await withUserLock(foundUserId, () => updateUser(foundUserId, patch));
 
     const userTxs = txStore.get(foundUserId) || [];
@@ -111,27 +82,6 @@ router.post('/:id/approve',
       account: { ...updated, passwordHash: undefined, googleId: undefined, activity: undefined },
     });
     emitAdmin('deposit:approved', { userId: foundUserId, amount, transactionId: txId, approvedBy: req.admin?.email });
-
-    if (autoPromoted) {
-      logActivity(foundUserId, {
-        kind: 'stage_auto_promoted', from: promotedFrom, to: promotedTo,
-        trigger: 'deposit_approval', singleDeposit: amount, totalDeposited: newTotal,
-      });
-      recordAudit({
-        actorId: null, action: 'user.stage.auto_promote', target: foundUserId, targetType: 'user',
-        severity: promotedTo === 3 ? 'warning' : 'info',
-        meta: { from: promotedFrom, to: promotedTo, singleDeposit: amount, totalDeposited: newTotal, threshold: STAGE_PROMOTE_THRESHOLD, trigger: 'deposit_approval', ...(promotedTo === 3 ? { autoBlocked: true } : {}) },
-      });
-      emitToUser(foundUserId, 'stage:promoted', { stage: promotedTo });
-    }
-    if (autoUnblocked) {
-      logActivity(foundUserId, { kind: 'stage3_auto_unblocked', trigger: 'deposit_approval', singleDeposit: amount, threshold: STAGE3_UNBLOCK_THRESHOLD });
-      recordAudit({
-        actorId: null, action: 'user.unblocked', target: foundUserId, targetType: 'user', severity: 'info',
-        meta: { trigger: 'deposit_approval', singleDeposit: amount, threshold: STAGE3_UNBLOCK_THRESHOLD },
-      });
-      emitToUser(foundUserId, 'account:unblocked', { trigger: 'deposit_approval' });
-    }
 
     // Referral bonus: on first deposit, credit the referrer 10% of the amount.
     if (updated.totalDeposited === amount && updated.referredBy) {

@@ -309,11 +309,14 @@ export default function AppProviders({ children }) {
       }
     });
     const offSettled = onLive('bet:settled', async () => { try { await tick(); } catch {} });
+    const offStatus = onLive('account:status-changed', ({ accountStatus }) => {
+      setAccount((prev) => prev ? { ...prev, accountStatus } : prev);
+    });
 
     return () => {
       alive = false;
       clearInterval(id);
-      offWallet?.(); offPending?.(); offApproved?.(); offRejected?.(); offNotif?.(); offWin?.(); offSettled?.();
+      offWallet?.(); offPending?.(); offApproved?.(); offRejected?.(); offNotif?.(); offWin?.(); offSettled?.(); offStatus?.();
     };
   }, [accountId]);
 

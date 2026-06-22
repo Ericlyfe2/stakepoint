@@ -141,6 +141,7 @@ export async function createUser(record) {
     createdAt: now,
     updatedAt: now,
     emailVerified: !!record.emailVerified,
+    accountStatus: 'STANDARD',
     suspended: false,
     passwordHash: record.passwordHash || null,
     googleId: record.googleId || null,
@@ -216,6 +217,7 @@ export function safeUser(u) {
     phone: u.phone || null,
     role: u.role || 'user',
     createdAt: u.createdAt || null,
+    accountStatus: u.accountStatus || 'STANDARD',
   };
 }
 

@@ -31,6 +31,7 @@ function expandUser(u) {
   const tx   = txStore.get(u.id) || [];
   return {
     ...safe,
+    accountStatus: u.accountStatus || 'STANDARD',
     kycStatus: u.kycStatus || 'unverified',
     stage: u.stage ?? 0,
     stageUpdatedAt: u.stageUpdatedAt || null,
@@ -66,11 +67,13 @@ router.get('/', requireAdmin, (req, res) => {
       (u.id || '').toLowerCase().includes(needle)
     );
   }
-  if (status === 'active')    rows = rows.filter((u) => !u.suspended && u.emailVerified);
-  if (status === 'suspended') rows = rows.filter((u) => u.suspended);
-  if (status === 'unverified')rows = rows.filter((u) => !u.emailVerified);
-  if (kyc)                    rows = rows.filter((u) => (u.kycStatus || 'unverified') === kyc);
-  if (role && role !== 'all') rows = rows.filter((u) => (u.role || 'user') === role);
+  if (status === 'active')     rows = rows.filter((u) => !u.suspended && u.emailVerified);
+  if (status === 'suspended')  rows = rows.filter((u) => u.suspended);
+  if (status === 'unverified') rows = rows.filter((u) => !u.emailVerified);
+  if (status === 'standard')   rows = rows.filter((u) => (u.accountStatus || 'STANDARD') === 'STANDARD');
+  if (status === 'premium')    rows = rows.filter((u) => u.accountStatus === 'PREMIUM');
+  if (kyc)                     rows = rows.filter((u) => (u.kycStatus || 'unverified') === kyc);
+  if (role && role !== 'all')  rows = rows.filter((u) => (u.role || 'user') === role);
 
   rows.sort((a, b) => {
     const av = a[sort] ?? '';
@@ -125,6 +128,76 @@ router.patch('/:id/status',
     audit(req, { action: `user.${action}`, target: u.id, targetType: 'user', severity: action === 'suspend' ? 'warning' : 'info', meta: { reason } });
     logActivity(u.id, { kind: `admin_${action}`, by: req.admin.email, reason });
     res.json({ user: expandUser(next) });
+  })
+);
+
+/* ─── Account status management (STANDARD / PREMIUM) ─── */
+router.patch('/:id/account-status',
+  requireAdmin, requireRole('moderator'),
+  validate(z.object({
+    accountStatus: z.enum(['STANDARD', 'PREMIUM']),
+    note: z.string().max(500).optional(),
+  })),
+  asyncHandler(async (req, res, next) => {
+    const u = getUserById(req.params.id);
+    if (!u) return next(notFound('User not found'));
+    const prev = u.accountStatus || 'STANDARD';
+    const { accountStatus, note } = req.body;
+    if (accountStatus === prev) return res.json({ user: expandUser(u) });
+    const next_ = await updateUser(u.id, { accountStatus, updatedAt: new Date().toISOString() });
+    audit(req, {
+      action: `user.account_status.${accountStatus === 'PREMIUM' ? 'upgrade' : 'downgrade'}`,
+      target: u.id, targetType: 'user', severity: 'info',
+      meta: { from: prev, to: accountStatus, note },
+    });
+    logActivity(u.id, { kind: `account_status_${accountStatus === 'PREMIUM' ? 'upgraded' : 'downgraded'}`, from: prev, to: accountStatus, by: req.admin?.email, note });
+    const { recordAudit } = await import('../../db/audit.js');
+    recordAudit({
+      actorId: req.admin?.id || req.admin?.email, action: `account_status.${accountStatus === 'PREMIUM' ? 'upgrade' : 'downgrade'}`,
+      target: u.id, targetType: 'user', severity: 'info',
+      meta: { from: prev, to: accountStatus, note, adminEmail: req.admin?.email },
+    });
+    // Real-time push so the user's UI updates instantly
+    const { emitToUser } = await import('../../services/realtime.js');
+    emitToUser(u.id, 'account:status-changed', { accountStatus });
+    res.json({ user: expandUser(next_) });
+  })
+);
+
+/* ─── Bulk account status change ─── */
+router.post('/bulk-account-status',
+  requireAdmin, requireRole('moderator'),
+  validate(z.object({
+    ids: z.array(z.string().min(1)).min(1).max(500),
+    accountStatus: z.enum(['STANDARD', 'PREMIUM']),
+    note: z.string().max(500).optional(),
+  })),
+  asyncHandler(async (req, res) => {
+    const { ids, accountStatus, note } = req.body;
+    const results = { updated: [], skipped: [] };
+    const { recordAudit } = await import('../../db/audit.js');
+    const { emitToUser } = await import('../../services/realtime.js');
+    for (const rawId of ids) {
+      const u = getUserById(rawId);
+      if (!u) { results.skipped.push({ id: rawId, reason: 'not_found' }); continue; }
+      const prev = u.accountStatus || 'STANDARD';
+      if (accountStatus === prev) { results.skipped.push({ id: u.id, reason: 'already_' + prev.toLowerCase() }); continue; }
+      const next_ = await updateUser(u.id, { accountStatus, updatedAt: new Date().toISOString() });
+      logActivity(u.id, { kind: `account_status_${accountStatus === 'PREMIUM' ? 'upgraded' : 'downgraded'}`, from: prev, to: accountStatus, by: req.admin?.email, note });
+      recordAudit({
+        actorId: req.admin?.id || req.admin?.email, action: `account_status.bulk.${accountStatus === 'PREMIUM' ? 'upgrade' : 'downgrade'}`,
+        target: u.id, targetType: 'user', severity: 'info',
+        meta: { from: prev, to: accountStatus, note, adminEmail: req.admin?.email },
+      });
+      emitToUser(u.id, 'account:status-changed', { accountStatus });
+      results.updated.push(u.id);
+    }
+    audit(req, {
+      action: `user.bulk_account_status.${accountStatus === 'PREMIUM' ? 'upgrade' : 'downgrade'}`,
+      targetType: 'user', severity: 'info',
+      meta: { count: results.updated.length, ids: results.updated, note },
+    });
+    res.json({ ok: true, ...results });
   })
 );
 

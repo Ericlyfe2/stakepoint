@@ -4,8 +4,9 @@
  * Deposit / Withdraw split CTA, then a navigable menu list. Profile edit and
  * password change open as inline sheets without leaving the page.
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
 import { fetchTransactions, updateProfile, changePassword } from '../api/betApi.js';
 import { useAccount, useToast } from '../providers/AccountProvider.jsx';
 import NotificationBell from '../components/NotificationBell.jsx';
@@ -34,6 +35,8 @@ const I = {
   logout:  (p) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg>,
   chevron: (p) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" {...p}><polyline points="9 18 15 12 9 6"/></svg>,
   close:   (p) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M6 6l12 12M6 18 18 6"/></svg>,
+  crown:   (p) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><path d="M2 20h20M4 20V8l4 4 4-8 4 8 4-4v12"/></svg>,
+  star:    (p) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>,
 };
 
 export default function ProfilePage() {
@@ -41,7 +44,10 @@ export default function ProfilePage() {
   const { account, refresh, signOut, openDeposit, openWithdraw } = useAccount();
   const { toast } = useToast();
 
-  const [sheet, setSheet] = useState(null); // 'profile' | 'security' | 'transactions' | 'notifications' | null
+  const [sheet, setSheet] = useState(null);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => { setMounted(true); }, []);
 
   if (!account) {
     return (
@@ -56,13 +62,8 @@ export default function ProfilePage() {
     );
   }
 
-  const stage = (() => {
-    const n = Number(account.stage);
-    if (!Number.isFinite(n)) return 0;
-    return Math.min(4, Math.max(0, n));
-  })();
-  const isUnverified = stage === 0;
-
+  const status = account.accountStatus || 'STANDARD';
+  const isPremium = status === 'PREMIUM';
   const identity = account.phone || shortId(account.email) || 'Account';
 
   const handleSignOut = async () => {
@@ -82,35 +83,41 @@ export default function ProfilePage() {
   ];
 
   return (
-    <main className="acct">
+    <motion.main
+      className="acct"
+      initial={{ opacity: 0, y: 30 }}
+      animate={mounted ? { opacity: 1, y: 0 } : {}}
+      transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+    >
       {/* Brand + balance pill */}
-      <header className="acct-top">
+      <motion.header
+        className="acct-top"
+        initial={{ opacity: 0, y: -15 }}
+        animate={mounted ? { opacity: 1, y: 0 } : {}}
+        transition={{ duration: 0.4, delay: 0.1, ease: 'easeOut' }}
+      >
         <div className="acct-brand">Xen<em>bet</em></div>
         <button type="button" className="acct-balance-pill" onClick={() => navigate('/wallet')}>
           <span className="acct-balance-icon" aria-hidden><I.user width="14" height="14" /></span>
           <span className="acct-balance-amt">₵&nbsp;{fmtMoney(account.balance)}</span>
         </button>
-      </header>
+      </motion.header>
 
-      {/* Identity row */}
-      <button type="button" className="acct-identity" onClick={() => setSheet('profile')}>
+      {/* Identity row with animated status badge */}
+      <motion.button
+        type="button"
+        className="acct-identity"
+        onClick={() => setSheet('profile')}
+        initial={{ opacity: 0, y: 20 }}
+        animate={mounted ? { opacity: 1, y: 0 } : {}}
+        transition={{ duration: 0.4, delay: 0.2, ease: 'easeOut' }}
+      >
         <span className="acct-identity-avatar"><I.user width="18" height="18" /></span>
         <span className="acct-identity-name">{identity}</span>
-        <span className={`acct-identity-alert${isUnverified ? ' is-warn' : ''}`} aria-hidden>
-          <I.alert width="16" height="16" />
+        <span className="acct-status-wrapper">
+          <AccountStatusBadge status={status} />
         </span>
-      </button>
-
-      {/* Verification banner (Stage 0 only) */}
-      {isUnverified && (
-        <div className="acct-verify" role="status">
-          <span className="acct-verify-icon" aria-hidden><I.shield width="18" height="18" /></span>
-          <div className="acct-verify-text">
-            <strong>Account not verified</strong>
-            <p>Complete deposit to unlock Premium</p>
-          </div>
-        </div>
-      )}
+      </motion.button>
 
       {/* Total balance + CTAs */}
       <div className="acct-balance-row">
@@ -168,7 +175,24 @@ export default function ProfilePage() {
       )}
 
       <style>{ACCT_CSS}</style>
-    </main>
+    </motion.main>
+  );
+}
+
+function AccountStatusBadge({ status }) {
+  const isPremium = status === 'PREMIUM';
+  return (
+    <motion.div
+      className={`acct-status-badge ${isPremium ? 'premium' : 'standard'}`}
+      initial={{ opacity: 0, scale: 0.5 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ type: 'spring', stiffness: 250, damping: 14, delay: 0.4 }}
+    >
+      <span className="acct-status-icon">
+        {isPremium ? <I.crown width="14" height="14" /> : <I.shield width="12" height="12" />}
+      </span>
+      <span className="acct-status-label">{status}</span>
+    </motion.div>
   );
 }
 
@@ -477,7 +501,7 @@ html[data-theme="light"] .acct {
   display: grid;
   grid-template-columns: auto 1fr auto;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   width: 100%;
   padding: 12px 14px;
   margin-bottom: 12px;
@@ -488,15 +512,17 @@ html[data-theme="light"] .acct {
   cursor: pointer;
   font: inherit;
   text-align: left;
-  transition: background .15s, border-color .15s;
+  transition: background .15s, border-color .15s, transform .15s;
 }
-.acct-identity:hover { background: var(--surface-2); border-color: var(--green-soft); }
+.acct-identity:hover { background: var(--surface-2); border-color: var(--green-soft); transform: translateY(-1px); }
+.acct-identity:active { transform: scale(0.99); }
 .acct-identity-avatar {
   width: 34px; height: 34px;
   border-radius: 50%;
   background: linear-gradient(135deg, var(--green), var(--green-2));
   color: #fff;
   display: grid; place-items: center;
+  flex-shrink: 0;
 }
 .acct-identity-name {
   font-size: 15px;
@@ -505,45 +531,129 @@ html[data-theme="light"] .acct {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  min-width: 0;
 }
-.acct-identity-alert {
-  width: 30px; height: 30px;
-  border-radius: 50%;
-  background: rgba(0, 0, 0, 0.25);
-  color: var(--text-dim);
-  display: grid; place-items: center;
-}
-.acct-identity-alert.is-warn { background: var(--yellow); color: #1a1500; }
-
-/* Verification banner */
-.acct-verify {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 12px;
+.acct-status-wrapper {
+  display: flex;
   align-items: center;
-  padding: 12px 14px;
-  margin-bottom: 14px;
-  background: var(--warn-bg);
-  border: 1px solid var(--warn-border);
-  border-radius: 14px;
 }
-.acct-verify-icon {
-  width: 32px; height: 32px;
-  border-radius: 10px;
-  background: rgba(250, 204, 21, 0.16);
-  color: var(--yellow);
-  display: grid; place-items: center;
-}
-.acct-verify-text strong {
-  display: block;
-  color: var(--yellow);
-  font-size: 14.5px;
+
+/* ─── Account Status Badge ─── */
+.acct-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px 4px 8px;
+  border-radius: 999px;
+  font-size: 11px;
   font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  position: relative;
+  overflow: hidden;
 }
-.acct-verify-text p {
-  margin: 2px 0 0;
-  font-size: 12.5px;
-  color: var(--text-soft);
+
+/* STANDARD */
+.acct-status-badge.standard {
+  background: linear-gradient(135deg, rgba(148, 163, 184, 0.12), rgba(148, 163, 184, 0.06));
+  color: #94a3b8;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+}
+.acct-status-badge.standard .acct-status-icon {
+  opacity: 0.7;
+}
+
+.standard::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(148, 163, 184, 0.08), transparent);
+  transform: translateX(-100%);
+  animation: standardSweep 3s ease-in-out infinite;
+}
+@keyframes standardSweep {
+  0%, 100% { transform: translateX(-100%); }
+  50% { transform: translateX(100%); }
+}
+
+.standard::after {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background: linear-gradient(135deg, rgba(148, 163, 184, 0.3), transparent, rgba(148, 163, 184, 0.15)) border-box;
+  -webkit-mask: linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0);
+  mask: linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  animation: standardBorderPulse 3s ease-in-out infinite;
+}
+@keyframes standardBorderPulse {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 0.8; }
+}
+
+/* PREMIUM */
+.acct-status-badge.premium {
+  background: linear-gradient(135deg, rgba(234, 179, 8, 0.15), rgba(202, 138, 4, 0.08));
+  color: #fbbf24;
+  border: 1px solid rgba(234, 179, 8, 0.3);
+  box-shadow: 0 0 12px rgba(234, 179, 8, 0.15);
+}
+.acct-status-badge.premium .acct-status-icon {
+  color: #fbbf24;
+}
+
+.premium::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(234, 179, 8, 0.12), transparent);
+  transform: translateX(-100%);
+  animation: premiumShimmer 2.5s ease-in-out infinite;
+}
+@keyframes premiumShimmer {
+  0%, 100% { transform: translateX(-100%); }
+  50% { transform: translateX(100%); }
+}
+
+.premium::after {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background: linear-gradient(135deg, rgba(234, 179, 8, 0.5), rgba(251, 191, 36, 0.2), rgba(234, 179, 8, 0.5)) border-box;
+  -webkit-mask: linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0);
+  mask: linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  animation: premiumBorderGlow 2s ease-in-out infinite;
+}
+@keyframes premiumBorderGlow {
+  0%, 100% { opacity: 0.4; transform: rotate(0deg); }
+  50% { opacity: 1; transform: rotate(180deg); }
+}
+
+.premium .acct-status-label {
+  background: linear-gradient(135deg, #fbbf24, #f59e0b, #fbbf24);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  filter: drop-shadow(0 0 6px rgba(251, 191, 36, 0.3));
+}
+
+html[data-theme="light"] .acct-status-badge.standard {
+  background: linear-gradient(135deg, rgba(100, 116, 139, 0.1), rgba(100, 116, 139, 0.05));
+  color: #64748b;
+  border-color: rgba(100, 116, 139, 0.2);
+}
+html[data-theme="light"] .acct-status-badge.premium {
+  background: linear-gradient(135deg, rgba(217, 119, 6, 0.12), rgba(217, 119, 6, 0.06));
+  color: #b45309;
+  border-color: rgba(217, 119, 6, 0.25);
 }
 
 /* Total balance row */

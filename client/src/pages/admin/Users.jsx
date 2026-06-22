@@ -16,7 +16,7 @@ import {
   adminUserReset, adminImpersonate, adminDeleteUser, adminBulkDeleteUsers,
   adminDeleteAllUsers,
   adminCreateUser, adminUserCredentials,
-  adminUserStage, adminUserBlocked,
+  adminUserAccountStatus, adminBulkAccountStatus,
 } from '../../api/adminApi.js';
 
 function toBookingCode(id = '') {
@@ -27,19 +27,7 @@ function toBookingCode(id = '') {
   return letters + digits;
 }
 
-const STAGE_LABELS = { 0: 'New', 1: 'Registered', 2: 'Verified', 3: 'Approved', 4: 'VIP' };
-const STAGE_GRADIENTS = {
-  0: 'linear-gradient(135deg, #475569 0%, #94a3b8 100%)',
-  1: 'linear-gradient(135deg, #7c5cff 0%, #22d3ee 100%)',
-  2: 'linear-gradient(135deg, #f5a623 0%, #ff6b1a 100%)',
-  3: 'linear-gradient(135deg, #18f0a1 0%, #1aa46a 100%)',
-  4: 'linear-gradient(135deg, #ffd166 0%, #ff8a3d 100%)',
-};
-const stageOf = (u) => {
-  const n = Number(u?.stage);
-  if (!Number.isFinite(n)) return 0;
-  return Math.min(4, Math.max(0, n));
-};
+
 import { Card, Badge, Drawer, Modal, Empty, SkeletonRow, moneyFmt, numFmt, ago, dateShort } from '../../components/admin/primitives.jsx';
 import {
   IconSearch, IconDownload, IconRefresh, IconBan, IconCheck, IconKey, IconUsers, IconActivity, IconCash,
@@ -68,6 +56,7 @@ export default function UsersPage() {
   const [drawerTab, setDrawerTab] = useState('profile');
   const [picked, setPicked] = useState(new Set()); // user ids ticked for bulk action
   const [bulkOpen, setBulkOpen] = useState(false);
+  const [bulkStatusOpen, setBulkStatusOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [deleteAllOpen, setDeleteAllOpen] = useState(false);
   const debounceRef = useRef(0);
@@ -137,6 +126,20 @@ export default function UsersPage() {
     }
   }
 
+  async function bulkStatus(targetStatus, note) {
+    const ids = Array.from(picked);
+    if (!ids.length) return;
+    try {
+      const r = await adminBulkAccountStatus(ids, targetStatus, note);
+      showToast(`Updated ${r.updated} account${r.updated === 1 ? '' : 's'} to ${targetStatus}.`);
+      setPicked(new Set());
+      setBulkStatusOpen(false);
+      load();
+    } catch (e) {
+      showToast(e.message || 'Bulk status update failed', 'error');
+    }
+  }
+
   async function deleteAll(reason) {
     try {
       const r = await adminDeleteAllUsers(reason);
@@ -200,6 +203,8 @@ export default function UsersPage() {
             <option value="active">Active</option>
             <option value="suspended">Suspended</option>
             <option value="unverified">Unverified</option>
+            <option value="standard">Standard</option>
+            <option value="premium">Premium</option>
           </select>
           <select value={filters.kyc} onChange={(e) => setFilters((f) => ({ ...f, kyc: e.target.value }))}>
             <option value="">Any KYC</option>
@@ -234,6 +239,9 @@ export default function UsersPage() {
             <span style={{ color: 'var(--text-dim)', fontSize: 12 }}>Choose a bulk action</span>
             <div className="grow" />
             <button className="adm-btn ghost" onClick={() => setPicked(new Set())}>Clear</button>
+            <button className="adm-btn" onClick={() => setBulkStatusOpen(true)}>
+              <IconCheck size={14} /> Set account status
+            </button>
             {isSuper && (
               <button className="adm-btn danger" onClick={() => setBulkOpen(true)}>
                 <IconTrash size={14} /> Delete selected
@@ -298,11 +306,16 @@ export default function UsersPage() {
                     </div>
                   </td>
                   <td>
-                    {u.suspended
-                      ? <Badge tone="danger">Suspended</Badge>
-                      : u.emailVerified
-                        ? <Badge tone="success" dot>Active</Badge>
-                        : <Badge tone="warn">Unverified</Badge>}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      {u.suspended
+                        ? <Badge tone="danger">Suspended</Badge>
+                        : u.emailVerified
+                          ? <Badge tone="success" dot>Active</Badge>
+                          : <Badge tone="warn">Unverified</Badge>}
+                      {u.accountStatus === 'PREMIUM' && (
+                        <Badge tone="warn" dot>Premium</Badge>
+                      )}
+                    </div>
                   </td>
                   <td><Badge tone={KYC_TONES[u.kycStatus] || 'default'}>{u.kycStatus || 'unverified'}</Badge></td>
                   <td className="num"><strong>{moneyFmt(u.balance, u.currency)}</strong></td>
@@ -337,6 +350,13 @@ export default function UsersPage() {
         count={picked.size}
         onClose={() => setBulkOpen(false)}
         onConfirm={bulkDelete}
+      />
+
+      <BulkStatusModal
+        open={bulkStatusOpen}
+        count={picked.size}
+        onClose={() => setBulkStatusOpen(false)}
+        onConfirm={bulkStatus}
       />
 
       <CreateUserModal
@@ -523,6 +543,51 @@ function DeleteAllModal({ open, count, onClose, onConfirm }) {
   );
 }
 
+function BulkStatusModal({ open, count, onClose, onConfirm }) {
+  const [targetStatus, setTargetStatus] = useState('PREMIUM');
+  const [note, setNote] = useState('');
+  useEffect(() => { if (open) { setTargetStatus('PREMIUM'); setNote(''); } }, [open]);
+  return (
+    <Modal
+      open={open}
+      onClose={onClose}
+      title={`Set account status for ${count} user${count === 1 ? '' : 's'}`}
+      description="Changes the accountStatus field. PREMIUM enables premium-only features; STANDARD is the default level for all new accounts."
+      footer={null}
+    >
+      <form
+        onSubmit={(e) => { e.preventDefault(); onConfirm(targetStatus, note || `bulk set to ${targetStatus}`); }}
+        style={{ display: 'flex', flexDirection: 'column', gap: 12 }}
+      >
+        <div style={{ display: 'flex', gap: 8 }}>
+          {['PREMIUM', 'STANDARD'].map((s) => (
+            <button key={s} type="button" className={`adm-btn ${targetStatus === s ? 'primary' : ''}`} onClick={() => setTargetStatus(s)}>
+              {s === 'PREMIUM' ? '★ PREMIUM' : '○ STANDARD'}
+            </button>
+          ))}
+        </div>
+        <div className="adm-field">
+          <label>Note (recorded in audit log)</label>
+          <input
+            className="adm-input"
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder="e.g. sweep upgrade, batch correction"
+            maxLength={500}
+            autoFocus
+          />
+        </div>
+        <div className="adm-modal-actions">
+          <button type="button" className="adm-btn ghost" onClick={onClose}>Cancel</button>
+          <button type="submit" className="adm-btn primary">
+            Set to {targetStatus}
+          </button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
 function StatTile({ label, value }) {
   return (
     <div className="adm-stat" style={{ '--accentGrad': 'linear-gradient(135deg,#7c5cff,#22d3ee)' }}>
@@ -580,23 +645,11 @@ function UserDrawer({ open, user, tab, setTab, onClose, onUpdate, onDeleted, has
       showToast(`KYC set to ${status}.`);
     } catch (e) { showToast(e.message, 'error'); }
   }
-  async function doStage(direction) {
-    const current = stageOf(detail || user);
-    const target = direction === 'up' ? Math.min(4, current + 1) : Math.max(0, current - 1);
-    if (target === current) return;
+  async function doAccountStatus(status) {
     try {
-      const { user: updated } = await adminUserStage(user.id, target);
+      const { user: updated } = await adminUserAccountStatus(user.id, status);
       setDetail(updated); onUpdate(updated);
-      showToast(direction === 'up'
-        ? `Verified — promoted to Stage ${target} (${STAGE_LABELS[target]}).`
-        : `Moved back to Stage ${target} (${STAGE_LABELS[target]}).`);
-    } catch (e) { showToast(e.message, 'error'); }
-  }
-  async function doBlocked(blocked) {
-    try {
-      const { user: updated } = await adminUserBlocked(user.id, blocked);
-      setDetail(updated); onUpdate(updated);
-      showToast(blocked ? 'Account blocked.' : 'Account unblocked.');
+      showToast(`Account status set to ${status}.`);
     } catch (e) { showToast(e.message, 'error'); }
   }
   async function saveTags(tags) {
@@ -694,8 +747,7 @@ function UserDrawer({ open, user, tab, setTab, onClose, onUpdate, onDeleted, has
           logins={logins}
           hasRole={hasRole}
           onKyc={doKyc}
-          onStage={doStage}
-          onBlocked={doBlocked}
+          onAccountStatus={doAccountStatus}
           onTags={saveTags}
           onNotes={saveNotes}
         />
@@ -916,14 +968,11 @@ function DeleteUserModal({ open, onClose, user, onConfirm }) {
   );
 }
 
-function ProfileTab({ user, logins = [], hasRole, onKyc, onStage, onBlocked, onTags, onNotes }) {
+function ProfileTab({ user, logins = [], hasRole, onKyc, onAccountStatus, onTags, onNotes }) {
   const [tagInput, setTagInput] = useState('');
   const [notes, setNotes] = useState(user.notes || '');
   const lastLogin  = logins.find((e) => e.kind === 'login_success' || e.kind === 'login_google');
   const lastLogout = logins.find((e) => e.kind === 'logout');
-  const current = stageOf(user);
-  const canMutateStage = hasRole('moderator', 'support');
-  const blocked = !!user.blocked;
   return (
     <>
       <Card flush>
@@ -953,105 +1002,46 @@ function ProfileTab({ user, logins = [], hasRole, onKyc, onStage, onBlocked, onT
       </Card>
 
       <Card
-        title="Verification stage"
-        subtitle="Move this player through the onboarding funnel. One step at a time."
+        title="Account Status"
+        subtitle="STANDARD and PREMIUM levels. Only admins can change this — never auto-assigned."
         pill={
           <span
             style={{
               padding: '4px 10px', borderRadius: 999,
-              background: STAGE_GRADIENTS[current], color: '#0a0d14',
+              background: user.accountStatus === 'PREMIUM'
+                ? 'linear-gradient(135deg, #fbbf24, #f59e0b)'
+                : 'linear-gradient(135deg, #64748b, #94a3b8)',
+              color: user.accountStatus === 'PREMIUM' ? '#0a0d14' : '#fff',
               fontWeight: 800, fontSize: 11, letterSpacing: 0.02,
             }}
           >
-            Stage {current} · {STAGE_LABELS[current]}
+            {user.accountStatus || 'STANDARD'}
           </span>
         }
       >
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
-          {current < 4 ? (
-            <button
-              type="button"
-              className="adm-btn primary"
-              disabled={!canMutateStage}
-              onClick={() => onStage('up')}
-              style={{ flex: '1 1 220px', justifyContent: 'center', minHeight: 42 }}
-            >
-              <IconCheck size={14} /> Verify · Promote to Stage {current + 1} ({STAGE_LABELS[current + 1]})
-            </button>
-          ) : (
-            <div
-              style={{
-                flex: '1 1 220px',
-                display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                padding: '11px 16px', borderRadius: 10,
-                background: 'linear-gradient(135deg, rgba(255, 209, 102, 0.18), rgba(255, 138, 61, 0.08))',
-                border: '1px solid rgba(255, 209, 102, 0.40)',
-                color: '#ffd166', fontWeight: 700, fontSize: 13,
-              }}
-            >
-              <IconCheck size={14} /> VIP · Free withdrawals · No popups
-            </div>
-          )}
-          {current > 0 && (
-            <button
-              type="button"
-              className="adm-btn ghost"
-              disabled={!canMutateStage}
-              onClick={() => onStage('down')}
-              title={`Move back to Stage ${current - 1} (${STAGE_LABELS[current - 1]})`}
-              style={{ minHeight: 42 }}
-            >
-              ← Stage {current - 1}
-            </button>
-          )}
-        </div>
-        {user.stageUpdatedAt && (
-          <div style={{ marginTop: 10, color: 'var(--text-dim)', fontSize: 12 }}>
-            Last changed {ago(user.stageUpdatedAt)} by <strong>{user.stageUpdatedBy || 'admin'}</strong>.
-          </div>
-        )}
-        {!canMutateStage && (
-          <div style={{ marginTop: 10, color: 'var(--text-dim)', fontSize: 12 }}>
-            Read-only — your role can't promote/demote stages.
-          </div>
-        )}
-
-        {/* Account block state — only relevant at Stage 3 (Stage 4 is always unlocked) */}
-        {(current === 3) && (
-          <div
-            style={{
-              marginTop: 14,
-              padding: 12,
-              borderRadius: 10,
-              background: blocked
-                ? 'linear-gradient(135deg, rgba(255,93,108,.12), rgba(255,93,108,.04))'
-                : 'linear-gradient(135deg, rgba(24,240,161,.10), rgba(24,240,161,.03))',
-              border: `1px solid ${blocked ? 'rgba(255,93,108,.35)' : 'rgba(24,240,161,.30)'}`,
-            }}
+          <button
+            type="button"
+            className={`adm-btn ${user.accountStatus !== 'PREMIUM' ? 'primary' : ''}`}
+            disabled={!hasRole('moderator')}
+            onClick={() => onAccountStatus('PREMIUM')}
+            style={{ flex: '1 1 200px', justifyContent: 'center', minHeight: 42 }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
-              <div>
-                <div style={{ fontWeight: 800, fontSize: 13, color: blocked ? 'var(--danger)' : 'var(--accent)' }}>
-                  {blocked ? '🔒 Account locked' : '🔓 Account unlocked'}
-                </div>
-                <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 3 }}>
-                  {blocked
-                    ? <>Withdrawal popup shows “account blocked”. Promotion to Stage 3 locks automatically.{user.blockedAt ? <> · {ago(user.blockedAt)} by <strong>{user.blockedBy || 'admin'}</strong></> : null}</>
-                    : 'Player can withdraw normally at Stage 3.'}
-                </div>
-              </div>
-              {canMutateStage && (
-                blocked ? (
-                  <button type="button" className="adm-btn success" onClick={() => onBlocked(false)}>
-                    <IconCheck size={14} /> Unblock account
-                  </button>
-                ) : (
-                  <button type="button" className="adm-btn warn" onClick={() => onBlocked(true)}>
-                    <IconBan size={14} /> Block account
-                  </button>
-                )
-              )}
-            </div>
+            ★ Upgrade to PREMIUM
+          </button>
+          <button
+            type="button"
+            className={`adm-btn ${user.accountStatus === 'PREMIUM' ? 'primary' : ''}`}
+            disabled={!hasRole('moderator')}
+            onClick={() => onAccountStatus('STANDARD')}
+            style={{ flex: '1 1 200px', justifyContent: 'center', minHeight: 42 }}
+          >
+            ○ Downgrade to STANDARD
+          </button>
+        </div>
+        {!hasRole('moderator') && (
+          <div style={{ marginTop: 10, color: 'var(--text-dim)', fontSize: 12 }}>
+            Read-only — your role can't change account status.
           </div>
         )}
       </Card>
