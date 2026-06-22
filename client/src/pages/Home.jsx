@@ -503,6 +503,58 @@ export default function Home({ initialChip }) {
     }
   }, [codeInput, loadFromCode, closeCodeModal]);
 
+  const makeBetId = () => `bv-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+  const generateBookingCode = () => {
+    const A = 'ABCDEFGHIJKLMNPQRSTUVWXYZ';
+    const D = '123456789';
+    const letters = A[Math.floor(Math.random() * A.length)] + A[Math.floor(Math.random() * A.length)];
+    let digits = '';
+    for (let i = 0; i < 5; i++) digits += D[Math.floor(Math.random() * D.length)];
+    return letters + digits;
+  };
+
+  const onBookBet = useCallback(() => {
+    setSlipErr('');
+    if (!selections.length) { setSlipErr('Add at least one selection to your bet slip.'); return; }
+    if (betMode === 'multiple' && selections.length < 2) {
+      setSlipErr('Multiple bets need at least 2 selections.'); return;
+    }
+    if (betMode === 'system' && !systemDef) {
+      setSlipErr('Pick a valid number of selections for a system bet (3–8).'); return;
+    }
+    const linePrice = parseStake(stake);
+    if (linePrice <= 0) { setSlipErr('Enter a stake amount.'); return; }
+    const cost = betMode === 'system' ? linePrice * linesCount : linePrice;
+
+    const receipt = {
+      id: makeBetId(),
+      bookingCode: generateBookingCode(),
+      placedAt: new Date().toISOString(),
+      mode: betMode,
+      stake: Number(cost.toFixed(2)),
+      currency: 'GHS',
+      totalOdds: Number(totalOdds.toFixed(4)),
+      potentialWin: Number(payout.toFixed(2)),
+      bonusRate: 0.08,
+      legs: selections.map((s) => ({
+        matchId: s.matchId,
+        market: s.market,
+        outcome: s.outcome,
+        odds: s.odds,
+        home: s.home || s.meta?.split(' vs ')?.[0] || '',
+        away: s.away || s.meta?.split(' vs ')?.[1] || '',
+        marketName: s.marketName || s.marketLabel || s.market,
+      })),
+      status: 'open',
+    };
+
+    setSelections([]);
+    setSlipOpen(false);
+    setSuccessBet(receipt);
+    toast(`Ticket booked — code ${receipt.bookingCode}.`);
+  }, [selections, betMode, systemDef, stake, linesCount, totalOdds, payout, toast]);
+
   const onPlaceBet = async () => {
     setSlipErr('');
     if (!selections.length) { setSlipErr('Add at least one selection to your bet slip.'); return; }
@@ -1439,10 +1491,7 @@ export default function Home({ initialChip }) {
                 <button 
                   type="button" 
                   className="sporty-book-bet-btn" 
-                  onClick={() => {
-                    setSlipOpen(false);
-                    toast('Ticket booked! Code: ME' + Math.floor(100000 + Math.random() * 900000));
-                  }}
+                  onClick={onBookBet}
                 >
                   Book Bet
                 </button>
