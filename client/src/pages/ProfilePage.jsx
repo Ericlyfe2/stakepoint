@@ -412,7 +412,6 @@ const ACCT_CSS = `
   --text: #f3f6f1;
   --text-soft: rgba(243, 246, 241, 0.78);
   --text-dim: rgba(243, 246, 241, 0.55);
-}
   --green: #16a34a;
   --green-2: #14803c;
   --green-soft: #1f8a4a;
