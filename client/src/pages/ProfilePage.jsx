@@ -45,9 +45,6 @@ export default function ProfilePage() {
   const { toast } = useToast();
 
   const [sheet, setSheet] = useState(null);
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => { setMounted(true); }, []);
 
   if (!account) {
     return (
@@ -63,7 +60,6 @@ export default function ProfilePage() {
   }
 
   const status = account.accountStatus || 'STANDARD';
-  const isPremium = status === 'PREMIUM';
   const identity = account.phone || shortId(account.email) || 'Account';
 
   const handleSignOut = async () => {
@@ -86,14 +82,14 @@ export default function ProfilePage() {
     <motion.main
       className="acct"
       initial={{ opacity: 0, y: 30 }}
-      animate={mounted ? { opacity: 1, y: 0 } : {}}
+      animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
     >
       {/* Brand + balance pill */}
       <motion.header
         className="acct-top"
         initial={{ opacity: 0, y: -15 }}
-        animate={mounted ? { opacity: 1, y: 0 } : {}}
+        animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4, delay: 0.1, ease: 'easeOut' }}
       >
         <div className="acct-brand">Xen<em>bet</em></div>
@@ -109,7 +105,7 @@ export default function ProfilePage() {
         className="acct-identity"
         onClick={() => setSheet('profile')}
         initial={{ opacity: 0, y: 20 }}
-        animate={mounted ? { opacity: 1, y: 0 } : {}}
+        animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4, delay: 0.2, ease: 'easeOut' }}
       >
         <span className="acct-identity-avatar"><I.user width="18" height="18" /></span>
@@ -416,6 +412,12 @@ const ACCT_CSS = `
   --text: #f3f6f1;
   --text-soft: rgba(243, 246, 241, 0.78);
   --text-dim: rgba(243, 246, 241, 0.55);
+  animation: pageFadeSlide 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+@keyframes pageFadeSlide {
+  0% { opacity: 0; transform: translateY(20px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
   --green: #16a34a;
   --green-2: #14803c;
   --green-soft: #1f8a4a;
@@ -552,6 +554,11 @@ html[data-theme="light"] .acct {
   white-space: nowrap;
   position: relative;
   overflow: hidden;
+  animation: badgePopIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.15s both;
+}
+@keyframes badgePopIn {
+  0% { opacity: 0; transform: scale(0.6); }
+  100% { opacity: 1; transform: scale(1); }
 }
 
 /* STANDARD */
@@ -568,9 +575,9 @@ html[data-theme="light"] .acct {
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(90deg, transparent, rgba(148, 163, 184, 0.08), transparent);
+  background: linear-gradient(90deg, transparent, rgba(148, 163, 184, 0.25), transparent);
   transform: translateX(-100%);
-  animation: standardSweep 3s ease-in-out infinite;
+  animation: standardSweep 2.5s ease-in-out infinite;
 }
 @keyframes standardSweep {
   0%, 100% { transform: translateX(-100%); }
@@ -610,9 +617,9 @@ html[data-theme="light"] .acct {
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(90deg, transparent, rgba(234, 179, 8, 0.12), transparent);
+  background: linear-gradient(90deg, transparent, rgba(234, 179, 8, 0.35), transparent);
   transform: translateX(-100%);
-  animation: premiumShimmer 2.5s ease-in-out infinite;
+  animation: premiumShimmer 2s ease-in-out infinite;
 }
 @keyframes premiumShimmer {
   0%, 100% { transform: translateX(-100%); }
