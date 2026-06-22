@@ -1193,33 +1193,17 @@ export default function Home({ initialChip }) {
         </>
       )}
 
-      {/* ─── Bottom stack: Grand Prize Winners + footer ─── */}
+      {/* ─── Grand Prize Winners ─── */}
       <div className="sb-bottom-stack">
         <GrandPrizeWinners />
-
-      {/* ─── Compliance / sponsors ─── */}
-      <div className="sb-compliance">
-        <div className="badge18">18+</div>
-        <div className="legal">© {new Date().getFullYear()} Xenbet GH · Licensed by the Gaming Commission of Ghana</div>
-        <div className="sponsors">
-          <span className="sponsor">Real Madrid</span>
-          <span className="sponsor">LaLiga</span>
-        </div>
-        <div className="tagline">The world's sharper betting platform</div>
-      </div>
       </div>
 
-      {/* ─── Featured section continues ─── */}
-
-      {/* ─── Floating slip pill (mobile only via CSS) ─── */}
-      {selections.length > 0 && (
-        <button type="button" className="sb-slip-pill" onClick={() => setSlipOpen(true)}>
-          <OddsGauge odds={totalOdds} size={44} />
-          <span className="ct">{selections.length}</span>
-          <span>Bet slip</span>
-          <span className="odds">@ {totalOdds.toFixed(2)}</span>
-        </button>
-      )}
+      {/* ─── Draggable floating betslip button ─── */}
+      <DraggableBetFAB
+        count={selections.length}
+        totalOdds={totalOdds}
+        onClick={() => setSlipOpen(true)}
+      />
 
       {/* ─── Slip bottom sheet ─── */}
       <dialog ref={slipDlg} className="sb-sheet sporty-betslip-sheet" onClose={() => setSlipOpen(false)}>
@@ -1649,6 +1633,120 @@ function RecentCodes({ onSelect }) {
 }
 
 /* ─── Helper: generate a random winner entry ─── */
+/* ─── Draggable floating betslip FAB ─── */
+function DraggableBetFAB({ count, totalOdds, onClick }) {
+  const fabRef = useRef(null);
+  const dragState = useRef({ dragging: false, startX: 0, startY: 0, offsetX: 0, offsetY: 0 });
+  const [pos, setPos] = useState(() => {
+    try {
+      const saved = localStorage.getItem('xenbet_fab_pos');
+      if (saved) return JSON.parse(saved);
+    } catch { /* ignore */ }
+    return null;
+  });
+  const [dragged, setDragged] = useState(false);
+
+  const getInitial = useCallback(() => {
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    return { x: vw - 76, y: vh - 160 };
+  }, []);
+
+  useEffect(() => {
+    if (!pos) setPos(getInitial());
+    const onResize = () => {
+      setPos((p) => {
+        if (!p) return getInitial();
+        const vw = window.innerWidth;
+        const vh = window.innerHeight;
+        return { x: Math.min(p.x, vw - 60), y: Math.min(p.y, vh - 60) };
+      });
+    };
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, [pos, getInitial]);
+
+  const handleStart = useCallback((clientX, clientY) => {
+    if (!pos) return;
+    dragState.current = { dragging: true, startX: clientX, startY: clientY, offsetX: pos.x, offsetY: pos.y };
+    setDragged(false);
+  }, [pos]);
+
+  const handleMove = useCallback((clientX, clientY) => {
+    const ds = dragState.current;
+    if (!ds.dragging) return;
+    const dx = clientX - ds.startX;
+    const dy = clientY - ds.startY;
+    if (Math.abs(dx) > 4 || Math.abs(dy) > 4) setDragged(true);
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    setPos({
+      x: Math.max(0, Math.min(vw - 60, ds.offsetX + dx)),
+      y: Math.max(0, Math.min(vh - 60, ds.offsetY + dy)),
+    });
+  }, []);
+
+  const handleEnd = useCallback(() => {
+    dragState.current.dragging = false;
+    setPos((p) => {
+      if (p) {
+        try { localStorage.setItem('xenbet_fab_pos', JSON.stringify(p)); } catch { /* ignore */ }
+      }
+      return p;
+    });
+  }, []);
+
+  useEffect(() => {
+    const onMouseMove = (e) => handleMove(e.clientX, e.clientY);
+    const onMouseUp = () => handleEnd();
+    const onTouchMove = (e) => { if (dragState.current.dragging) { e.preventDefault(); handleMove(e.touches[0].clientX, e.touches[0].clientY); } };
+    const onTouchEnd = () => handleEnd();
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+    window.addEventListener('touchmove', onTouchMove, { passive: false });
+    window.addEventListener('touchend', onTouchEnd);
+    return () => {
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
+      window.removeEventListener('touchmove', onTouchMove);
+      window.removeEventListener('touchend', onTouchEnd);
+    };
+  }, [handleMove, handleEnd]);
+
+  if (!pos) return null;
+
+  const hasSelections = count > 0;
+
+  return (
+    <div
+      ref={fabRef}
+      className={`drag-fab${hasSelections ? '' : ' drag-fab-empty'}`}
+      style={{ left: pos.x, top: pos.y }}
+      onMouseDown={(e) => { e.preventDefault(); handleStart(e.clientX, e.clientY); }}
+      onTouchStart={(e) => handleStart(e.touches[0].clientX, e.touches[0].clientY)}
+      onClick={(e) => { if (!dragged) onClick(); else e.stopPropagation(); }}
+      role="button"
+      aria-label={hasSelections ? `Open betslip – ${count} selections` : 'Open betslip'}
+    >
+      {hasSelections ? (
+        <>
+          <div className="drag-fab-ring">
+            <OddsGauge odds={totalOdds} size={42} />
+          </div>
+          <span className="drag-fab-count">{count}</span>
+        </>
+      ) : (
+        <div className="drag-fab-ring">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M4 4h16v16H4z" />
+            <path d="M4 9h16M9 4v16" />
+          </svg>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function makeWinner() {
   // Ghana mobile prefixes (MTN, Vodafone/Telecel, AirtelTigo, Glo) — masked
   // so the punter's identity stays private. Example: 024 *** **42
