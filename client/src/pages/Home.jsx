@@ -6,7 +6,8 @@ import {
   fetchBetByCode,
 } from '../api/betApi.js';
 import { useToast, useAccount } from '../layout/AppShell.jsx';
-import BetSuccessModal, { toBookingCode } from '../components/BetSuccessModal.jsx';
+import { toBookingCode } from '../components/BetSuccessModal.jsx';
+import BookingCodeOverlay from '../components/BookingCodeOverlay.jsx';
 import OddsGauge from '../components/OddsGauge.jsx';
 import NumericKeypad from '../components/NumericKeypad.jsx';
 import { useFavouriteLeagues } from '../hooks/useFavourites.js';
@@ -441,6 +442,28 @@ export default function Home({ initialChip }) {
       return false;
     }
   }, [toast]);
+
+  // Load ticket code from sessionStorage (set by /ticket/:code route)
+  useEffect(() => {
+    let code;
+    try { code = sessionStorage.getItem('sp_ticket_code'); } catch { /* ignore */ }
+    if (code) {
+      try { sessionStorage.removeItem('sp_ticket_code'); } catch { /* ignore */ }
+      loadFromCode(code);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Listen for xenbet:load-code events (from BookingCodeOverlay, GlobalFAB, etc.)
+  useEffect(() => {
+    const handler = (e) => {
+      const code = e.detail?.code;
+      if (code) loadFromCode(code);
+    };
+    window.addEventListener('xenbet:load-code', handler);
+    return () => window.removeEventListener('xenbet:load-code', handler);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const openCodeModal = useCallback(() => {
     setCodeInput('');
@@ -1533,9 +1556,9 @@ export default function Home({ initialChip }) {
         })()}
       </dialog>
 
-      <BetSuccessModal
+      <BookingCodeOverlay
         bet={successBet}
-        recommendedCodes={featuredCards}
+        toast={toast}
         onClose={() => setSuccessBet(null)}
         onConfirm={() => { setSuccessBet(null); navigate('/my-bets'); }}
         onRebet={() => {

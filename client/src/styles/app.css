@@ -4767,3 +4767,640 @@ html[data-theme="light"] .gfab-input:focus {
   background: var(--accent-soft);
 }
 
+/* ===== BOOKING CODE OVERLAY ===== */
+.sp-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.sp-overlay-backdrop {
+  position: fixed;
+  inset: 0;
+  background: radial-gradient(900px 600px at 50% 30%, rgba(8, 60, 42, .6), rgba(0, 0, 0, .88));
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  z-index: -1;
+}
+
+/* ===== LIGHT RAYS ===== */
+.sp-light-rays {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.4;
+}
+
+.sp-ray {
+  position: absolute;
+  width: 2px;
+  height: 300px;
+  background: linear-gradient(180deg, transparent 0%, rgba(197, 255, 61, 0.15) 40%, rgba(197, 255, 61, 0.3) 50%, rgba(197, 255, 61, 0.15) 60%, transparent 100%);
+  transform-origin: bottom center;
+  border-radius: 50%;
+  animation: sp-ray-pulse 3s ease-in-out infinite;
+}
+
+.sp-ray:nth-child(odd) {
+  animation-delay: 0.5s;
+  height: 250px;
+  opacity: 0.6;
+}
+
+@keyframes sp-ray-pulse {
+  0%, 100% { opacity: 0.3; transform: rotate(var(--r, 0deg)) scaleY(1); }
+  50% { opacity: 0.7; transform: rotate(var(--r, 0deg)) scaleY(1.08); }
+}
+
+/* ===== SUCCESS CHECKMARK ===== */
+.sp-success-checkmark {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  pointer-events: none;
+}
+
+.sp-success-circle {
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #4ade80 0%, #16a34a 50%, #15803d 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow:
+    0 0 0 4px rgba(74, 222, 128, 0.2),
+    0 0 30px rgba(74, 222, 128, 0.3),
+    0 0 60px rgba(74, 222, 128, 0.15);
+}
+
+.sp-success-text {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.sp-success-title {
+  font-size: 20px;
+  font-weight: 800;
+  color: #fff;
+  text-shadow: 0 2px 12px rgba(0,0,0,0.3);
+  letter-spacing: -0.01em;
+}
+
+.sp-success-sub {
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(255,255,255,0.6);
+}
+
+/* ===== PARTICLES ===== */
+.sp-particles {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 2;
+  overflow: hidden;
+}
+
+.sp-particle {
+  will-change: transform, opacity;
+}
+
+/* ===== CARD CONTAINER ===== */
+.sp-card-container {
+  position: relative;
+  z-index: 3;
+  width: min(420px, 92vw);
+  margin: 20px auto;
+}
+
+.sp-card-glow {
+  position: absolute;
+  top: -20px;
+  left: -20px;
+  right: -20px;
+  bottom: -20px;
+  background: radial-gradient(400px 400px at 50% 30%, rgba(74, 222, 128, 0.08), transparent 60%);
+  border-radius: 30px;
+  pointer-events: none;
+}
+
+/* ===== CARD ===== */
+.sp-card {
+  position: relative;
+  background:
+    radial-gradient(600px 220px at 80% -10%, rgba(74, 222, 128, 0.06), transparent 60%),
+    linear-gradient(180deg, #0d2c1d 0%, #0a2418 100%);
+  border-radius: 20px;
+  padding: 20px;
+  box-shadow:
+    0 24px 80px rgba(0, 0, 0, 0.5),
+    0 0 0 1px rgba(74, 222, 128, 0.12) inset,
+    0 0 40px rgba(74, 222, 128, 0.06);
+  border: none;
+  overflow: hidden;
+}
+
+html[data-theme="light"] .sp-card {
+  background:
+    radial-gradient(600px 220px at 80% -10%, rgba(22, 163, 74, 0.06), transparent 60%),
+    linear-gradient(180deg, #f0fdf4 0%, #dcfce7 100%);
+  box-shadow:
+    0 24px 80px rgba(0, 0, 0, 0.12),
+    0 0 0 1px rgba(22, 163, 74, 0.12) inset;
+}
+
+/* Card header */
+.sp-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.sp-card-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 16px;
+  font-weight: 800;
+  color: #fff;
+}
+
+html[data-theme="light"] .sp-card-brand {
+  color: #166534;
+}
+
+.sp-card-badge {
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  font-weight: 800;
+  text-transform: uppercase;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(74, 222, 128, 0.12);
+  color: #4ade80;
+  border: 1px solid rgba(74, 222, 128, 0.25);
+}
+
+html[data-theme="light"] .sp-card-badge {
+  background: rgba(22, 163, 74, 0.1);
+  color: #16a34a;
+  border-color: rgba(22, 163, 74, 0.2);
+}
+
+/* Booking code */
+.sp-card-code-section {
+  text-align: center;
+  padding: 16px 0;
+  margin-bottom: 12px;
+}
+
+.sp-card-code-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  color: rgba(255,255,255,0.5);
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  margin-bottom: 6px;
+}
+
+html[data-theme="light"] .sp-card-code-label {
+  color: rgba(0,0,0,0.45);
+}
+
+.sp-card-code-value {
+  font-family: 'JetBrains Mono', 'Roboto Mono', monospace;
+  font-size: 36px;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  background: linear-gradient(135deg, #4ade80, #22d3ee);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  text-shadow: none;
+  filter: drop-shadow(0 2px 8px rgba(74, 222, 128, 0.3));
+}
+
+html[data-theme="light"] .sp-card-code-value {
+  background: linear-gradient(135deg, #16a34a, #0891b2);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Summary section */
+.sp-card-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 0;
+}
+
+.sp-card-summary-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 5px 0;
+}
+
+.sp-card-summary-label {
+  font-size: 12.5px;
+  color: rgba(255,255,255,0.55);
+  font-weight: 600;
+}
+
+html[data-theme="light"] .sp-card-summary-label {
+  color: rgba(0,0,0,0.5);
+}
+
+.sp-card-summary-value {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #fff;
+}
+
+html[data-theme="light"] .sp-card-summary-value {
+  color: #166534;
+}
+
+.sp-card-mono {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+}
+
+.sp-card-summary-row-win {
+  padding: 8px 10px;
+  margin: 2px -10px;
+  border-radius: 10px;
+  background: rgba(74, 222, 128, 0.08);
+}
+
+html[data-theme="light"] .sp-card-summary-row-win {
+  background: rgba(22, 163, 74, 0.06);
+}
+
+.sp-card-win {
+  font-size: 17px;
+  font-weight: 900;
+  color: #4ade80 !important;
+}
+
+html[data-theme="light"] .sp-card-win {
+  color: #16a34a !important;
+}
+
+.sp-card-divider {
+  height: 1px;
+  background: rgba(255,255,255,0.06);
+  margin: 4px 0;
+}
+
+html[data-theme="light"] .sp-card-divider {
+  background: rgba(0,0,0,0.06);
+}
+
+/* Legs preview */
+.sp-card-legs {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255,255,255,0.06);
+}
+
+html[data-theme="light"] .sp-card-legs {
+  border-top-color: rgba(0,0,0,0.06);
+}
+
+.sp-card-legs-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: rgba(255,255,255,0.4);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin-bottom: 8px;
+}
+
+html[data-theme="light"] .sp-card-legs-title {
+  color: rgba(0,0,0,0.4);
+}
+
+.sp-card-leg {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+
+html[data-theme="light"] .sp-card-leg {
+  border-bottom-color: rgba(0,0,0,0.04);
+}
+
+.sp-card-leg:last-child {
+  border-bottom: none;
+}
+
+.sp-card-leg-info {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  flex: 1;
+}
+
+.sp-card-leg-teams {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+html[data-theme="light"] .sp-card-leg-teams {
+  color: #166534;
+}
+
+.sp-card-leg-market {
+  font-size: 10.5px;
+  color: rgba(255,255,255,0.45);
+}
+
+html[data-theme="light"] .sp-card-leg-market {
+  color: rgba(0,0,0,0.45);
+}
+
+.sp-card-leg-odds {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  font-weight: 700;
+  color: #4ade80;
+  flex-shrink: 0;
+  margin-left: 12px;
+}
+
+html[data-theme="light"] .sp-card-leg-odds {
+  color: #16a34a;
+}
+
+.sp-card-leg-more {
+  text-align: center;
+  font-size: 11px;
+  font-weight: 600;
+  color: rgba(255,255,255,0.35);
+  padding: 8px 0 4px;
+}
+
+html[data-theme="light"] .sp-card-leg-more {
+  color: rgba(0,0,0,0.35);
+}
+
+/* Actions */
+.sp-card-actions {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(255,255,255,0.06);
+}
+
+html[data-theme="light"] .sp-card-actions {
+  border-top-color: rgba(0,0,0,0.06);
+}
+
+.sp-card-actions-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.sp-card-actions-row:last-child {
+  margin-bottom: 0;
+}
+
+.sp-card-actions-social {
+  grid-template-columns: repeat(4, 1fr);
+}
+
+.sp-action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 10px 8px;
+  border-radius: 10px;
+  border: none;
+  font-size: 11.5px;
+  font-weight: 700;
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+  transition: background 0.15s ease, transform 0.15s ease;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  min-width: 0;
+}
+
+html[data-theme="light"] .sp-action-btn {
+  background: rgba(0, 0, 0, 0.05);
+  color: #166534;
+}
+
+.sp-action-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+html[data-theme="light"] .sp-action-btn:hover {
+  background: rgba(0, 0, 0, 0.08);
+}
+
+.sp-action-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.sp-action-btn-social {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+html[data-theme="light"] .sp-action-btn-social {
+  background: rgba(0, 0, 0, 0.03);
+}
+
+.sp-action-btn-icon {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.sp-action-btn-label {
+  white-space: nowrap;
+}
+
+/* Bottom buttons */
+.sp-card-bottom {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.sp-card-btn {
+  padding: 14px 16px;
+  border-radius: 12px;
+  border: none;
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+
+.sp-card-btn:active {
+  transform: scale(0.97);
+}
+
+.sp-card-btn-primary {
+  background: linear-gradient(135deg, #4ade80 0%, #16a34a 100%);
+  color: #fff;
+  box-shadow: 0 8px 24px rgba(74, 222, 128, 0.3);
+}
+
+.sp-card-btn-primary:hover {
+  box-shadow: 0 12px 32px rgba(74, 222, 128, 0.45);
+  transform: translateY(-1px);
+}
+
+html[data-theme="light"] .sp-card-btn-primary {
+  background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+  box-shadow: 0 8px 24px rgba(22, 163, 74, 0.25);
+}
+
+.sp-card-btn-secondary {
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+html[data-theme="light"] .sp-card-btn-secondary {
+  background: rgba(0, 0, 0, 0.04);
+  color: #166534;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.sp-card-btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+html[data-theme="light"] .sp-card-btn-secondary:hover {
+  background: rgba(0, 0, 0, 0.06);
+}
+
+/* Feedback toast */
+.sp-feedback-toast {
+  position: fixed;
+  bottom: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10001;
+  padding: 12px 24px;
+  border-radius: 12px;
+  background: rgba(74, 222, 128, 0.15);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(74, 222, 128, 0.2);
+  color: #4ade80;
+  font-size: 13px;
+  font-weight: 700;
+  text-align: center;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+  white-space: nowrap;
+}
+
+html[data-theme="light"] .sp-feedback-toast {
+  background: rgba(22, 163, 74, 0.12);
+  border-color: rgba(22, 163, 74, 0.2);
+  color: #16a34a;
+}
+
+/* ===== RESPONSIVE ===== */
+@media (max-width: 480px) {
+  .sp-card {
+    padding: 16px;
+    border-radius: 16px;
+  }
+  .sp-card-code-value {
+    font-size: 28px;
+  }
+  .sp-success-circle {
+    width: 80px;
+    height: 80px;
+  }
+  .sp-success-circle svg {
+    width: 56px;
+    height: 56px;
+  }
+  .sp-success-title {
+    font-size: 17px;
+  }
+  .sp-success-sub {
+    font-size: 12px;
+  }
+  .sp-card-actions-row {
+    gap: 4px;
+  }
+  .sp-action-btn {
+    padding: 8px 6px;
+    font-size: 10.5px;
+  }
+  .sp-card-btn {
+    padding: 12px 14px;
+    font-size: 13px;
+  }
+  .sp-feedback-toast {
+    bottom: 60px;
+    font-size: 12px;
+    padding: 10px 18px;
+  }
+  .sp-ray {
+    height: 200px;
+  }
+}
+
+@media (max-width: 360px) {
+  .sp-card {
+    padding: 12px;
+  }
+  .sp-card-code-value {
+    font-size: 24px;
+  }
+  .sp-card-actions-row {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .sp-card-actions-social {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .sp-card-bottom {
+    grid-template-columns: 1fr;
+  }
+}
+

@@ -226,8 +226,16 @@ router.get('/code/:code', (req, res, next) => {
     totalOdds: slip.totalOdds,
     mode: slip.mode,
     stake: slip.stake,
+    stakePerLine: slip.stakePerLine,
+    linesCount: slip.linesCount,
+    systemType: slip.systemType,
+    systemLabel: slip.systemLabel,
     potentialWin: slip.potentialWin,
     bookingCode: slip.bookingCode,
+    placedAt: slip.placedAt,
+    currency: slip.currency,
+    status: slip.status,
+    bonusRate: slip.bonusRate,
   };
   res.json({ bet: safe });
 });
