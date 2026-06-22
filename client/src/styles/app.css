@@ -4787,6 +4787,15 @@ html[data-theme="light"] .gfab-input:focus {
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   z-index: -1;
+  overflow: hidden;
+}
+
+.sp-overlay-backdrop-orb {
+  position: absolute;
+  inset: -50%;
+  background: radial-gradient(600px 600px at 30% 40%, rgba(74, 222, 128, 0.06), transparent 60%),
+              radial-gradient(500px 500px at 70% 60%, rgba(197, 255, 61, 0.04), transparent 55%);
+  pointer-events: none;
 }
 
 .sp-overlay-body {
@@ -4878,6 +4887,23 @@ html[data-theme="light"] .gfab-input:focus {
   font-size: 13px;
   font-weight: 600;
   color: rgba(255,255,255,0.6);
+}
+
+/* Ring pulse */
+.sp-success-checkmark-inner {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sp-ring-pulse {
+  position: absolute;
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  border: 2px solid rgba(74, 222, 128, 0.5);
+  pointer-events: none;
 }
 
 /* ===== PARTICLES ===== */
@@ -4996,24 +5022,53 @@ html[data-theme="light"] .sp-card-code-label {
   color: rgba(0,0,0,0.45);
 }
 
-.sp-card-code-value {
+.sp-card-code-stagger {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  perspective: 600px;
+}
+
+.sp-card-code-char {
+  display: inline-block;
   font-family: 'JetBrains Mono', 'Roboto Mono', monospace;
   font-size: 32px;
   font-weight: 900;
-  letter-spacing: 0.12em;
+  letter-spacing: 0;
   background: linear-gradient(135deg, #4ade80, #22d3ee);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
   text-shadow: none;
   filter: drop-shadow(0 2px 8px rgba(74, 222, 128, 0.3));
+  will-change: transform, opacity;
 }
 
-html[data-theme="light"] .sp-card-code-value {
+html[data-theme="light"] .sp-card-code-char {
   background: linear-gradient(135deg, #16a34a, #0891b2);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
+}
+
+/* Shimmer sweep across card */
+.sp-card-shimmer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.03) 30%,
+    rgba(255, 255, 255, 0.08) 50%,
+    rgba(255, 255, 255, 0.03) 70%,
+    transparent 100%
+  );
+  pointer-events: none;
+  z-index: 4;
 }
 
 /* Summary section */
@@ -5275,7 +5330,7 @@ html[data-theme="light"] .sp-feedback-toast {
     padding: 10px 0 8px;
     margin-bottom: 8px;
   }
-  .sp-card-code-value {
+  .sp-card-code-char {
     font-size: 26px;
   }
   .sp-success-checkmark {
@@ -5333,7 +5388,7 @@ html[data-theme="light"] .sp-feedback-toast {
   .sp-card {
     padding: 10px;
   }
-  .sp-card-code-value {
+  .sp-card-code-char {
     font-size: 22px;
   }
   .sp-card-summary {

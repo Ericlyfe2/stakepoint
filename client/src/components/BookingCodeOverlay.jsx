@@ -39,63 +39,125 @@ function usePhaseSequence() {
   return phase;
 }
 
-function particles(count = 24) {
+function useAnimatedNumber(target, enabled) {
+  const [display, setDisplay] = useState(0);
+  const frameRef = useRef();
+
+  useEffect(() => {
+    if (!enabled) { setDisplay(0); return; }
+    let start = performance.now();
+    const duration = 1200;
+    const from = 0;
+    const to = target;
+
+    function tick(now) {
+      const elapsed = now - start;
+      const progress = Math.min(elapsed / duration, 1);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      setDisplay(from + (to - from) * eased);
+      if (progress < 1) frameRef.current = requestAnimationFrame(tick);
+    }
+
+    frameRef.current = requestAnimationFrame(tick);
+    return () => { if (frameRef.current) cancelAnimationFrame(frameRef.current); };
+  }, [target, enabled]);
+
+  return display;
+}
+
+function particles(count = 60) {
   return Array.from({ length: count }, (_, i) => ({
     id: i,
-    x: 50 + (Math.random() - 0.5) * 60,
-    y: 50 + (Math.random() - 0.5) * 60,
-    size: 4 + Math.random() * 8,
-    color: ['#c5ff3d', '#4ade80', '#22d3ee', '#ffb547', '#ff4d3d', '#a78bfa', '#f472b6'][i % 7],
-    delay: Math.random() * 0.3,
-    duration: 0.8 + Math.random() * 0.6,
-    driftX: (Math.random() - 0.5) * 100,
-    driftY: (Math.random() - 0.5) * 100 - 30,
-    rotation: Math.random() * 720,
+    x: 50 + (Math.random() - 0.5) * 80,
+    y: 50 + (Math.random() - 0.5) * 80,
+    size: 3 + Math.random() * 12,
+    color: ['#c5ff3d', '#4ade80', '#22d3ee', '#ffb547', '#ff4d3d', '#a78bfa', '#f472b6', '#fff'][i % 8],
+    delay: Math.random() * 0.4,
+    duration: 1 + Math.random() * 1.2,
+    driftX: (Math.random() - 0.5) * 300,
+    driftY: (Math.random() - 0.5) * 300 - 80,
+    rotation: Math.random() * 1080,
+    shape: ['circle', 'square', 'triangle'][i % 3],
   }));
+}
+
+function RingPulse({ phase }) {
+  const show = phase === PHASES.CHECKMARK || phase === PHASES.PARTICLES || phase === PHASES.RAYS || phase === PHASES.CARD_REVEAL || phase === PHASES.COMPLETE;
+
+  return (
+    <AnimatePresence>
+      {show && (
+        <motion.div
+          className="sp-ring-pulse"
+          initial={{ scale: 0, opacity: 0.8 }}
+          animate={{
+            scale: [1, 2.5, 3.5],
+            opacity: [0.6, 0.2, 0],
+          }}
+          exit={{ opacity: 0, scale: 4 }}
+          transition={{
+            duration: 2.5,
+            repeat: Infinity,
+            ease: 'easeOut',
+          }}
+          aria-hidden
+        />
+      )}
+    </AnimatePresence>
+  );
 }
 
 function SuccessCheckmark({ phase }) {
   const visible = phase !== PHASES.INIT;
-  const circleScale = phase === PHASES.INIT ? 0 : phase === PHASES.FADE_IN ? 0.3 : phase === PHASES.CHECKMARK ? 1.1 : 1;
+  const circleScale = phase === PHASES.INIT ? 0 : phase === PHASES.FADE_IN ? 0.3 : phase === PHASES.CHECKMARK ? 1.3 : 1;
   const strokeDone = phase === PHASES.CHECKMARK || phase === PHASES.PARTICLES || phase === PHASES.RAYS || phase === PHASES.CARD_REVEAL || phase === PHASES.COMPLETE;
   const showText = phase === PHASES.CHECKMARK || phase === PHASES.PARTICLES || phase === PHASES.RAYS || phase === PHASES.CARD_REVEAL || phase === PHASES.COMPLETE;
 
   return (
     <motion.div
       className="sp-success-checkmark"
-      initial={{ opacity: 0, scale: 0.5 }}
-      animate={visible ? { opacity: 1, scale: 1 } : { opacity: 0, scale: 0.5 }}
-      transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+      initial={{ opacity: 0, scale: 0.3 }}
+      animate={visible ? { opacity: 1, scale: 1 } : { opacity: 0, scale: 0.3 }}
+      transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
     >
-      <motion.div
-        className="sp-success-circle"
-        animate={{ scale: circleScale }}
-        transition={{ type: 'spring', stiffness: 200, damping: 14, mass: 0.8 }}
-      >
-        <svg width="56" height="56" viewBox="0 0 72 72" fill="none">
-          <motion.path
-            d="M20 36 L30 46 L52 24"
-            stroke="#fff"
-            strokeWidth="7"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            initial={{ pathLength: 0 }}
-            animate={{ pathLength: strokeDone ? 1 : 0 }}
-            transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1], delay: 0.1 }}
-            style={{ filter: 'drop-shadow(0 0 8px rgba(255,255,255,0.6))' }}
-          />
-        </svg>
-      </motion.div>
+      <div className="sp-success-checkmark-inner">
+        <RingPulse phase={phase} />
+        <motion.div
+          className="sp-success-circle"
+          animate={{ scale: circleScale }}
+          transition={{ type: 'spring', stiffness: 250, damping: 10, mass: 0.7 }}
+        >
+          <svg width="56" height="56" viewBox="0 0 72 72" fill="none">
+            <motion.path
+              d="M20 36 L30 46 L52 24"
+              stroke="#fff"
+              strokeWidth="7"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              initial={{ pathLength: 0 }}
+              animate={{ pathLength: strokeDone ? 1 : 0 }}
+              transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1], delay: 0.15 }}
+              style={{ filter: 'drop-shadow(0 0 12px rgba(255,255,255,0.8))' }}
+            />
+          </svg>
+        </motion.div>
+      </div>
       <AnimatePresence>
         {showText && (
           <motion.div
             className="sp-success-text"
-            initial={{ opacity: 0, y: 10 }}
+            initial={{ opacity: 0, y: 15 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            transition={{ duration: 0.4, ease: 'easeOut' }}
+            exit={{ opacity: 0, y: -15 }}
+            transition={{ duration: 0.5, ease: 'easeOut' }}
           >
-            <span className="sp-success-title">Bet Placed</span>
+            <motion.span
+              className="sp-success-title"
+              animate={{ textShadow: ['0 0 8px rgba(74,222,128,0)', '0 0 20px rgba(74,222,128,0.6)', '0 0 8px rgba(74,222,128,0)'] }}
+              transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+            >
+              Bet Placed
+            </motion.span>
             <span className="sp-success-sub">Booking code ready</span>
           </motion.div>
         )}
@@ -120,8 +182,8 @@ function ParticleBurst({ phase }) {
               animate={{
                 x: `calc(50vw + ${p.driftX}px)`,
                 y: `calc(50vh + ${p.driftY}px)`,
-                scale: [0, 1.2, 0.8, 0],
-                opacity: [0, 1, 1, 0],
+                scale: [0, 1.5, 0.6, 0],
+                opacity: [0, 1, 0.8, 0],
                 rotate: p.rotation,
               }}
               transition={{
@@ -133,9 +195,11 @@ function ParticleBurst({ phase }) {
                 width: p.size,
                 height: p.size,
                 background: p.color,
-                borderRadius: Math.random() > 0.5 ? '50%' : '2px',
+                borderRadius: p.shape === 'circle' ? '50%' : p.shape === 'square' ? '4px' : '0',
+                clipPath: p.shape === 'triangle' ? 'polygon(50% 0%, 0% 100%, 100% 100%)' : undefined,
                 position: 'absolute',
                 pointerEvents: 'none',
+                boxShadow: p.size > 8 ? `0 0 ${p.size}px ${p.color}40` : undefined,
               }}
             />
           ))}
@@ -153,22 +217,103 @@ function LightRays({ phase }) {
       {show && (
         <motion.div
           className="sp-light-rays"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
+          initial={{ opacity: 0, rotate: 0 }}
+          animate={{ opacity: 1, rotate: 360 }}
           exit={{ opacity: 0 }}
-          transition={{ duration: 0.6 }}
+          transition={{
+            opacity: { duration: 0.6 },
+            rotate: { duration: 20, repeat: Infinity, ease: 'linear' },
+          }}
           aria-hidden
         >
-          {[0, 60, 120, 180, 240, 300].map((angle) => (
+          {[0, 30, 60, 90, 120, 150, 180, 210, 240, 270, 300, 330].map((angle, i) => (
             <div
               key={angle}
               className="sp-ray"
-              style={{ transform: `rotate(${angle}deg)` }}
+              style={{
+                transform: `rotate(${angle}deg)`,
+                height: 200 + (i % 3) * 120,
+                opacity: 0.3 + (i % 4) * 0.15,
+                animationDelay: `${i * 0.15}s`,
+              }}
             />
           ))}
         </motion.div>
       )}
     </AnimatePresence>
+  );
+}
+
+function StaggeredCode({ code, enabled }) {
+  const chars = code.split('');
+
+  return (
+    <motion.div
+      className="sp-card-code-stagger"
+      initial="hidden"
+      animate={enabled ? 'visible' : 'hidden'}
+      variants={{
+        hidden: {},
+        visible: { transition: { staggerChildren: 0.06, delayChildren: 0.2 } },
+      }}
+    >
+      {chars.map((ch, i) => (
+        <motion.span
+          key={i}
+          className="sp-card-code-char"
+          variants={{
+            hidden: { opacity: 0, y: 40, rotateX: -90, scale: 0.5 },
+            visible: {
+              opacity: 1, y: 0, rotateX: 0, scale: 1,
+              transition: {
+                type: 'spring',
+                stiffness: 200,
+                damping: 12,
+                mass: 0.6,
+              },
+            },
+          }}
+        >
+          {ch}
+        </motion.span>
+      ))}
+    </motion.div>
+  );
+}
+
+function AnimatedRow({ label, value, prefix = '', enabled, highlight = false }) {
+  const animatedValue = useAnimatedNumber(value, enabled);
+
+  return (
+    <motion.div
+      className={`sp-card-summary-row ${highlight ? 'sp-card-summary-row-win' : ''}`}
+      initial={{ opacity: 0, x: -20 }}
+      animate={enabled ? { opacity: 1, x: 0 } : { opacity: 0, x: -20 }}
+      transition={{ duration: 0.5, ease: 'easeOut' }}
+    >
+      <span className="sp-card-summary-label">{label}</span>
+      <span className={`sp-card-summary-value ${highlight ? 'sp-card-win' : ''} ${highlight ? '' : ''}`}>
+        {prefix}{formatAmt(Math.round(animatedValue * 100) / 100)}
+      </span>
+    </motion.div>
+  );
+}
+
+function OddsRow({ label, value, enabled }) {
+  const animatedValue = useAnimatedNumber(value * 100, enabled);
+
+  return (
+    <motion.div
+      className="sp-card-summary-row"
+      initial={{ opacity: 0, x: -20 }}
+      animate={enabled ? { opacity: 1, x: 0 } : { opacity: 0, x: -20 }}
+      transition={{ duration: 0.5, ease: 'easeOut', delay: 0.1 }}
+    >
+      <span className="sp-card-summary-label">{label}</span>
+      <span className="sp-card-summary-value sp-card-mono">
+        {(animatedValue / 100).toFixed(2)}
+      </span>
+    </motion.div>
   );
 }
 
@@ -185,7 +330,7 @@ function TicketImageContent({ bet }) {
             <rect width="40" height="40" rx="10" fill="#c5ff3d" />
             <path d="M12 20 L18 26 L28 14" stroke="#0a0d0c" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
-          <span>StakePoint</span>
+          <span>XENBET</span>
         </div>
         <div className="sp-ticket-image-code">{code}</div>
       </div>
@@ -226,7 +371,7 @@ function TicketImageContent({ bet }) {
         </div>
       </div>
       <div className="sp-ticket-image-footer">
-        <span>stakepoint.com/ticket/{code}</span>
+        <span>xenbet.com/ticket/{code}</span>
       </div>
     </div>
   );
@@ -246,10 +391,10 @@ function ActionButton({ icon, label, onClick, variant = 'default', disabled }) {
       className={`sp-action-btn sp-action-btn-${variant}`}
       onClick={onClick}
       disabled={disabled}
-      whileHover={{ scale: 1.03 }}
-      whileTap={{ scale: 0.96 }}
+      whileHover={{ scale: 1.05, y: -2 }}
+      whileTap={{ scale: 0.93 }}
     >
-      {icon && <span className="sp-action-btn-icon">{icon}</span>}
+      {icon && <motion.span className="sp-action-btn-icon" whileHover={{ rotate: 10 }}>{icon}</motion.span>}
       <span className="sp-action-btn-label">{label}</span>
     </motion.button>
   );
@@ -323,7 +468,6 @@ export default function BookingCodeOverlay({ bet, onClose, onConfirm, onRebet, t
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   const ticketCaptureRef = useRef(null);
 
-  // Lock body scroll when overlay is active
   useEffect(() => {
     document.body.style.overflow = 'hidden';
     return () => { document.body.style.overflow = ''; };
@@ -342,6 +486,7 @@ export default function BookingCodeOverlay({ bet, onClose, onConfirm, onRebet, t
   const ticketUrl = getTicketUrl(code);
   const shareText = bet ? buildShareText(bet) : '';
   const showActions = phase === PHASES.COMPLETE;
+  const animateNumbers = phase === PHASES.COMPLETE;
 
   const showFeedback = useCallback((msg) => {
     setActionFeedback(msg);
@@ -415,19 +560,25 @@ export default function BookingCodeOverlay({ bet, onClose, onConfirm, onRebet, t
   };
 
   const cardVariants = {
-    hidden: { opacity: 0, y: 60, scale: 0.85 },
+    hidden: { opacity: 0, y: 80, scale: 0.7, rotateX: 10 },
     visible: {
-      opacity: 1, y: 0, scale: 1,
-      transition: { type: 'spring', stiffness: 120, damping: 18, mass: 0.9, delay: 0.15 },
+      opacity: 1, y: 0, scale: 1, rotateX: 0,
+      transition: {
+        type: 'spring',
+        stiffness: 180,
+        damping: 14,
+        mass: 0.8,
+        delay: 0.15,
+      },
     },
   };
 
   const glowVariants = {
-    hidden: { opacity: 0, scale: 0.95 },
+    hidden: { opacity: 0, scale: 0.9 },
     visible: {
-      opacity: [0, 0.6, 0.3, 0.5, 0.2],
-      scale: [0.95, 1.05, 1, 1.03, 1],
-      transition: { duration: 3, ease: 'easeInOut', repeat: Infinity, repeatType: 'mirror' },
+      opacity: [0, 0.7, 0.3, 0.6, 0.2],
+      scale: [0.9, 1.08, 1, 1.05, 1],
+      transition: { duration: 4, ease: 'easeInOut', repeat: Infinity, repeatType: 'mirror' },
     },
   };
 
@@ -447,8 +598,17 @@ export default function BookingCodeOverlay({ bet, onClose, onConfirm, onRebet, t
             className="sp-overlay-backdrop"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            transition={{ duration: 0.5, delay: 0.1 }}
-          />
+            transition={{ duration: 0.6, delay: 0.05 }}
+          >
+            <motion.div
+              className="sp-overlay-backdrop-orb"
+              animate={{
+                x: ['-20%', '20%', '-20%'],
+                y: ['-10%', '10%', '-10%'],
+              }}
+              transition={{ duration: 12, repeat: Infinity, ease: 'easeInOut' }}
+            />
+          </motion.div>
 
           {/* Light Rays */}
           <LightRays phase={phase} />
@@ -476,49 +636,103 @@ export default function BookingCodeOverlay({ bet, onClose, onConfirm, onRebet, t
                   animate="visible"
                 />
 
-                <div className="sp-card">
+                {/* Shimmer overlay */}
+                <motion.div
+                  className="sp-card-shimmer"
+                  initial={{ x: '-100%' }}
+                  animate={{ x: '200%' }}
+                  transition={{ duration: 1.2, ease: [0.25, 0.46, 0.45, 0.94], delay: 0.4 }}
+                />
+
+                <motion.div
+                  className="sp-card"
+                  initial={{ borderColor: 'rgba(74, 222, 128, 0)' }}
+                  animate={{
+                    borderColor: ['rgba(74, 222, 128, 0)', 'rgba(74, 222, 128, 0.3)', 'rgba(74, 222, 128, 0)'],
+                  }}
+                  transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut', delay: 1.5 }}
+                  style={{ border: '1px solid transparent' }}
+                >
                   {/* Card Header */}
                   <div className="sp-card-header">
-                    <div className="sp-card-brand">
+                    <motion.div
+                      className="sp-card-brand"
+                      animate={{ opacity: [1, 0.8, 1] }}
+                      transition={{ duration: 2.5, repeat: Infinity, ease: 'easeInOut' }}
+                    >
                       <svg width="18" height="18" viewBox="0 0 40 40" fill="none">
                         <rect width="40" height="40" rx="10" fill="#c5ff3d" />
                         <path d="M12 20 L18 26 L28 14" stroke="#0a0d0c" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
                       </svg>
-                      <span>StakePoint</span>
-                    </div>
-                    <span className="sp-card-badge">{statusLabel(status)}</span>
+                      <span>XENBET</span>
+                    </motion.div>
+                    <motion.span
+                      className="sp-card-badge"
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      transition={{ type: 'spring', stiffness: 300, damping: 10, delay: 1.2 }}
+                    >
+                      {statusLabel(status)}
+                    </motion.span>
                   </div>
 
                   {/* Booking Code */}
                   <div className="sp-card-code-section">
-                    <span className="sp-card-code-label">Booking Code</span>
-                    <div className="sp-card-code-value">{code}</div>
+                    <motion.span
+                      className="sp-card-code-label"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ duration: 0.5, delay: 0.3 }}
+                    >
+                      Booking Code
+                    </motion.span>
+                    <StaggeredCode code={code} enabled={phase === PHASES.CARD_REVEAL || phase === PHASES.COMPLETE} />
                   </div>
 
                   {/* Compact Summary */}
-                  <div className="sp-card-summary">
-                    <div className="sp-card-summary-row sp-card-summary-row-win">
-                      <span className="sp-card-summary-label">Potential Win</span>
-                      <span className="sp-card-summary-value sp-card-win">GHS {formatAmt(potentialWin)}</span>
-                    </div>
-                    <div className="sp-card-divider" />
-                    <div className="sp-card-summary-row">
-                      <span className="sp-card-summary-label">Stake</span>
-                      <span className="sp-card-summary-value">GHS {formatAmt(stake)}</span>
-                    </div>
-                    <div className="sp-card-summary-row">
-                      <span className="sp-card-summary-label">Total Odds</span>
-                      <span className="sp-card-summary-value sp-card-mono">{totalOdds.toFixed(2)}</span>
-                    </div>
-                  </div>
+                  <motion.div
+                    className="sp-card-summary"
+                    initial="hidden"
+                    animate={phase === PHASES.CARD_REVEAL || phase === PHASES.COMPLETE ? 'visible' : 'hidden'}
+                    variants={{
+                      hidden: {},
+                      visible: { transition: { staggerChildren: 0.15 } },
+                    }}
+                  >
+                    <AnimatedRow
+                      label="Potential Win"
+                      value={potentialWin}
+                      prefix="GHS "
+                      enabled={animateNumbers}
+                      highlight
+                    />
+                    <motion.div
+                      className="sp-card-divider"
+                      initial={{ scaleX: 0 }}
+                      animate={animateNumbers ? { scaleX: 1 } : { scaleX: 0 }}
+                      transition={{ duration: 0.5, delay: 0.2 }}
+                      style={{ transformOrigin: 'left' }}
+                    />
+                    <AnimatedRow
+                      label="Stake"
+                      value={stake}
+                      prefix="GHS "
+                      enabled={animateNumbers}
+                    />
+                    <OddsRow
+                      label="Total Odds"
+                      value={totalOdds}
+                      enabled={animateNumbers}
+                    />
+                  </motion.div>
 
                   {/* Actions */}
                   {showActions && (
                     <motion.div
                       className="sp-card-actions"
-                      initial={{ opacity: 0, y: 10 }}
+                      initial={{ opacity: 0, y: 15 }}
                       animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.3, duration: 0.4 }}
+                      transition={{ delay: 0.4, duration: 0.5, ease: 'easeOut' }}
                     >
                       <div className="sp-card-actions-row">
                         <ActionButton
@@ -572,25 +786,29 @@ export default function BookingCodeOverlay({ bet, onClose, onConfirm, onRebet, t
                       className="sp-card-bottom"
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
-                      transition={{ delay: 0.5, duration: 0.4 }}
+                      transition={{ delay: 0.6, duration: 0.5 }}
                     >
-                      <button
+                      <motion.button
                         type="button"
                         className="sp-card-btn sp-card-btn-primary"
                         onClick={onConfirm}
+                        whileHover={{ scale: 1.03, boxShadow: '0 12px 32px rgba(74, 222, 128, 0.4)' }}
+                        whileTap={{ scale: 0.96 }}
                       >
                         View My Bets
-                      </button>
-                      <button
+                      </motion.button>
+                      <motion.button
                         type="button"
                         className="sp-card-btn sp-card-btn-secondary"
                         onClick={() => { onRebet?.(); onClose?.(); }}
+                        whileHover={{ scale: 1.03 }}
+                        whileTap={{ scale: 0.96 }}
                       >
                         Rebet
-                      </button>
+                      </motion.button>
                     </motion.div>
                   )}
-                </div>
+                </motion.div>
               </motion.div>
             )}
           </div>
@@ -600,10 +818,10 @@ export default function BookingCodeOverlay({ bet, onClose, onConfirm, onRebet, t
             {actionFeedback && (
               <motion.div
                 className="sp-feedback-toast"
-                initial={{ opacity: 0, y: 30 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: 20 }}
-                transition={{ duration: 0.3 }}
+                initial={{ opacity: 0, y: 30, scale: 0.9 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 20, scale: 0.9 }}
+                transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
               >
                 {actionFeedback}
               </motion.div>
@@ -615,7 +833,6 @@ export default function BookingCodeOverlay({ bet, onClose, onConfirm, onRebet, t
             <TicketImageContent bet={bet} />
           </div>
 
-          {/* Inline styles for the ticket image capture */}
           <style>{TICKET_IMAGE_CSS}</style>
         </motion.div>
       )}
