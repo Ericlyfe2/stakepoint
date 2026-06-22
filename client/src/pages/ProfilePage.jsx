@@ -412,11 +412,6 @@ const ACCT_CSS = `
   --text: #f3f6f1;
   --text-soft: rgba(243, 246, 241, 0.78);
   --text-dim: rgba(243, 246, 241, 0.55);
-  animation: pageFadeSlide 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-@keyframes pageFadeSlide {
-  0% { opacity: 0; transform: translateY(20px); }
-  100% { opacity: 1; transform: translateY(0); }
 }
   --green: #16a34a;
   --green-2: #14803c;
@@ -554,11 +549,6 @@ html[data-theme="light"] .acct {
   white-space: nowrap;
   position: relative;
   overflow: hidden;
-  animation: badgePopIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.15s both;
-}
-@keyframes badgePopIn {
-  0% { opacity: 0; transform: scale(0.6); }
-  100% { opacity: 1; transform: scale(1); }
 }
 
 /* STANDARD */
