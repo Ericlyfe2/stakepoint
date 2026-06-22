@@ -1271,7 +1271,7 @@ const BH_CSS = `
   border-radius: 8px;
   border: none;
   background: var(--accent);
-  color: #0a0d0c;
+  color: var(--text-inv);
   font-weight: 800;
   font-size: 12px;
   cursor: pointer;

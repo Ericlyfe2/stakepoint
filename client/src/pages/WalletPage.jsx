@@ -411,12 +411,12 @@ const WALLET_CSS = `
 .wallet-split-cta:hover { opacity: .85; transform: scale(1.01); }
 .wallet-split-cta:active { transform: scale(.98); }
 .wallet-split-deposit .wallet-split-cta {
-  background: linear-gradient(135deg, var(--accent), #b0e82d);
-  color: #0a0d0c;
+  background: linear-gradient(135deg, var(--accent), var(--accent-soft));
+  color: var(--text-inv);
 }
 .wallet-split-withdraw .wallet-split-cta {
-  background: linear-gradient(135deg, #ff4d3d, #cc3a2e);
-  color: #fff;
+  background: linear-gradient(135deg, var(--accent-hot), #cc3a2e);
+  color: var(--text);
 }
 .wallet-note-section { margin-top: -4px; }
 

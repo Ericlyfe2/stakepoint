@@ -394,6 +394,48 @@ export default function AppShell() {
           <NavLink to="/info#status">System Status</NavLink>
         </div>
 
+        {/* ─── Sponsor logos ─── */}
+        <div className="sporty-sponsors">
+          <div className="sporty-sponsors-label">Official Club Partners</div>
+          <div className="sporty-sponsors-row">
+            {/* Manchester City */}
+            <div className="sporty-sponsor-card">
+              <svg viewBox="0 0 48 48" width="40" height="40" aria-label="Manchester City">
+                <circle cx="24" cy="24" r="23" fill="#6CABDD" stroke="#1C2C5B" strokeWidth="1.5" />
+                <circle cx="24" cy="24" r="17" fill="#1C2C5B" />
+                <text x="24" y="21" textAnchor="middle" fontSize="7" fontWeight="800" fill="#6CABDD" fontFamily="sans-serif">MAN</text>
+                <text x="24" y="29" textAnchor="middle" fontSize="7" fontWeight="800" fill="#6CABDD" fontFamily="sans-serif">CITY</text>
+                <circle cx="24" cy="13" r="1.5" fill="#fabe00" />
+              </svg>
+              <span>Manchester City</span>
+            </div>
+            {/* FC Barcelona */}
+            <div className="sporty-sponsor-card">
+              <svg viewBox="0 0 48 48" width="40" height="40" aria-label="FC Barcelona">
+                <rect x="4" y="4" width="40" height="40" rx="6" fill="#A50044" />
+                <rect x="10" y="10" width="13" height="14" rx="1" fill="#004D98" />
+                <rect x="25" y="10" width="13" height="14" rx="1" fill="#004D98" />
+                <rect x="10" y="26" width="13" height="12" rx="1" fill="#EDBB00" />
+                <rect x="25" y="26" width="13" height="12" rx="1" fill="#EDBB00" />
+                <text x="24" y="22" textAnchor="middle" fontSize="8" fontWeight="900" fill="#fff" fontFamily="sans-serif">FC</text>
+                <text x="24" y="35" textAnchor="middle" fontSize="6" fontWeight="800" fill="#A50044" fontFamily="sans-serif">BARÇA</text>
+              </svg>
+              <span>FC Barcelona</span>
+            </div>
+            {/* Real Madrid */}
+            <div className="sporty-sponsor-card">
+              <svg viewBox="0 0 48 48" width="40" height="40" aria-label="Real Madrid">
+                <circle cx="24" cy="24" r="23" fill="#FABE00" stroke="#00529F" strokeWidth="1.5" />
+                <circle cx="24" cy="24" r="16" fill="#fff" />
+                <text x="24" y="22" textAnchor="middle" fontSize="7" fontWeight="900" fill="#00529F" fontFamily="sans-serif">REAL</text>
+                <text x="24" y="30" textAnchor="middle" fontSize="5.5" fontWeight="700" fill="#00529F" fontFamily="sans-serif">MADRID</text>
+                <path d="M21 10 l3 -4 l3 4" fill="none" stroke="#FABE00" strokeWidth="1.5" />
+              </svg>
+              <span>Real Madrid</span>
+            </div>
+          </div>
+        </div>
+
         <button type="button" className="sporty-back-top" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
           Back to Top
         </button>
@@ -473,8 +515,8 @@ export default function AppShell() {
                 alignItems: 'center',
                 justifyContent: 'center',
                 gap: 8,
-                background: 'linear-gradient(135deg, var(--accent), #b0e82d)',
-                color: '#0a0d0c',
+                background: 'linear-gradient(135deg, var(--accent), var(--accent-soft))',
+                color: 'var(--text-inv)',
                 border: 'none',
                 cursor: 'pointer'
               }}

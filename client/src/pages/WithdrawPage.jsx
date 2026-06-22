@@ -466,11 +466,11 @@ export default function WithdrawPage() {
                   style={{
                     padding: '12px 0',
                     background: balance >= MIN_WITHDRAW
-                      ? 'linear-gradient(135deg, var(--accent), #b0e82d)'
+                      ? 'linear-gradient(135deg, var(--accent), var(--accent-soft))'
                       : 'var(--surface)',
                     border: '1px solid var(--line)',
                     borderRadius: 8,
-                    color: balance >= MIN_WITHDRAW ? '#0a0d0c' : 'var(--text-dim)',
+                    color: balance >= MIN_WITHDRAW ? 'var(--text-inv)' : 'var(--text-dim)',
                     fontWeight: 800,
                     fontSize: 14,
                     cursor: balance >= MIN_WITHDRAW ? 'pointer' : 'not-allowed',
@@ -498,8 +498,8 @@ export default function WithdrawPage() {
                 disabled={!isAmountValid || busy}
                 style={{
                   width: '100%', padding: '14px 0', borderRadius: 10, border: 'none',
-                  background: isAmountValid && !busy ? 'linear-gradient(135deg, var(--accent), #b0e82d)' : 'var(--surface-2)',
-                  color: isAmountValid && !busy ? '#0a0d0c' : 'var(--text-dim)',
+                  background: isAmountValid && !busy ? 'linear-gradient(135deg, var(--accent), var(--accent-soft))' : 'var(--surface-2)',
+                  color: isAmountValid && !busy ? 'var(--text-inv)' : 'var(--text-dim)',
                   fontWeight: 800, fontSize: 16, cursor: isAmountValid && !busy ? 'pointer' : 'not-allowed', marginBottom: 18,
                 }}
               >

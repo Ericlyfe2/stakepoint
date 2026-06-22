@@ -69,7 +69,7 @@ function CopyButton({ value, label }) {
         borderRadius: 6,
         border: '1px solid var(--line)',
         background: copied ? 'var(--accent)' : 'var(--surface-2)',
-        color: copied ? '#0a0d0c' : 'var(--text)',
+        color: copied ? 'var(--text-inv)' : 'var(--text)',
         fontWeight: 700, fontSize: 12, cursor: 'pointer',
         display: 'inline-flex', alignItems: 'center', gap: 6,
         transition: 'background 120ms ease, color 120ms ease',

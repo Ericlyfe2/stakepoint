@@ -92,7 +92,7 @@ export default function DepositResultModal({ result, onClose }) {
               background: approved
                 ? 'linear-gradient(135deg, #22c55e, #16a34a)'
                 : 'var(--surface-2, #1a221d)',
-              color: approved ? '#0a0d0c' : 'var(--text, #e7efea)',
+              color: approved ? 'var(--text-inv)' : 'var(--text, #e7efea)',
               fontWeight: 800, fontSize: 15, cursor: 'pointer',
             }}
           >
