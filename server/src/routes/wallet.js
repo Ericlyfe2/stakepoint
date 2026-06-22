@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { requireAuth } from '../middleware/auth.js';
+import { requireAuth, requireEmailVerified } from '../middleware/auth.js';
 import { validate } from '../middleware/validate.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { badRequest } from '../utils/httpError.js';
@@ -79,12 +79,9 @@ router.post('/deposit', requireAuth, validate(depositSchema), asyncHandler(async
   res.json({ ok: true, transaction: tx });
 }));
 
-router.post('/withdraw', requireAuth, validate(withdrawSchema), asyncHandler(async (req, res) => {
+router.post('/withdraw', requireAuth, requireEmailVerified, validate(withdrawSchema), asyncHandler(async (req, res) => {
   const { amount, method = 'momo' } = req.body;
   const user = req.user;
-
-  // Require email verification before any withdrawal.
-  if (!user.emailVerified) throw badRequest('Verify your email before making a withdrawal.');
 
   // Stage-based minimum withdrawal (enforced server-side).
   const stageMinWithdraw = { 0: MIN_WITHDRAW, 1: 500, 2: 300, 3: 200, 4: 100 }[user.stage ?? 0] ?? MIN_WITHDRAW;

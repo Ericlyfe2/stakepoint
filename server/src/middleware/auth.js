@@ -12,12 +12,17 @@ export function requireAuth(req, _res, next) {
     const user = getUserById(claims.sub);
     if (!user)            return next(unauthorized('Account no longer exists.'));
     if (user.suspended)   return next(forbidden('Account suspended. Contact support.'));
-    if (!user.emailVerified) return next(forbidden('Email not verified.'));
     req.user = user;
     next();
   } catch {
     next(unauthorized('Session expired. Please sign in again.'));
   }
+}
+
+/** Stricter gate for money-out flows that require a verified email. */
+export function requireEmailVerified(req, _res, next) {
+  if (!req.user?.emailVerified) return next(forbidden('Email not verified.'));
+  next();
 }
 
 /** Optional: attach req.user if token is valid, never reject. */
