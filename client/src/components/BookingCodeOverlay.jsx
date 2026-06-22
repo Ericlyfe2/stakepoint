@@ -72,7 +72,7 @@ function SuccessCheckmark({ phase }) {
         animate={{ scale: circleScale }}
         transition={{ type: 'spring', stiffness: 200, damping: 14, mass: 0.8 }}
       >
-        <svg width="72" height="72" viewBox="0 0 72 72" fill="none">
+        <svg width="56" height="56" viewBox="0 0 72 72" fill="none">
           <motion.path
             d="M20 36 L30 46 L52 24"
             stroke="#fff"
@@ -95,8 +95,8 @@ function SuccessCheckmark({ phase }) {
             exit={{ opacity: 0, y: -10 }}
             transition={{ duration: 0.4, ease: 'easeOut' }}
           >
-            <span className="sp-success-title">Bet Placed Successfully!</span>
-            <span className="sp-success-sub">Your ticket is being processed</span>
+            <span className="sp-success-title">Bet Placed</span>
+            <span className="sp-success-sub">Booking code ready</span>
           </motion.div>
         )}
       </AnimatePresence>
@@ -441,220 +441,183 @@ export default function BookingCodeOverlay({ bet, onClose, onConfirm, onRebet, t
           initial="hidden"
           animate="visible"
           exit="exit"
-      >
-        {/* Backdrop */}
-        <motion.div
-          className="sp-overlay-backdrop"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.5, delay: 0.1 }}
-        />
-
-        {/* Light Rays */}
-        <LightRays phase={phase} />
-
-        {/* Success Checkmark */}
-        <SuccessCheckmark phase={phase} />
-
-        {/* Particle Burst */}
-        <ParticleBurst phase={phase} />
-
-        {/* Booking Code Card */}
-        {(phase === PHASES.CARD_REVEAL || phase === PHASES.COMPLETE) && (
+        >
+          {/* Backdrop */}
           <motion.div
-            className="sp-card-container"
-            variants={cardVariants}
-            initial="hidden"
-            animate="visible"
-          >
-            {/* Floating glow */}
-            <motion.div
-              className="sp-card-glow"
-              variants={glowVariants}
-              initial="hidden"
-              animate="visible"
-            />
+            className="sp-overlay-backdrop"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.5, delay: 0.1 }}
+          />
 
-            <div className="sp-card">
-              {/* Card Header */}
-              <div className="sp-card-header">
-                <div className="sp-card-brand">
-                  <svg width="20" height="20" viewBox="0 0 40 40" fill="none">
-                    <rect width="40" height="40" rx="10" fill="#c5ff3d" />
-                    <path d="M12 20 L18 26 L28 14" stroke="#0a0d0c" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                  <span>StakePoint</span>
-                </div>
-                <span className="sp-card-badge">{statusLabel(status)}</span>
-              </div>
+          {/* Light Rays */}
+          <LightRays phase={phase} />
 
-              {/* Booking Code */}
-              <div className="sp-card-code-section">
-                <span className="sp-card-code-label">Booking Code</span>
-                <div className="sp-card-code-value">{code}</div>
-              </div>
+          <div className="sp-overlay-body">
+            {/* Particle Burst */}
+            <ParticleBurst phase={phase} />
 
-              {/* Ticket Summary */}
-              <div className="sp-card-summary">
-                <div className="sp-card-summary-row">
-                  <span className="sp-card-summary-label">Date</span>
-                  <span className="sp-card-summary-value">{formatDate(placedAt)}</span>
-                </div>
-                <div className="sp-card-summary-row">
-                  <span className="sp-card-summary-label">Time</span>
-                  <span className="sp-card-summary-value">{formatTime(placedAt)}</span>
-                </div>
-                <div className="sp-card-summary-row">
-                  <span className="sp-card-summary-label">Ticket ID</span>
-                  <span className="sp-card-summary-value sp-card-mono">{bet.id?.slice(-10) || '—'}</span>
-                </div>
-                <div className="sp-card-divider" />
-                <div className="sp-card-summary-row">
-                  <span className="sp-card-summary-label">Stake</span>
-                  <span className="sp-card-summary-value">GHS {formatAmt(stake)}</span>
-                </div>
-                <div className="sp-card-summary-row">
-                  <span className="sp-card-summary-label">Total Odds</span>
-                  <span className="sp-card-summary-value sp-card-mono">{totalOdds.toFixed(2)}</span>
-                </div>
-                <div className="sp-card-summary-row sp-card-summary-row-win">
-                  <span className="sp-card-summary-label">Potential Win</span>
-                  <span className="sp-card-summary-value sp-card-win">GHS {formatAmt(potentialWin)}</span>
-                </div>
-                <div className="sp-card-summary-row">
-                  <span className="sp-card-summary-label">Selections</span>
-                  <span className="sp-card-summary-value">{legs.length}</span>
-                </div>
-                <div className="sp-card-summary-row">
-                  <span className="sp-card-summary-label">Type</span>
-                  <span className="sp-card-summary-value">{modeLabel}</span>
-                </div>
-              </div>
+            {/* Success Checkmark */}
+            <SuccessCheckmark phase={phase} />
 
-              {/* Legs Preview */}
-              {legs.length > 0 && (
-                <div className="sp-card-legs">
-                  <div className="sp-card-legs-title">Selections</div>
-                  {legs.slice(0, 5).map((leg, i) => (
-                    <div key={i} className="sp-card-leg">
-                      <div className="sp-card-leg-info">
-                        <span className="sp-card-leg-teams">{leg.home} vs {leg.away}</span>
-                        <span className="sp-card-leg-market">{leg.marketName || leg.market}</span>
-                      </div>
-                      <span className="sp-card-leg-odds">{Number(leg.odds || 0).toFixed(2)}</span>
+            {/* Booking Code Card */}
+            {(phase === PHASES.CARD_REVEAL || phase === PHASES.COMPLETE) && (
+              <motion.div
+                className="sp-card-container"
+                variants={cardVariants}
+                initial="hidden"
+                animate="visible"
+              >
+                {/* Floating glow */}
+                <motion.div
+                  className="sp-card-glow"
+                  variants={glowVariants}
+                  initial="hidden"
+                  animate="visible"
+                />
+
+                <div className="sp-card">
+                  {/* Card Header */}
+                  <div className="sp-card-header">
+                    <div className="sp-card-brand">
+                      <svg width="18" height="18" viewBox="0 0 40 40" fill="none">
+                        <rect width="40" height="40" rx="10" fill="#c5ff3d" />
+                        <path d="M12 20 L18 26 L28 14" stroke="#0a0d0c" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                      <span>StakePoint</span>
                     </div>
-                  ))}
-                  {legs.length > 5 && (
-                    <div className="sp-card-leg-more">+{legs.length - 5} more selections</div>
+                    <span className="sp-card-badge">{statusLabel(status)}</span>
+                  </div>
+
+                  {/* Booking Code */}
+                  <div className="sp-card-code-section">
+                    <span className="sp-card-code-label">Booking Code</span>
+                    <div className="sp-card-code-value">{code}</div>
+                  </div>
+
+                  {/* Compact Summary */}
+                  <div className="sp-card-summary">
+                    <div className="sp-card-summary-row sp-card-summary-row-win">
+                      <span className="sp-card-summary-label">Potential Win</span>
+                      <span className="sp-card-summary-value sp-card-win">GHS {formatAmt(potentialWin)}</span>
+                    </div>
+                    <div className="sp-card-divider" />
+                    <div className="sp-card-summary-row">
+                      <span className="sp-card-summary-label">Stake</span>
+                      <span className="sp-card-summary-value">GHS {formatAmt(stake)}</span>
+                    </div>
+                    <div className="sp-card-summary-row">
+                      <span className="sp-card-summary-label">Total Odds</span>
+                      <span className="sp-card-summary-value sp-card-mono">{totalOdds.toFixed(2)}</span>
+                    </div>
+                  </div>
+
+                  {/* Actions */}
+                  {showActions && (
+                    <motion.div
+                      className="sp-card-actions"
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.3, duration: 0.4 }}
+                    >
+                      <div className="sp-card-actions-row">
+                        <ActionButton
+                          icon={<CopyIcon />}
+                          label="Copy"
+                          onClick={handleCopyCode}
+                        />
+                        <ActionButton
+                          icon={<LoadIcon />}
+                          label="Load"
+                          onClick={handleLoadCode}
+                        />
+                        <ActionButton
+                          icon={<LinkIcon />}
+                          label="Link"
+                          onClick={handleCopyLink}
+                        />
+                        <ActionButton
+                          icon={<ImageIcon />}
+                          label={isGeneratingImage ? 'Saving' : 'Image'}
+                          onClick={handleSaveImage}
+                          disabled={isGeneratingImage}
+                        />
+                      </div>
+                      <div className="sp-card-actions-row sp-card-actions-social">
+                        <ActionButton
+                          icon={<WhatsAppIcon />}
+                          label="WhatsApp"
+                          onClick={handleWhatsApp}
+                          variant="social"
+                        />
+                        <ActionButton
+                          icon={<TelegramIcon />}
+                          label="Telegram"
+                          onClick={handleTelegram}
+                          variant="social"
+                        />
+                        <ActionButton
+                          icon={<TwitterIcon />}
+                          label="X"
+                          onClick={handleTwitter}
+                          variant="social"
+                        />
+                      </div>
+                    </motion.div>
+                  )}
+
+                  {/* Bottom Navigation */}
+                  {showActions && (
+                    <motion.div
+                      className="sp-card-bottom"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ delay: 0.5, duration: 0.4 }}
+                    >
+                      <button
+                        type="button"
+                        className="sp-card-btn sp-card-btn-primary"
+                        onClick={onConfirm}
+                      >
+                        View My Bets
+                      </button>
+                      <button
+                        type="button"
+                        className="sp-card-btn sp-card-btn-secondary"
+                        onClick={() => { onRebet?.(); onClose?.(); }}
+                      >
+                        Rebet
+                      </button>
+                    </motion.div>
                   )}
                 </div>
-              )}
+              </motion.div>
+            )}
+          </div>
 
-              {/* Actions */}
-              {showActions && (
-                <motion.div
-                  className="sp-card-actions"
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.3, duration: 0.4 }}
-                >
-                  <div className="sp-card-actions-row">
-                    <ActionButton
-                      icon={<CopyIcon />}
-                      label="Copy Code"
-                      onClick={handleCopyCode}
-                    />
-                    <ActionButton
-                      icon={<LoadIcon />}
-                      label="Load Code"
-                      onClick={handleLoadCode}
-                    />
-                    <ActionButton
-                      icon={<LinkIcon />}
-                      label="Copy Link"
-                      onClick={handleCopyLink}
-                    />
-                  </div>
-                  <div className="sp-card-actions-row sp-card-actions-social">
-                    <ActionButton
-                      icon={<ImageIcon />}
-                      label={isGeneratingImage ? 'Saving...' : 'Save Image'}
-                      onClick={handleSaveImage}
-                      disabled={isGeneratingImage}
-                    />
-                    <ActionButton
-                      icon={<WhatsAppIcon />}
-                      label="WhatsApp"
-                      onClick={handleWhatsApp}
-                      variant="social"
-                    />
-                    <ActionButton
-                      icon={<TelegramIcon />}
-                      label="Telegram"
-                      onClick={handleTelegram}
-                      variant="social"
-                    />
-                    <ActionButton
-                      icon={<TwitterIcon />}
-                      label="X"
-                      onClick={handleTwitter}
-                      variant="social"
-                    />
-                  </div>
-                </motion.div>
-              )}
+          {/* Feedback Toast */}
+          <AnimatePresence>
+            {actionFeedback && (
+              <motion.div
+                className="sp-feedback-toast"
+                initial={{ opacity: 0, y: 30 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 20 }}
+                transition={{ duration: 0.3 }}
+              >
+                {actionFeedback}
+              </motion.div>
+            )}
+          </AnimatePresence>
 
-              {/* Bottom Navigation */}
-              {showActions && (
-                <motion.div
-                  className="sp-card-bottom"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ delay: 0.5, duration: 0.4 }}
-                >
-                  <button
-                    type="button"
-                    className="sp-card-btn sp-card-btn-primary"
-                    onClick={onConfirm}
-                  >
-                    View My Bets
-                  </button>
-                  <button
-                    type="button"
-                    className="sp-card-btn sp-card-btn-secondary"
-                    onClick={() => { onRebet?.(); onClose?.(); }}
-                  >
-                    Rebet
-                  </button>
-                </motion.div>
-              )}
-            </div>
-          </motion.div>
-        )}
+          {/* Hidden ticket image for capture */}
+          <div ref={ticketCaptureRef} style={{ position: 'fixed', left: '-9999px', top: 0 }}>
+            <TicketImageContent bet={bet} />
+          </div>
 
-        {/* Feedback Toast */}
-        <AnimatePresence>
-          {actionFeedback && (
-            <motion.div
-              className="sp-feedback-toast"
-              initial={{ opacity: 0, y: 30 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 20 }}
-              transition={{ duration: 0.3 }}
-            >
-              {actionFeedback}
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* Hidden ticket image for capture */}
-        <div ref={ticketCaptureRef} style={{ position: 'fixed', left: '-9999px', top: 0 }}>
-          <TicketImageContent bet={bet} />
-        </div>
-
-        {/* Inline styles for the ticket image capture */}
-        <style>{TICKET_IMAGE_CSS}</style>
-      </motion.div>
+          {/* Inline styles for the ticket image capture */}
+          <style>{TICKET_IMAGE_CSS}</style>
+        </motion.div>
       )}
     </AnimatePresence>
   );
