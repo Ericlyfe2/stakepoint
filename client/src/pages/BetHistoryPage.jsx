@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { fetchBetHistory, cashOutBet, fetchBetByCode } from '../api/betApi.js';
 import { useAccount, useToast } from '../providers/AccountProvider.jsx';
 import { toBookingCode } from '../components/BetSuccessModal.jsx';
+import BetDashboard from '../components/BetDashboard.jsx';
 
 const AUTO_TARGETS_KEY = 'bv_auto_cashout_targets';
 
@@ -720,6 +721,28 @@ export default function BetHistoryPage() {
     settledCount: settled.length,
   }), [openBets, settled]);
 
+  const mappedTickets = useMemo(() => visible.map(b => ({
+    ticketId: b.id,
+    status: b.status === 'open' ? 'pending' : b.status,
+    type: b.mode === 'system' ? 'system' : (b.legs?.length > 1 ? 'multiple' : 'single'),
+    legs: (b.legs || []).map(l => ({
+      id: l.id || l.matchId || `${b.id}-${l.market}-${l.outcome}`,
+      selection: PICK_LABEL[l.outcome] || l.outcome,
+      market: MARKET_LABEL[l.market] || l.marketName || l.market,
+      homeTeam: l.home,
+      awayTeam: l.away,
+      matchTime: l.matchTime || '',
+      odds: Number(l.odds || 0),
+      isLive: !!l.isLive,
+    })),
+    stake: Number(b.stake || 0),
+    currency: 'GHS',
+    potentialWin: Number(b.potentialWin || 0),
+    cashoutAvailable: b.status === 'open',
+    cashoutAmount: computeOffer(b),
+    placedAt: b.placedAt,
+  })), [visible]);
+
   const performCashOut = useCallback(async (id, expectedAmount, fraction = 1) => {
     try {
       const res = await cashOutBet(id, expectedAmount, fraction);
@@ -957,178 +980,22 @@ export default function BetHistoryPage() {
           </div>
         )}
 
-        {busy && !visible.length ? (
-          <p className="bh-empty">Loading bets…</p>
-        ) : !visible.length ? (
-          <div className="bh-empty-card fade-up">
-            <div className="bh-empty-icon" aria-hidden>📋</div>
-            <h3>{tab === 'open' ? 'No open bets' : 'No settled bets yet'}</h3>
-            <p>
-              {tab === 'open'
-                ? 'Pick a market on the home page to place your first ticket.'
-                : 'Once your open bets settle, they\'ll show up here.'}
-            </p>
-            <button type="button" className="btn btn-primary" onClick={() => navigate('/')}>
-              Browse markets
-            </button>
-          </div>
-        ) : tab === 'history' ? (
-          <ul className="bh-hlist">
-            {visible.map((b) => (
-              <HistoryBetCard
-                key={b.id}
-                bet={b}
-                expanded={expandedIds.has(b.id)}
-                onToggle={() => toggleExpanded(b.id)}
-                onOpen={() => setActiveTicket(b)}
-                onRemix={() => onRemixBet(b)}
-              />
-            ))}
-          </ul>
-        ) : (
-          <ul className="bh-list">
-            {visible.map((b) => {
-              const code = b.bookingCode || toBookingCode(b.id);
-              const isOpen = b.status === 'open';
-              const cashOutAmount = isOpen ? computeOffer(b) : 0;
-              const trend = trends[b.id]; // 'up' | 'down' | undefined
-              const autoTarget = autoTargets[b.id] || '';
-              const hasLegs = b.legs?.length > 0;
-              const firstLeg = hasLegs ? b.legs[0] : null;
-              return (
-                <li key={b.id} className={`bh-card status-${b.status} fade-up`}>
-                  <header className="bh-card-head">
-                    <div className="bh-card-headline">
-                      <span className={`bh-status ${b.status}`}>{STATUS_LABEL[b.status] || b.status?.toUpperCase()}</span>
-                      <span className="bh-card-meta">
-                        {b.legs?.length || 1} selection{(b.legs?.length || 1) > 1 ? 's' : ''} · {placedAtLabel(b.placedAt)}
-                      </span>
-                    </div>
-                    <span className="bh-card-mode">{b.mode}</span>
-                  </header>
-
-                  <div className="bh-stats">
-                    <div className="bh-stat">
-                      <span className="lbl">Total Odds</span>
-                      <strong>{b.mode === 'system' ? 'System' : Number(b.totalOdds || 0).toFixed(2)}</strong>
-                    </div>
-                    <div className="bh-stat">
-                      <span className="lbl">Stake</span>
-                      <strong>GHS {fmt(b.stake)}</strong>
-                    </div>
-                    <div className="bh-stat">
-                      <span className="lbl">Potential Win</span>
-                      <strong className="accent">GHS {fmt(b.potentialWin)}</strong>
-                    </div>
-                  </div>
-
-                  <div className="bh-code">
-                    <span className="bh-code-label">Booking Code</span>
-                    <code className="bh-code-value">{code}</code>
-                    <div style={{ display: 'flex', gap: 6 }}>
-                      <button type="button" className="bh-copy" onClick={() => onCopy(code)}>
-                        {copiedCode === code ? '✓ Copied' : 'Copy'}
-                      </button>
-                      {navigator.share && (
-                        <button 
-                          type="button" 
-                          className="bh-copy" 
-                          onClick={() => {
-                            navigator.share({
-                              title: 'My Xenbet Slip',
-                              text: `Check out my bet slip on Xenbet! Booking Code: ${code}`,
-                            }).catch(() => {});
-                          }}
-                        >
-                          Share
-                        </button>
-                      )}
-                    </div>
-                  </div>
-
-                  {b.mode === 'system' && (
-                    <div className="bh-system-info">
-                      <span className="bh-system-badge">{b.systemLabel || b.systemType}</span>
-                      <span>{b.linesCount} lines · GHS {fmt(b.stakePerLine || 0)}/line</span>
-                    </div>
-                  )}
-
-                  {isOpen && (
-                    <>
-                      <button
-                        type="button"
-                        className={`bh-cashout trend-${trend || 'flat'}`}
-                        onClick={() => onCashOut(b)}
-                      >
-                        Cash Out · GHS {fmt(cashOutAmount)}
-                        {trend === 'up'   && <span className="bh-trend up"   aria-label="offer rose">▲</span>}
-                        {trend === 'down' && <span className="bh-trend down" aria-label="offer dropped">▼</span>}
-                      </button>
-                      <div className="bh-auto-row">
-                        <label htmlFor={`auto-${b.id}`} className="bh-auto-lbl">Auto cash-out at</label>
-                        <span className="bh-auto-prefix">GHS</span>
-                        <input
-                          id={`auto-${b.id}`}
-                          type="number"
-                          inputMode="decimal"
-                          min="0"
-                          step="1"
-                          placeholder="e.g. 400"
-                          value={autoTarget}
-                          onChange={(e) => setAutoTarget(b.id, e.target.value)}
-                          className="bh-auto-input"
-                        />
-                        {autoTarget ? (
-                          <button type="button" className="bh-auto-clear" onClick={() => setAutoTarget(b.id, '')}>Clear</button>
-                        ) : null}
-                      </div>
-                    </>
-                  )}
-
-                  {!isOpen && b.status === 'cashed_out' && (
-                    <p className="bh-cashed-note">Cashed out for <strong>GHS {fmt(b.cashOut)}</strong>.</p>
-                  )}
-
-                  {hasLegs && (
-                    <details className="bh-legs">
-                      <summary>{b.legs.length} selection{b.legs.length > 1 ? 's' : ''} · tap to expand</summary>
-                      <ul>
-                        {b.legs.map((l, i) => {
-                          const lr = b.legsResolved?.[i];
-                          const resIndicator = lr
-                            ? lr.won === true ? 'Won' : lr.won === false ? 'Lost' : 'Void'
-                            : null;
-                          const scoreStr = lr ? `${lr.scoreHome ?? '?'}:${lr.scoreAway ?? '?'}` : null;
-                          return (
-                            <li key={i} className="bh-leg">
-                              <div className="bh-leg-teams">
-                                {l.home} <span>vs</span> {l.away}
-                                {scoreStr && <span className="bh-leg-score">FT {scoreStr}</span>}
-                              </div>
-                              <div className="bh-leg-pick">
-                                <span className="bh-leg-market">{MARKET_LABEL[l.market] || l.marketName || l.market}</span>
-                                <span className="bh-leg-odds">{PICK_LABEL[l.outcome] || l.outcome} @ {Number(l.odds).toFixed(2)}</span>
-                              </div>
-                              {resIndicator && (
-                                <span className={`bh-leg-result-tag ${resIndicator.toLowerCase()}`}>
-                                  {resIndicator === 'Won' ? '✓' : resIndicator === 'Lost' ? '✕' : '⚪'} {resIndicator}
-                                </span>
-                              )}
-                            </li>
-                          );
-                        })}
-                      </ul>
-                    </details>
-                  )}
-
-                  {firstLeg && !hasLegs && (
-                    <p className="bh-leg-summary">{firstLeg.home} vs {firstLeg.away}</p>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-        )}
+        <BetDashboard
+          tickets={mappedTickets}
+          isLoading={busy && !visible.length}
+          hideTabs
+          activeTab={tab}
+          onCashout={(ticket) => {
+            const b = bets.find(x => x.id === ticket.ticketId);
+            if (b) onCashOut(b);
+          }}
+          onRebet={(ticket) => {
+            const b = bets.find(x => x.id === ticket.ticketId);
+            if (b) onRemixBet(b);
+          }}
+          openCount={totals.openCount}
+          historyCount={totals.settledCount}
+        />
       </div>
 
       {confirmCashOut && (() => {

@@ -164,7 +164,7 @@ function BetCardItem({ ticket, index, isExpanded, onToggle, onCashout, onRebet, 
 
       {/* ── Expand/collapse ── */}
       {ticket.legs?.length > 2 && (
-        <button type="button" className="bd-toggle" onClick={onToggle}>
+        <button type="button" className="bd-toggle" onClick={() => onToggle?.()}>
           <span>{isExpanded ? 'Hide' : 'View'} Match Details</span>
           {isExpanded ? <SvgChevronUp size={14} /> : <SvgChevronDown size={14} />}
         </button>
@@ -206,7 +206,7 @@ function BetCardItem({ ticket, index, isExpanded, onToggle, onCashout, onRebet, 
 
       {/* ── Cashout CTA ── */}
       {cashable ? (
-        <button type="button" className="bd-cashout-btn" onClick={onCashout}>
+        <button type="button" className="bd-cashout-btn" onClick={() => onCashout?.()}>
           Cashout {ticket.currency || 'GHS'} {fmtNum(ticket.cashoutAmount)}
         </button>
       ) : ticket.status === 'cashed_out' ? (
@@ -218,14 +218,14 @@ function BetCardItem({ ticket, index, isExpanded, onToggle, onCashout, onRebet, 
       {/* ── Actions row (Rebet / SIM / Edit) ── */}
       {ticket.status === 'pending' && (
         <div className="bd-actions-row">
-          <button type="button" className="bd-action-btn" onClick={onRebet}><SvgRefresh size={13} /> Rebet</button>
-          <button type="button" className="bd-action-btn" onClick={onSim}><SvgTrendingUp size={13} /> SIM</button>
-          <button type="button" className="bd-action-btn" onClick={onEdit}><SvgPen size={13} /> Edit</button>
+          <button type="button" className="bd-action-btn" onClick={() => onRebet?.()}><SvgRefresh size={13} /> Rebet</button>
+          <button type="button" className="bd-action-btn" onClick={() => onSim?.()}><SvgTrendingUp size={13} /> SIM</button>
+          <button type="button" className="bd-action-btn" onClick={() => onEdit?.()}><SvgPen size={13} /> Edit</button>
         </div>
       )}
       {ticket.status !== 'pending' && (
         <div className="bd-actions-row">
-          <button type="button" className="bd-action-btn" onClick={onRebet}><SvgRefresh size={13} /> Rebet</button>
+          <button type="button" className="bd-action-btn" onClick={() => onRebet?.()}><SvgRefresh size={13} /> Rebet</button>
         </div>
       )}
     </motion.div>
@@ -239,6 +239,7 @@ export default function BetDashboard({
   tickets = [],
   isLoading = false,
   activeTab = 'open',
+  hideTabs = false,
   onTabSwitch,
   onCashout,
   onRebet,
@@ -277,27 +278,29 @@ export default function BetDashboard({
 
   return (
     <div className="bd-root">
-      {/* ── Tab bar ── */}
-      <div className="bd-tabs">
-        <button type="button" className={`bd-tab${activeTab === 'open' ? ' active' : ''}`} onClick={() => onTabSwitch?.('open')}>
-          Open Bets <span className="bd-tab-count">{openCount ?? tickets.filter((t) => t.status === 'pending').length}</span>
-        </button>
-        <button type="button" className={`bd-tab${activeTab === 'history' ? ' active' : ''}`} onClick={() => onTabSwitch?.('history')}>
-          Bet History <span className="bd-tab-count">{historyCount ?? tickets.filter((t) => t.status !== 'pending').length}</span>
-        </button>
-      </div>
+      {!hideTabs && (
+        <>
+          <div className="bd-tabs">
+            <button type="button" className={`bd-tab${activeTab === 'open' ? ' active' : ''}`} onClick={() => onTabSwitch?.('open')}>
+              Open Bets <span className="bd-tab-count">{openCount ?? tickets.filter((t) => t.status === 'pending').length}</span>
+            </button>
+            <button type="button" className={`bd-tab${activeTab === 'history' ? ' active' : ''}`} onClick={() => onTabSwitch?.('history')}>
+              Bet History <span className="bd-tab-count">{historyCount ?? tickets.filter((t) => t.status !== 'pending').length}</span>
+            </button>
+          </div>
 
-      {/* ── Filter pills ── */}
-      <div className="bd-filters">
-        {filterPills.map((p) => (
-          <button key={p.key} type="button" className={`bd-pill${filter === p.key ? ' active' : ''}`} onClick={() => setFilter(p.key)}>
-            {p.label}
-          </button>
-        ))}
-        <button type="button" className="bd-grid-btn" onClick={() => setViewMode((v) => (v === 'grid' ? 'list' : 'grid'))} aria-label="Toggle view">
-          <SvgGrid size={16} />
-        </button>
-      </div>
+          <div className="bd-filters">
+            {filterPills.map((p) => (
+              <button key={p.key} type="button" className={`bd-pill${filter === p.key ? ' active' : ''}`} onClick={() => setFilter(p.key)}>
+                {p.label}
+              </button>
+            ))}
+            <button type="button" className="bd-grid-btn" onClick={() => setViewMode((v) => (v === 'grid' ? 'list' : 'grid'))} aria-label="Toggle view">
+              <SvgGrid size={16} />
+            </button>
+          </div>
+        </>
+      )}
 
       {/* ── Content ── */}
       <AnimatePresence mode="wait">
