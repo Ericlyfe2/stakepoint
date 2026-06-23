@@ -61,7 +61,7 @@ export function getTicketUrl(code) {
 export function buildShareText(bet) {
   const summary = buildBetSummary(bet);
   const lines = [
-    `⚡ StakePoint Betting Ticket`,
+    `XENBET Betting Ticket`,
     ``,
     `Booking Code: ${summary.code}`,
     `Stake: GHS ${formatAmt(summary.stake)}`,
@@ -70,14 +70,14 @@ export function buildShareText(bet) {
     `Selections: ${summary.legs.length}`,
     `Status: ${summary.status}`,
     ``,
-    `Place your bets on StakePoint!`,
+    `Place your bets on XENBET!`,
   ];
   return lines.join('\n');
 }
 
 export async function downloadTicketImage(canvas, code) {
   const link = document.createElement('a');
-  link.download = `stakepoint-ticket-${code}.png`;
+  link.download = `xenbet-ticket-${code}.png`;
   link.href = canvas.toDataURL('image/png');
   document.body.appendChild(link);
   link.click();

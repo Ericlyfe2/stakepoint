@@ -148,13 +148,32 @@ async function boot() {
   // Re-register open bets in the cash-out engine so offers work after restart.
   try {
     const { createStore } = await import('./db/store.js');
-    const { registerBet } = await import('./services/cashOutEngine.js');
+    const cashOutEngine = await import('./services/cashOutEngine.js');
     const betsStore = createStore('bets', {});
     for (const bet of Object.values(betsStore.all() || {})) {
-      if (bet.status === 'open') registerBet(bet);
+      if (bet.status === 'open') {
+        cashOutEngine.registerBet(bet);
+        // Restore last-offer from the persisted receipt so the first
+        // cash-out attempt doesn't fall back to the static estimate.
+        if (bet.lastCashOutOffer?.amount != null) {
+          // Use import() trick to access the internal module state.
+          // The engine doesn't export a setter, so we access through
+          // getLastOffer's partner method — we add one below.
+          cashOutEngine.restoreLastOffer(bet.id, bet.lastCashOutOffer);
+        }
+      }
     }
   } catch (e) {
     log.warn('Could not rebuild cash-out engine state:', e.message);
+  }
+
+  // Build booking code index from all stored bets.
+  try {
+    const { rebuildBookCodeIndex } = await import('./routes/bet.js');
+    rebuildBookCodeIndex();
+    log.info('Booking code index rebuilt.');
+  } catch (e) {
+    log.warn('Could not rebuild booking code index:', e.message);
   }
 
   // Sweep expired refresh tokens every 15 minutes.

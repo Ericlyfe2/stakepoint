@@ -6,7 +6,6 @@ import {
   fetchBetByCode,
 } from '../api/betApi.js';
 import { useToast, useAccount } from '../layout/AppShell.jsx';
-import { toBookingCode } from '../components/BetSuccessModal.jsx';
 import BookingCodeOverlay from '../components/BookingCodeOverlay.jsx';
 import OddsGauge from '../components/OddsGauge.jsx';
 import NumericKeypad from '../components/NumericKeypad.jsx';
@@ -465,6 +464,60 @@ export default function Home({ initialChip }) {
       try { sessionStorage.removeItem('sp_ticket_code'); } catch { /* ignore */ }
       loadFromCode(code);
     }
+    // Load recommended legs from CodeHubPage
+    let rec;
+    try {
+      rec = JSON.parse(sessionStorage.getItem('sp_recommended_legs') || 'null');
+    } catch { /* ignore */ }
+    if (rec?.legs?.length) {
+      try { sessionStorage.removeItem('sp_recommended_legs'); } catch { /* ignore */ }
+      const hydrated = rec.legs.map((l, i) => ({
+        id: `sel-${Date.now()}-${i}`,
+        matchId: l.matchId,
+        market: l.market,
+        outcome: l.outcome,
+        odds: l.odds,
+        pickLabel: l.pick || '',
+        marketLabel: l.type || l.market,
+        meta: l.matchLabel || `${l.home || ''} vs ${l.away || ''}`,
+        home: l.home || '',
+        away: l.away || '',
+        trend: null,
+      }));
+      if (hydrated.length) {
+        setSelections(hydrated);
+        setBetMode(hydrated.length === 1 ? 'single' : 'multiple');
+        setSlipOpen(true);
+        setSlipErr('');
+      }
+    }
+    // Load remix selections from BetHistoryPage
+    let remix;
+    try {
+      remix = JSON.parse(localStorage.getItem('bv_remix_selections') || 'null');
+    } catch { /* ignore */ }
+    if (remix?.length) {
+      try { localStorage.removeItem('bv_remix_selections'); } catch { /* ignore */ }
+      const hydrated = remix.map((l, i) => ({
+        id: `sel-${Date.now()}-${i}`,
+        matchId: l.matchId,
+        market: l.market,
+        outcome: l.outcome,
+        odds: l.odds,
+        pickLabel: pickLabel(l.market, l.outcome, { home: l.home || '', away: l.away || '' }),
+        marketLabel: l.marketName || l.market,
+        meta: `${l.home || ''} vs ${l.away || ''}`,
+        home: l.home || '',
+        away: l.away || '',
+        trend: null,
+      }));
+      if (hydrated.length) {
+        setSelections(hydrated);
+        setBetMode(hydrated.length === 1 ? 'single' : 'multiple');
+        setSlipOpen(true);
+        setSlipErr('');
+      }
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -499,7 +552,7 @@ export default function Home({ initialChip }) {
     e?.preventDefault();
     const trimmed = codeInput.trim().toUpperCase();
     if (!trimmed) { setCodeErr('Enter a booking code.'); return; }
-    if (trimmed.length < 4) { setCodeErr('Code is too short.'); return; }
+    if (!/^[A-Z]{2}\d{5}$/.test(trimmed)) { setCodeErr('Use 2 letters + 5 digits (e.g. AB12345).'); return; }
     setCodeLoading(true);
     setCodeErr('');
     const ok = await loadFromCode(trimmed);
@@ -519,16 +572,7 @@ export default function Home({ initialChip }) {
 
   const makeBetId = () => `bv-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
-  const generateBookingCode = () => {
-    const A = 'ABCDEFGHIJKLMNPQRSTUVWXYZ';
-    const D = '123456789';
-    const letters = A[Math.floor(Math.random() * A.length)] + A[Math.floor(Math.random() * A.length)];
-    let digits = '';
-    for (let i = 0; i < 5; i++) digits += D[Math.floor(Math.random() * D.length)];
-    return letters + digits;
-  };
-
-  const onBookBet = useCallback(() => {
+  const onBookBet = useCallback(async () => {
     setSlipErr('');
     if (!selections.length) { setSlipErr('Add at least one selection to your bet slip.'); return; }
     if (betMode === 'multiple' && selections.length < 2) {
@@ -541,33 +585,45 @@ export default function Home({ initialChip }) {
     if (linePrice <= 0) { setSlipErr('Enter a stake amount.'); return; }
     const cost = betMode === 'system' ? linePrice * linesCount : linePrice;
 
-    const receipt = {
-      id: makeBetId(),
-      bookingCode: generateBookingCode(),
-      placedAt: new Date().toISOString(),
-      mode: betMode,
-      stake: Number(cost.toFixed(2)),
-      currency: 'GHS',
-      totalOdds: Number(totalOdds.toFixed(4)),
-      potentialWin: Number(payout.toFixed(2)),
-      bonusRate: 0.08,
-      legs: selections.map((s) => ({
-        matchId: s.matchId,
-        market: s.market,
-        outcome: s.outcome,
-        odds: s.odds,
-        home: s.home || s.meta?.split(' vs ')?.[0] || '',
-        away: s.away || s.meta?.split(' vs ')?.[1] || '',
-        marketName: s.marketName || s.marketLabel || s.market,
-      })),
-      status: 'open',
-    };
+    // Place through API so the server generates and stores the real booking code
+    if (!account) {
+      setSlipOpen(false);
+      navigate('/login?next=/');
+      toast('Sign in to place a bet.');
+      return;
+    }
+    if (cost > account.balance) {
+      setSlipErr(`Insufficient balance — this ticket costs GHS ${formatAmt(cost)}.`);
+      return;
+    }
 
-    setSelections([]);
-    setSlipOpen(false);
-    setSuccessBet(receipt);
-    toast(`Ticket booked — code ${receipt.bookingCode}.`);
-  }, [selections, betMode, systemDef, stake, linesCount, totalOdds, payout, toast]);
+    setIsPlacing(true);
+    try {
+      const res = await placeBet({
+        mode: betMode,
+        stake: linePrice,
+        ...(betMode === 'system' ? { systemType } : {}),
+        selections: selections.map((s) => ({
+          matchId: s.matchId, market: s.market, outcome: s.outcome, odds: s.odds,
+        })),
+      });
+      if (res.account) setAccount(res.account);
+      setSelections([]);
+      setSlipOpen(false);
+      setSuccessBet(res.bet);
+      toast(`Ticket booked — code ${res.bet.bookingCode}.`);
+    } catch (e) {
+      if (e.status === 409) {
+        setSlipErr(e.message || 'Odds changed or market closed — refreshing.');
+        setSelections([]);
+        try { setSnapshot(await fetchMatches(sportId)); } catch {/* ignore */}
+      } else {
+        setSlipErr(e.message || 'Could not place bet.');
+      }
+    } finally {
+      setIsPlacing(false);
+    }
+  }, [selections, betMode, systemDef, stake, linesCount, totalOdds, payout, toast, account, navigate, sportId]);
 
   const onPlaceBet = async () => {
     setSlipErr('');
@@ -607,6 +663,12 @@ export default function Home({ initialChip }) {
       });
       if (res.account) setAccount(res.account);
       toast(`Bet placed — booking code ${res.bet.bookingCode}.`);
+      try {
+        const stored = localStorage.getItem('xenbet_recent_codes');
+        let list = stored ? JSON.parse(stored) : [];
+        list = [res.bet.bookingCode, ...list.filter((c) => c !== res.bet.bookingCode)].slice(0, 8);
+        localStorage.setItem('xenbet_recent_codes', JSON.stringify(list));
+      } catch { /* ignore */ }
       setSelections([]);
       setSlipOpen(false);
       setSuccessBet(res.bet);
@@ -1650,11 +1712,23 @@ export default function Home({ initialChip }) {
         onRebet={() => {
           if (!successBet?.legs) return;
           setSelections(successBet.legs.map((l) => ({
-            matchId: l.matchId, market: l.market, outcome: l.outcome, odds: l.odds,
-            home: l.home, away: l.away,
+            id: `sel-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+            matchId: l.matchId,
+            market: l.market,
+            outcome: l.outcome,
+            odds: l.odds,
+            home: l.home || '',
+            away: l.away || '',
             marketName: l.marketName || l.market,
-            league: '', minute: '', kickoff: '',
+            marketLabel: l.marketName || l.market,
+            pickLabel: pickLabel(l.market, l.outcome, { home: l.home || '', away: l.away || '' }),
+            meta: `${l.home || ''} vs ${l.away || ''}`.replace(/^ vs | vs $/g, '').trim(),
+            league: l.league || '',
+            minute: '',
+            kickoff: '',
+            trend: null,
           })));
+          setBetMode(successBet.legs.length === 1 ? 'single' : 'multiple');
           setSlipOpen(true);
         }}
       />
@@ -1678,8 +1752,8 @@ export default function Home({ initialChip }) {
                 type="text"
                 value={codeInput}
                 onChange={(e) => { setCodeInput(e.target.value.toUpperCase().replace(/\s+/g, '')); setCodeErr(''); }}
-                placeholder="e.g. ABCD1234"
-                maxLength={16}
+                placeholder="e.g. AB12345"
+                maxLength={7}
                 autoCapitalize="characters"
                 spellCheck={false}
                 autoComplete="off"

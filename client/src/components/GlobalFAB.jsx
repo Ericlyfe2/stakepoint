@@ -80,8 +80,8 @@ export default function GlobalFAB() {
       setError('Please enter a valid booking code.');
       return;
     }
-    if (trimmed.length < 4) {
-      setError('Booking code is too short.');
+    if (!/^[A-Z]{2}\d{5}$/.test(trimmed)) {
+      setError('Invalid format. Use 2 letters + 5 digits (e.g. AB12345).');
       return;
     }
 
@@ -238,8 +238,8 @@ export default function GlobalFAB() {
                   setCode(e.target.value.toUpperCase().replace(/\s+/g, ''));
                   setError('');
                 }}
-                placeholder="e.g. ABCD1234"
-                maxLength={16}
+                placeholder="e.g. AB12345"
+                maxLength={7}
                 autoCapitalize="characters"
                 spellCheck={false}
                 autoComplete="off"

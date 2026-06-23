@@ -69,6 +69,13 @@ export function getLastOffer(betId) {
   return lastOfferByBet.get(betId) || null;
 }
 
+/** Restore a persisted offer (e.g. after server restart). */
+export function restoreLastOffer(betId, { amount, ts }) {
+  if (amount != null && ts != null) {
+    lastOfferByBet.set(betId, { cashOut: amount, ts });
+  }
+}
+
 /**
  * Pure function: compute the cash-out offer for a bet given a current-odds
  * lookup. Returns null when the bet shape isn't supported (system bets),

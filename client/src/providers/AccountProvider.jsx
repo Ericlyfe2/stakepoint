@@ -8,6 +8,7 @@ import {
 } from '../api/betApi.js';
 import { onLive, refreshAuth, disconnectSocket } from '../api/socketClient.js';
 import WinTrophyModal from '../components/WinTrophyModal.jsx';
+import WinCelebrationModal from '../components/WinCelebrationModal.jsx';
 import DepositResultModal from '../components/DepositResultModal.jsx';
 import TxHeader from '../components/TxHeader.jsx';
 import PaybillInstructions from '../components/PaybillInstructions.jsx';
@@ -80,6 +81,7 @@ export default function AppProviders({ children }) {
   const [busy, setBusy] = useState(false);
   const [err,  setErr]  = useState('');
   const [wins, setWins] = useState([]);
+  const [celebration, setCelebration] = useState(null); // single bet for WinCelebrationModal
   // Queue of deposit decisions still to show. Approve/reject events push into
   // it; the modal pops the head when dismissed. A queue (not a single value)
   // means a burst of admin decisions never silently overwrites an unread
@@ -229,11 +231,19 @@ export default function AppProviders({ children }) {
         if (!alive || !Array.isArray(bets) || !bets.length) return;
         // Merge instead of replace so a concurrent cash-out modal entry
         // isn't clobbered by a polled win batch.
+        let newWins = null;
         setWins((prev) => {
           const seen = new Set(prev.map((b) => b.id));
           const merged = [...prev];
-          for (const b of bets) if (!seen.has(b.id)) merged.push(b);
+          for (const b of bets) if (!seen.has(b.id)) merged.push({ ...b, id: b.id });
           return merged;
+        });
+        // Trigger celebration for the first new win (if no active celebration)
+        setCelebration((cur) => {
+          if (cur) return cur; // don't clobber active celebration
+          const first = bets[0];
+          if (!first) return cur;
+          return { id: first.id, winAmount: first.cashOut ?? first.potentialWin ?? 0, currency: 'GHS', ticketId: first.bookingCode || first.id, bet: first };
         });
       } catch { /* ignore */ }
     };
@@ -394,10 +404,18 @@ export default function AppProviders({ children }) {
   // trigger the trophy modal without re-implementing the timer/animation.
   const showWin = useCallback((bet) => {
     if (!bet) return;
+    const id = bet.id || `synthetic-${Date.now()}`;
     setWins((prev) => {
-      const id = bet.id || `synthetic-${Date.now()}`;
       if (prev.some((b) => b.id === id)) return prev;
       return [...prev, { ...bet, id }];
+    });
+    // Trigger the new celebration modal for single win/cashout
+    setCelebration({
+      id,
+      winAmount: bet.cashOut ?? bet.potentialWin ?? 0,
+      currency: 'GHS',
+      ticketId: bet.bookingCode || id,
+      bet,
     });
   }, []);
 
@@ -415,6 +433,30 @@ export default function AppProviders({ children }) {
     <AccountCtx.Provider value={accountValue}>
       <ToastCtx.Provider value={{ toast }}>
         {children}
+
+        {/* Celebration modal for single win / cash-out */}
+        <WinCelebrationModal
+          isOpen={!!celebration}
+          winAmount={celebration?.winAmount ?? 0}
+          currency={celebration?.currency || 'GHS'}
+          ticketId={celebration?.ticketId ?? ''}
+          markets={(() => {
+            const legs = celebration?.bet?.legs || [];
+            const seen = new Set();
+            return legs.map((l) => l.market).filter((m) => m && !seen.has(m) && seen.add(m));
+          })()}
+          onClose={() => { setCelebration(null); dismissWins(); }}
+          onDetails={() => { setCelebration(null); navigate('/my-bets'); }}
+          onShowOff={() => {
+            const code = celebration?.bet?.bookingCode;
+            if (code) {
+              const url = `${window.location.origin}/ticket/${code}`;
+              if (navigator.share) { navigator.share({ title: 'XenBet Win', text: `I just won GHS ${celebration?.winAmount ?? 0} on XenBet!`, url }).catch(() => {}); }
+              else { navigator.clipboard?.writeText(url).catch(() => {}); }
+            }
+            setCelebration(null);
+          }}
+        />
 
         <WinTrophyModal
           wins={wins}

@@ -27,7 +27,21 @@ export default function BetSuccessModal({ bet, onClose, onRebet, onConfirm, reco
   const code = bet.bookingCode || toBookingCode(bet.id);
 
   const copy = async () => {
-    try { await navigator.clipboard.writeText(code); } catch {/* ignore */}
+    try {
+      await navigator.clipboard.writeText(code);
+    } catch {
+      // Fallback
+      try {
+        const ta = document.createElement('textarea');
+        ta.value = code;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+      } catch { /* clipboard not available */ }
+    }
   };
 
   const totalOdds = bet.legs?.reduce((acc, l) => acc * (l.odds || 1), 1) || bet.totalOdds || 0;

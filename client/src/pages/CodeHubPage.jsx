@@ -77,7 +77,6 @@ export default function CodeHubPage() {
         const odds = legs.reduce((acc, l) => acc * l.odds, 1);
         cards.push({
           id: 'safe-picks',
-          code: `XB${String(Math.floor(Math.random() * 90000 + 10000))}`,
           folds: legs.length,
           odds: Number(odds.toFixed(2)),
           legs,
@@ -103,7 +102,6 @@ export default function CodeHubPage() {
         const odds = legs.reduce((acc, l) => acc * l.odds, 1);
         cards.push({
           id: 'goals-galore',
-          code: `XG${String(Math.floor(Math.random() * 90000 + 10000))}`,
           folds: legs.length,
           odds: Number(odds.toFixed(2)),
           legs,
@@ -129,7 +127,6 @@ export default function CodeHubPage() {
         const odds = legs.reduce((acc, l) => acc * l.odds, 1);
         cards.push({
           id: 'btts-special',
-          code: `XB${String(Math.floor(Math.random() * 90000 + 10000))}`,
           folds: legs.length,
           odds: Number(odds.toFixed(2)),
           legs,
@@ -229,7 +226,9 @@ export default function CodeHubPage() {
           {recommendedCodes.map((card) => (
             <div key={card.id} className="codehub-card">
               <div className="codehub-card-header">
-                <span className="codehub-card-code">{card.code}</span>
+                <span className="codehub-card-code">
+                  {card.id === 'safe-picks' ? '⭐ Top Picks' : card.id === 'goals-galore' ? '⚽ Over 2.5 Goals' : '🔄 BTTS'}
+                </span>
                 <div className="codehub-card-meta">
                   <span>Folds: <strong>{card.folds}</strong></span>
                   <span className="codehub-card-odds">
@@ -257,18 +256,16 @@ export default function CodeHubPage() {
               ))}
 
               <div className="codehub-card-actions">
-                <button type="button" className="codehub-share" onClick={() => shareCode(card.code)}>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
-                    <polyline points="16 6 12 2 8 6" />
-                    <line x1="12" y1="2" x2="12" y2="15" />
-                  </svg>
-                  Share
-                </button>
                 <button
                   type="button"
                   className="codehub-add"
-                  onClick={() => navigate(`/?code=${card.code}`)}
+                  onClick={() => {
+                    const payload = { legs: card.legs };
+                    try {
+                      sessionStorage.setItem('sp_recommended_legs', JSON.stringify(payload));
+                    } catch { /* ignore */ }
+                    navigate('/');
+                  }}
                 >
                   Add to Betslip
                 </button>

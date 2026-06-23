@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
+import rateLimit from 'express-rate-limit';
 import {
   SPORTS,
   CASINO_GAMES,
@@ -33,9 +34,46 @@ import { LIVE_BETTING } from '../config/env.js';
 
 const MIN_STAKE = Number(process.env.MIN_STAKE) || 2; // GHS 2 min (configurable via env)
 
+const BOOKING_CODE_REGEX = /^[ABCDEFGHIJKLMNPQRSTUVWXYZ]{2}[1-9]{5}$/;
+
 const router = Router();
 
-// AF36513 — 2 uppercase letters + 5 digits.
+const codeLookupLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  limit: 30,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: { error: 'Too many booking code lookups. Please slow down.' },
+});
+
+// In-memory booking code index for O(1) lookups.
+// Synced lazily on first miss, then kept in sync on writes.
+const bookCodeIndex = new Map(); // bookingCode → betId
+
+function rebuildBookCodeIndex() {
+  bookCodeIndex.clear();
+  for (const [betId, bet] of Object.entries(betsStore.all())) {
+    if (bet.bookingCode) bookCodeIndex.set(bet.bookingCode, betId);
+  }
+}
+
+function indexBookingCode(code, betId) {
+  if (code) bookCodeIndex.set(code, betId);
+}
+
+function findBetByBookingCode(code) {
+  const betId = bookCodeIndex.get(code);
+  if (betId) {
+    const bet = betsStore.get(betId);
+    if (bet && bet.bookingCode === code) return bet;
+  }
+  // Fallback: rebuild index on miss (handles race with external writes)
+  rebuildBookCodeIndex();
+  const fallbackId = bookCodeIndex.get(code);
+  return fallbackId ? betsStore.get(fallbackId) : null;
+}
+
+// AA12345 — 2 uppercase letters + 5 digits.
 function generateBookingCode() {
   const A = 'ABCDEFGHIJKLMNPQRSTUVWXYZ'; // dropped 'O' to avoid 0/O confusion
   const D = '123456789';
@@ -46,12 +84,20 @@ function generateBookingCode() {
 }
 
 async function uniqueBookingCode() {
-  for (let i = 0; i < 50; i++) {
+  const existing = new Set(bookCodeIndex.keys());
+  for (let i = 0; i < 100; i++) {
     const code = generateBookingCode();
-    const found = Object.values(betsStore.all()).some((b) => b.bookingCode === code);
-    if (!found) return code;
+    if (!existing.has(code)) return code;
   }
-  return generateBookingCode() + Math.floor(Math.random() * 9 + 1);
+  // Extreme edge case: namespace collision. Expand to 3 letters + 4 digits.
+  const A = 'ABCDEFGHIJKLMNPQRSTUVWXYZ';
+  const D = '123456789';
+  for (let i = 0; i < 100; i++) {
+    const code = A[Math.floor(Math.random() * A.length)] + A[Math.floor(Math.random() * A.length)] + A[Math.floor(Math.random() * A.length)] + D[Math.floor(Math.random() * D.length)] + D[Math.floor(Math.random() * D.length)] + D[Math.floor(Math.random() * D.length)] + D[Math.floor(Math.random() * D.length)];
+    if (!existing.has(code)) return code;
+  }
+  // Absolute fallback: timestamp-based code
+  return 'XX' + Date.now().toString(36).slice(-5).toUpperCase();
 }
 
 const betsStore        = createStore('bets', {});         // { betId: receipt }
@@ -60,6 +106,7 @@ const promoUsageStore  = createStore('promo_usage', {});  // { userId: [{ promoI
 
 async function pushBet(receipt) {
   await betsStore.setCritical(receipt.id, receipt);
+  if (receipt.bookingCode) indexBookingCode(receipt.bookingCode, receipt.id);
 }
 function listUserBets(userId) {
   return Object.values(betsStore.all())
@@ -203,12 +250,12 @@ router.get('/leagues/:leagueId/matches', asyncHandler(async (req, res) => {
 
 /* ------------ authenticated bet operations ------------ */
 
-router.get('/code/:code', (req, res, next) => {
+router.get('/code/:code', codeLookupLimiter, (req, res, next) => {
   const raw = String(req.params.code || '').trim().toUpperCase();
-  if (!raw || raw.length < 3 || raw.length > 20) {
-    return next(badRequest('Invalid booking code format.'));
+  if (!raw || !BOOKING_CODE_REGEX.test(raw)) {
+    return next(badRequest('Invalid booking code format. Use a valid 7-character code (e.g. AB12345).'));
   }
-  const bet = Object.values(betsStore.all()).find((b) => b.bookingCode === raw);
+  const bet = findBetByBookingCode(raw);
   if (!bet) return next(notFound('Booking code not found. Double-check and try again.'));
   // Only return the slip data needed to rebuild the betslip — no user info.
   const { userId, legsResolved, cashOutHistory, activity, ...slip } = bet;
@@ -447,7 +494,13 @@ router.delete('/bets/:id',
       // System bets keep the legacy formula in v1. acceptedAmount ignored.
       cashOut = Number((bet.stake * bet.totalOdds * 0.6).toFixed(2));
     } else {
-      const last = cashOutEngine.getLastOffer(bet.id);
+      // 1) Engine's in-memory offer (fast, from live ticks).
+      // 2) Receipt's persisted offer (survives restart).
+      // 3) Static estimate matching what the client shows.
+      const last = cashOutEngine.getLastOffer(bet.id)
+        || (bet.lastCashOutOffer?.amount != null
+          ? { cashOut: bet.lastCashOutOffer.amount, ts: bet.lastCashOutOffer.ts }
+          : null);
       if (last) {
         if (last.cashOut === 0) {
           throw conflict('This bet has busted — cash-out is no longer available. The natural settlement will run shortly.', { code: 'OFFER_ZERO' });
@@ -455,8 +508,9 @@ router.delete('/bets/:id',
         cashOut = last.cashOut;
       } else {
         // No live offer recorded yet (no tick has happened since /place).
-        // Fall back to a conservative offer based on stake and the house margin.
-        cashOut = Number((bet.stake * (1 - LIVE_BETTING.houseMargin)).toFixed(2));
+        // Fall back to a static estimate matching the value the client
+        // showed the user (stake × totalOdds × (1 - houseMargin)).
+        cashOut = Number((bet.stake * bet.totalOdds * (1 - LIVE_BETTING.houseMargin)).toFixed(2));
       }
       // Validate drift in both paths when client provided acceptedAmount.
       if (req.body?.acceptedAmount !== undefined) {
@@ -656,5 +710,7 @@ function parseDuration(str) {
   const min = parseInt(m[3] || '0', 10);
   return ((d * 24 + h) * 60 + min) * 60_000;
 }
+
+export { findBetByBookingCode, rebuildBookCodeIndex, generateBookingCode, uniqueBookingCode, pushBet };
 
 export default router;

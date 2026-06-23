@@ -102,7 +102,7 @@ export default function BetShareModal({
   const [linkCopied, setLinkCopied] = useState(false);
 
   const defaultUrl = shareUrl || `${window.location.origin}/ticket/${bookingCode}`;
-  const shareText = `Check out my bet on StakePoint — code ${bookingCode}!`;
+  const shareText = `Check out my bet on XENBET — code ${bookingCode}!`;
 
   const handleCopyCode = useCallback(async () => {
     try {
@@ -205,7 +205,7 @@ export default function BetShareModal({
 
         {/* Footer */}
         <div className="bsm-footer">
-          <span className="bsm-footer-pill">stakepoint.com</span>
+          <span className="bsm-footer-pill">{window.location.hostname}</span>
         </div>
       </div>
 

@@ -18,7 +18,15 @@
 import fs from 'fs';
 import path from 'path';
 import pg from 'pg';
-import { PATHS } from '../config/env.js';
+import { PATHS as ENV_PATHS } from '../config/env.js';
+
+// Allow override via process.env.PATHS (used in tests)
+const PATHS = (() => {
+  if (process.env.PATHS) {
+    try { return JSON.parse(process.env.PATHS); } catch { /* ignore */ }
+  }
+  return ENV_PATHS;
+})();
 import { log } from '../utils/logger.js';
 
 const { Pool } = pg;
