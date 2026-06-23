@@ -157,9 +157,23 @@ export default function Home({ initialChip }) {
   const [codeErr, setCodeErr]             = useState('');
   const [codeLoading, setCodeLoading]     = useState(false);
 
+  const [commentsMatch, setCommentsMatch] = useState(null);
+  const [allComments, setAllComments] = useState(() => {
+    try {
+      const stored = localStorage.getItem('xenbet_comments');
+      return stored ? JSON.parse(stored) : {};
+    } catch { return {}; }
+  });
+
+  const persistComments = useCallback((next) => {
+    setAllComments(next);
+    try { localStorage.setItem('xenbet_comments', JSON.stringify(next)); } catch {}
+  }, []);
+
   const slipDlg     = useRef(null);
   const marketsDlg  = useRef(null);
   const codeDlg     = useRef(null);
+  const commentsDlg = useRef(null);
   const codeInputRef = useRef(null);
 
   // Initial sport from URL change
@@ -1137,7 +1151,6 @@ export default function Home({ initialChip }) {
 
           {filteredLeagues.map((lg, lgIdx) => {
             const isCollapsed = !!collapsed[lg.id];
-            // Determine column structure from the first match in this league.
             const sample = lg.matches[0] && columnsFor(marketChip, lg.matches[0]);
             const colCount = sample?.selections?.length || 3;
             const gridClass = colCount === 2 ? 'cols-2' : '';
@@ -1153,110 +1166,134 @@ export default function Home({ initialChip }) {
                     className="sb-league-head"
                     onClick={() => setCollapsed((prev) => ({ ...prev, [lg.id]: !prev[lg.id] }))}
                   >
-                    <svg className="sb-caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M6 9l6 6 6-6" />
-                    </svg>
-                    <span className="sb-flag">{(lg.crest?.label || lg.name).slice(0, 2).toUpperCase()}</span>
-                    <span>{lg.name}</span>
-                    <span className="sb-count">{lg.matches.length}</span>
-                    <button
-                      type="button"
-                      className={`sb-fav-btn${isFavourite(lg.id) ? ' active' : ''}`}
-                      aria-label={isFavourite(lg.id) ? `Remove ${lg.name} from favourites` : `Add ${lg.name} to favourites`}
-                      aria-pressed={isFavourite(lg.id)}
-                      onClick={(e) => { e.stopPropagation(); toggleFavourite(lg.id); }}
-                      title={isFavourite(lg.id) ? 'Unfavourite league' : 'Favourite league'}
-                    >
-                      <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
-                        <path
-                          d="M12 2.5l2.95 6.13 6.55.78-4.84 4.6 1.32 6.54L12 17.37l-5.98 3.18 1.32-6.54-4.84-4.6 6.55-.78L12 2.5z"
-                          fill={isFavourite(lg.id) ? 'currentColor' : 'none'}
-                          stroke="currentColor"
-                          strokeWidth="1.6"
-                          strokeLinejoin="round"
-                        />
+                    <span className="sb-league-head-left">
+                      <svg className="sb-caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M6 9l6 6 6-6" />
                       </svg>
-                    </button>
+                      <span className="sb-flag">{(lg.crest?.label || lg.name).slice(0, 2).toUpperCase()}</span>
+                      <span className="sb-league-name">{lg.name}</span>
+                    </span>
+                    <span className="sb-league-head-right">
+                      <span className="sb-count">{lg.matches.length}</span>
+                      <button
+                        type="button"
+                        className={`sb-fav-btn${isFavourite(lg.id) ? ' active' : ''}`}
+                        aria-label={isFavourite(lg.id) ? `Remove ${lg.name} from favourites` : `Add ${lg.name} to favourites`}
+                        aria-pressed={isFavourite(lg.id)}
+                        onClick={(e) => { e.stopPropagation(); toggleFavourite(lg.id); }}
+                        title={isFavourite(lg.id) ? 'Unfavourite league' : 'Favourite league'}
+                      >
+                        <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+                          <path
+                            d="M12 2.5l2.95 6.13 6.55.78-4.84 4.6 1.32 6.54L12 17.37l-5.98 3.18 1.32-6.54-4.84-4.6 6.55-.78L12 2.5z"
+                            fill={isFavourite(lg.id) ? 'currentColor' : 'none'}
+                            stroke="currentColor"
+                            strokeWidth="1.6"
+                            strokeLinejoin="round"
+                          />
+                        </svg>
+                      </button>
+                    </span>
                   </header>
 
                   <div className="sb-league-body">
                     <div className={`sb-league-cols ${gridClass}`}>
-                      <span>Time</span>
-                      <span>Match</span>
+                      <span />
+                      <span />
                       {sample?.selections?.map((s) => <span key={s.key}>{s.key}</span>)
                         || <><span>1</span><span>X</span><span>2</span></>}
                     </div>
 
-                    {lg.matches.map((match) => {
+                    {lg.matches.map((match, mIdx) => {
                       const cols = columnsFor(marketChip, match);
                       const market = cols?.market;
                       const myPicks = selections.filter((s) => s.matchId === match.id && s.market === market);
+                      const minOdds = cols?.selections ? Math.min(...cols.selections.map((s) => s.odds || 99)) : 99;
+                      const isHot = match.isLive || minOdds < 1.8;
+                      const isBestOdds = !match.isLive && minOdds >= 1.3 && minOdds < 2.2 && mIdx % 3 !== 2;
+                      const commentCount = ((match.id?.charCodeAt?.(0) || mIdx) % 5) + 1;
 
                       return (
                         <div key={match.id} className={`sb-match ${gridClass}`}>
-                          <button
-                            type="button"
-                            className="sb-match-time"
-                            onClick={() => openMarkets(lg, match)}
-                            style={{ textAlign: 'left' }}
-                          >
-                            {match.isLive ? (
-                              <>
-                                <span className="live">● LIVE</span>
-                                <span className="score">{match.scoreHome}-{match.scoreAway}</span>
-                                <span>{match.minute || ''}</span>
-                              </>
-                            ) : (
-                              <>
-                                <span>{match.kickoff || ''}</span>
-                                <span>{match.day || ''}</span>
-                              </>
-                            )}
-                          </button>
-
-                          <button
-                            type="button"
-                            className="sb-match-teams"
-                            onClick={() => openMarkets(lg, match)}
-                            style={{ textAlign: 'left' }}
-                          >
-                            <span className="row">{match.home}</span>
-                            <span className="row">{match.away}</span>
-                          </button>
-
-                          {cols ? (
-                            cols.selections.map((s) => {
-                              const isSel = myPicks.some((p) => p.outcome === s.key);
-                              return (
-                                <button
-                                  key={s.key}
-                                  type="button"
-                                  className={`sb-odd${isSel ? ' selected' : ''}`}
-                                  onClick={() => toggleSelection(lg, match, market, s.key, s.odds)}
-                                >
-                                  {s.odds?.toFixed(2)}
-                                </button>
-                              );
-                            })
-                          ) : (
-                            <>
-                              <span className="sb-odd disabled">—</span>
-                              <span className="sb-odd disabled">—</span>
-                              <span className="sb-odd disabled">—</span>
-                            </>
+                          {(isHot || isBestOdds) && (
+                            <div className="sb-match-badges">
+                              {isHot && <span className="sb-badge-hot">HOT</span>}
+                              {isBestOdds && <span className="sb-badge-best">BEST ODDS</span>}
+                            </div>
                           )}
 
-                          <button
-                            type="button"
-                            className="sb-match-code-btn"
-                            onClick={() => openCodeModal()}
-                            aria-label="Enter booking code"
-                            title="Booking code"
-                          >
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                              <path d="M16 18l6-6-6-6" /><path d="M8 6l-6 6 6 6" />
-                            </svg>
-                          </button>
+                          <div className="sb-match-id-bar">
+                            <span>ID {String(match.id || '').slice(-5).replace(/\D/g, '') || (43000 + mIdx)}</span>
+                            <span>{lg.name.includes('International') ? 'International' : lg.name.split(' ').pop()}</span>
+                            <span>•</span>
+                            <span>{match.day || 'Today'}</span>
+                          </div>
+
+                          <div className="sb-match-row">
+                            <button
+                              type="button"
+                              className="sb-match-time"
+                              onClick={() => openMarkets(lg, match)}
+                            >
+                              {match.isLive ? (
+                                <>
+                                  <span className="live">LIVE</span>
+                                  <span className="score">{match.scoreHome}-{match.scoreAway}</span>
+                                  <span className="minute">{match.minute || ''}'</span>
+                                </>
+                              ) : (
+                                <>
+                                  <span className="kickoff">{match.kickoff || ''}</span>
+                                </>
+                              )}
+                            </button>
+
+                            <button
+                              type="button"
+                              className="sb-match-teams"
+                              onClick={() => openMarkets(lg, match)}
+                            >
+                              <span className="row">{match.home}</span>
+                              <span className="row">{match.away}</span>
+                            </button>
+
+                            <div className="sb-odds-group">
+                              {cols ? (
+                                cols.selections.map((s) => {
+                                  const isSel = myPicks.some((p) => p.outcome === s.key);
+                                  return (
+                                    <button
+                                      key={s.key}
+                                      type="button"
+                                      className={`sb-odd${isSel ? ' selected' : ''}`}
+                                      onClick={() => toggleSelection(lg, match, market, s.key, s.odds)}
+                                    >
+                                      {s.odds?.toFixed(2)}
+                                    </button>
+                                  );
+                                })
+                              ) : (
+                                <>
+                                  <span className="sb-odd disabled">—</span>
+                                  <span className="sb-odd disabled">—</span>
+                                  <span className="sb-odd disabled">—</span>
+                                </>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="sb-match-footer">
+                            <button
+                              type="button"
+                              className="sb-match-comments"
+                              onClick={() => {
+                                setCommentsMatch({ league: lg, match });
+                                requestAnimationFrame(() => commentsDlg.current?.showModal());
+                              }}
+                            >
+                              💬 Comments {(allComments[match.id] || []).length || ''}
+                            </button>
+                          </div>
                         </div>
                       );
                     })}
@@ -1679,6 +1716,38 @@ export default function Home({ initialChip }) {
           <RecentCodes onSelect={(c) => { setCodeInput(c); setCodeErr(''); }} />
         </div>
       </dialog>
+
+      {/* ─── Comments dialog ─── */}
+      <dialog ref={commentsDlg} className="sb-comments-dlg" onClose={() => setCommentsMatch(null)}>
+        {commentsMatch && (
+          <CommentsPanel
+            match={commentsMatch.match}
+            league={commentsMatch.league}
+            comments={allComments[commentsMatch.match.id] || []}
+            onAdd={(text) => {
+              const matchId = commentsMatch.match.id;
+              const entry = {
+                id: `c-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+                text,
+                user: account?.displayName || account?.phone || account?.email?.split('@')[0] || 'Guest',
+                at: new Date().toISOString(),
+                likes: 0,
+              };
+              const next = { ...allComments, [matchId]: [...(allComments[matchId] || []), entry] };
+              persistComments(next);
+            }}
+            onLike={(commentId) => {
+              const matchId = commentsMatch.match.id;
+              const list = (allComments[matchId] || []).map((c) =>
+                c.id === commentId ? { ...c, likes: (c.likes || 0) + 1 } : c
+              );
+              persistComments({ ...allComments, [matchId]: list });
+            }}
+            onClose={() => { commentsDlg.current?.close(); setCommentsMatch(null); }}
+            isLoggedIn={!!account}
+          />
+        )}
+      </dialog>
     </>
   );
 }
@@ -1700,6 +1769,94 @@ function RecentCodes({ onSelect }) {
           <button key={c} type="button" className="gfab-recent-chip" onClick={() => onSelect(c)}>{c}</button>
         ))}
       </div>
+    </div>
+  );
+}
+
+/* ─── Comments panel ─── */
+function CommentsPanel({ match, league, comments, onAdd, onLike, onClose, isLoggedIn }) {
+  const [text, setText] = useState('');
+  const listRef = useRef(null);
+
+  const submit = (e) => {
+    e.preventDefault();
+    const trimmed = text.trim();
+    if (!trimmed) return;
+    onAdd(trimmed);
+    setText('');
+    requestAnimationFrame(() => {
+      listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: 'smooth' });
+    });
+  };
+
+  const timeAgo = (iso) => {
+    const diff = Date.now() - new Date(iso).getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return 'just now';
+    if (mins < 60) return `${mins}m ago`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return `${hrs}h ago`;
+    return `${Math.floor(hrs / 24)}d ago`;
+  };
+
+  return (
+    <div className="sb-comments-panel">
+      <header className="sb-comments-head">
+        <button type="button" className="sb-comments-back" onClick={onClose}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+        </button>
+        <div className="sb-comments-title">
+          <span className="sb-comments-match">{match.home} vs {match.away}</span>
+          <span className="sb-comments-league">{league.name}</span>
+        </div>
+        <span className="sb-comments-count">{comments.length}</span>
+      </header>
+
+      <div className="sb-comments-list" ref={listRef}>
+        {comments.length === 0 ? (
+          <div className="sb-comments-empty">
+            <span className="sb-comments-empty-icon">💬</span>
+            <p>No comments yet</p>
+            <p className="sb-comments-empty-sub">Be the first to share your prediction!</p>
+          </div>
+        ) : (
+          comments.map((c) => (
+            <div key={c.id} className="sb-comment">
+              <div className="sb-comment-avatar">{(c.user || 'G')[0].toUpperCase()}</div>
+              <div className="sb-comment-body">
+                <div className="sb-comment-meta">
+                  <span className="sb-comment-user">{c.user}</span>
+                  <span className="sb-comment-time">{timeAgo(c.at)}</span>
+                </div>
+                <p className="sb-comment-text">{c.text}</p>
+                <button type="button" className="sb-comment-like" onClick={() => onLike(c.id)}>
+                  👍 {c.likes > 0 && <span>{c.likes}</span>}
+                </button>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
+      {isLoggedIn ? (
+        <form className="sb-comments-input" onSubmit={submit}>
+          <input
+            type="text"
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            placeholder="Share your prediction..."
+            maxLength={280}
+            autoComplete="off"
+          />
+          <button type="submit" disabled={!text.trim()}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+          </button>
+        </form>
+      ) : (
+        <div className="sb-comments-login-prompt">
+          Sign in to join the conversation
+        </div>
+      )}
     </div>
   );
 }
