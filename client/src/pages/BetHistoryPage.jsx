@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { fetchBetHistory, fetchBetByCode, executeCashout, setAutoCashout as apiSetAutoCashout } from '../api/betApi.js';
+import { fetchBetHistory, fetchBetByCode, fetchCashoutOffer, executeCashout, setAutoCashout as apiSetAutoCashout } from '../api/betApi.js';
 import { useAccount, useToast } from '../providers/AccountProvider.jsx';
 import CashoutModal from '../components/CashoutModal.jsx';
 import AutoCashoutPanel from '../components/AutoCashoutPanel.jsx';
@@ -33,7 +33,7 @@ function placedAtLabel(iso) {
 
 function computeOffer(b) {
   if (b.status !== 'open') return 0;
-  return b.lastCashOutOffer?.amount ?? b.cashoutOffer ?? Number((b.stake * b.totalOdds * 0.95).toFixed(2));
+  return b.lastCashOutOffer?.amount ?? b.cashoutOffer ?? Number((b.stake * 0.95).toFixed(2));
 }
 
 function stableHash(key) {
@@ -659,8 +659,14 @@ export default function BetHistoryPage() {
 
   // ── Cashout ──
   const onCashOut = async (b) => {
-    const amount = computeOffer(b);
+    let amount = computeOffer(b);
     if (amount <= 0) { toast('Cash-out is not available for this bet.', 'warn'); return; }
+    try {
+      const res = await fetchCashoutOffer(b.id);
+      if (res.offer > 0) amount = res.offer;
+    } catch {
+      // use client-side fallback if server is unreachable
+    }
     const code = b.bookingCode || toBookingCode(b.id);
     setCashoutCurrentOffer(amount);
     setCashoutError(null);
