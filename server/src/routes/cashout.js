@@ -70,7 +70,7 @@ function getCurrentOfferForBet(bet) {
     return bet.lastCashOutOffer.amount;
   }
 
-  return null;
+  return cashOutEngine.computeInitialOffer(bet);
 }
 
 async function validateAndComputeCashout(betId, userId, acceptedAmount, fraction) {
