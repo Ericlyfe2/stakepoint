@@ -143,6 +143,14 @@ export const cashOutBet     = (id, acceptedAmount, fraction) => {
 export const fetchUnacknowledgedWins = () => get('/bet/bets/unacknowledged');
 export const acknowledgeBet = (id) => post(`/bet/bets/${encodeURIComponent(id)}/ack`);
 
+/* cashout API (new dedicated routes) */
+export const fetchCashoutOffer  = (betId)     => post(`/cashout/offer/${encodeURIComponent(betId)}`);
+export const executeCashout     = (betId, acceptedAmount, fraction) => {
+  return post(`/cashout/execute/${encodeURIComponent(betId)}`, { acceptedAmount, fraction: fraction || 1 });
+};
+export const setAutoCashout     = (betId, target) => post(`/cashout/auto/${encodeURIComponent(betId)}`, { target });
+export const getAutoCashout     = (betId)         => get(`/cashout/auto/${encodeURIComponent(betId)}`);
+
 /* casino, virtuals, jackpot, promos */
 export const fetchCasinoGames = (cat) => get(`/bet/casino/games${cat ? `?category=${encodeURIComponent(cat)}` : ''}`);
 export const fetchVirtuals    = ()    => get('/bet/virtuals');

@@ -322,11 +322,19 @@ export default function AppProviders({ children }) {
     const offStatus = onLive('account:status-changed', ({ accountStatus }) => {
       setAccount((prev) => prev ? { ...prev, accountStatus } : prev);
     });
+    const offAutoCashout = onLive('cashout:auto-triggered', ({ betId, amount, bet }) => {
+      toast(`Auto cash-out triggered! GHS ${formatAmt(amount)} credited.`, 'success');
+      if (bet) showWin({ ...bet, cashOut: amount, status: 'cashed_out' });
+      refresh();
+    });
+    const offSuspended = onLive('cashout:suspended', ({ betId, reason }) => {
+      toast(`Cash-out suspended for bet #${betId}${reason ? ': ' + reason : ''}.`, 'warn');
+    });
 
     return () => {
       alive = false;
       clearInterval(id);
-      offWallet?.(); offPending?.(); offApproved?.(); offRejected?.(); offNotif?.(); offWin?.(); offSettled?.(); offStatus?.();
+      offWallet?.(); offPending?.(); offApproved?.(); offRejected?.(); offNotif?.(); offWin?.(); offSettled?.(); offStatus?.(); offAutoCashout?.(); offSuspended?.();
     };
   }, [accountId]);
 

@@ -17,6 +17,8 @@
  *   bet:won        { betId, payout }                                             // user room only
  *   wallet:update  { balance, delta, reason }                                    // user room only
  *   cashout:offer  { betId, cashOut, potentialWin, ts, reason? }                 // user room only
+ *   cashout:auto-triggered { betId, amount, target, ts }                         // user room only
+ *   cashout:suspended { betId, reason }                                          // user room only
  *
  * Server -> client events (/admin):
  *   audit:event       Audit log row

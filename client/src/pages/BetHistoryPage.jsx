@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { fetchBetHistory, cashOutBet, fetchBetByCode } from '../api/betApi.js';
+import { fetchBetHistory, fetchBetByCode, executeCashout, setAutoCashout as apiSetAutoCashout } from '../api/betApi.js';
 import { useAccount, useToast } from '../providers/AccountProvider.jsx';
+import CashoutModal from '../components/CashoutModal.jsx';
+import AutoCashoutPanel from '../components/AutoCashoutPanel.jsx';
 import { toBookingCode } from '../components/BetSuccessModal.jsx';
 
 const AUTO_TARGETS_KEY = 'bv_auto_cashout_targets';
@@ -336,7 +338,7 @@ function TicketDetails({ bet, onClose, onRemix, onShare }) {
 }
 
 /* ─────────── BetCard (SportyBet-style compact card) ─────────── */
-function BetCardView({ bet, expanded, onToggle, onCashout, onRemix, onDetails, trend, copiedCode, onCopy, autoTarget, onAutoTargetChange, onAutoClear }) {
+function BetCardView({ bet, expanded, onToggle, onCashout, onRemix, onDetails, trend, copiedCode, onCopy, autoTarget, onAutoTargetChange, onAutoClear, cashoutBusy }) {
   const code = bet.bookingCode || toBookingCode(bet.id);
   const isOpen = bet.status === 'open';
   const cashOutAmount = isOpen ? computeOffer(bet) : 0;
@@ -465,6 +467,18 @@ function BetCardView({ bet, expanded, onToggle, onCashout, onRemix, onDetails, t
         </div>
       )}
 
+      {/* ── Auto-cashout panel ── */}
+      {isOpen && cashOutAmount > 0 && (
+        <AutoCashoutPanel
+          betId={bet.id}
+          currentOffer={cashOutAmount}
+          target={Number(autoTarget) || 0}
+          onSetTarget={(id, v) => onAutoTargetChange(id, v)}
+          onClearTarget={(id) => onAutoClear(id)}
+          busy={cashoutBusy}
+        />
+      )}
+
       {/* ── Cashed out / void note ── */}
       {bet.status === 'cashed_out' && (
         <div className="xh-result-note xh-result-cashed">
@@ -525,11 +539,16 @@ export default function BetHistoryPage() {
   // Auto cashout
   const [autoTargets, setAutoTargets] = useState(() => loadAutoTargets());
   const autoFiredRef = useRef({});
-  const cashingOutRef = useRef({});
 
   // Cashout confirm dialog
   const [confirmCashOut, setConfirmCashOut] = useState(null);
   const [confirmFraction, setConfirmFraction] = useState(1);
+  const [cashoutBusy, setCashoutBusy] = useState(false);
+  const [cashoutError, setCashoutError] = useState(null);
+  const [cashoutProcessing, setCashoutProcessing] = useState(false);
+  const [cashoutProcessingMsg, setCashoutProcessingMsg] = useState('');
+  const [cashoutChangedOffer, setCashoutChangedOffer] = useState(null);
+  const [cashoutCurrentOffer, setCashoutCurrentOffer] = useState(0);
 
   // Booking code loader
   const [loadCodeInput, setLoadCodeInput] = useState('');
@@ -639,11 +658,40 @@ export default function BetHistoryPage() {
   }), [openBets, settledBets, cashoutableBets]);
 
   // ── Cashout ──
-  const performCashOut = useCallback(async (id, expectedAmount, fraction = 1) => {
+  const onCashOut = async (b) => {
+    const amount = computeOffer(b);
+    if (amount <= 0) { toast('Cash-out is not available for this bet.', 'warn'); return; }
+    const code = b.bookingCode || toBookingCode(b.id);
+    setCashoutCurrentOffer(amount);
+    setCashoutError(null);
+    setCashoutChangedOffer(null);
+    setCashoutProcessing(false);
+    setConfirmCashOut({ id: b.id, amount, code, bet: b });
+    setConfirmFraction(1);
+  };
+
+  const closeCashout = () => {
+    setConfirmCashOut(null);
+    setCashoutBusy(false);
+    setCashoutError(null);
+    setCashoutProcessing(false);
+    setCashoutChangedOffer(null);
+  };
+
+  const confirmAndCashOut = async (fraction) => {
+    if (!confirmCashOut) return;
+    const { id, amount } = confirmCashOut;
+    const f = fraction || confirmFraction;
+
+    setCashoutProcessing(true);
+    setCashoutBusy(true);
+    setCashoutError(null);
+    setCashoutProcessingMsg('Processing Cashout...');
+
     try {
-      const res = await cashOutBet(id, expectedAmount, fraction);
+      const res = await executeCashout(id, cashoutCurrentOffer, f);
       const cash = res.bet.cashOut || 0;
-      const partial = fraction != null && fraction > 0 && fraction < 1;
+      const partial = f > 0 && f < 1;
       adjustBalance(cash, partial ? `Partial cash-out: GHS ${fmt(cash)}. Remainder still in play.` : `Cashed out: GHS ${fmt(cash)}.`);
       showWin({ ...res.bet, status: 'cashed_out', settledAt: res.bet.settledAt || new Date().toISOString() });
       setAutoTargets(prev => {
@@ -652,51 +700,65 @@ export default function BetHistoryPage() {
         saveAutoTargets(rest);
         return rest;
       });
+      closeCashout();
       await refresh();
+      toast(`Cash-out successful! GHS ${fmt(cash)} credited.`, 'success');
     } catch (e) {
-      toast(e.message || 'Cash-out unavailable.', 'error');
-    }
-  }, [adjustBalance, refresh, toast, showWin]);
-
-  useEffect(() => {
-    for (const b of openBets) {
-      const target = Number(autoTargets[b.id] || 0);
-      if (target <= 0) continue;
-      const cur = computeOffer(b);
-      if (cur >= target && !autoFiredRef.current[b.id] && !cashingOutRef.current[b.id]) {
-        autoFiredRef.current[b.id] = true;
-        cashingOutRef.current[b.id] = true;
-        toast(`Auto cash-out triggered at GHS ${fmt(cur)}.`);
-        performCashOut(b.id, cur).finally(() => { cashingOutRef.current[b.id] = false; });
+      setCashoutProcessing(false);
+      setCashoutBusy(false);
+      if (e.body?.code === 'OFFER_CHANGED' && e.body?.currentOffer) {
+        setCashoutChangedOffer(e.body.currentOffer);
+        setCashoutCurrentOffer(e.body.currentOffer);
+      } else if (e.body?.code === 'OFFER_UNAVAILABLE') {
+        setCashoutError('Cash-out is no longer available. Market may be suspended.');
+      } else if (e.body?.code === 'OFFER_STALE') {
+        setCashoutError('The offer changed. Close and try again.');
+        setCashoutCurrentOffer(e.body?.currentOffer || cashoutCurrentOffer);
+      } else {
+        setCashoutError(e.message || 'Cash-out failed. Please try again.');
       }
     }
-  }, [openBets, autoTargets, performCashOut, toast]);
-
-  const onCashOut = (b) => {
-    const amount = computeOffer(b);
-    const code = b.bookingCode || toBookingCode(b.id);
-    setConfirmCashOut({ id: b.id, amount, code, bet: b });
-    setConfirmFraction(1);
   };
 
-  const confirmAndCashOut = async () => {
-    if (!confirmCashOut) return;
-    const { id, amount } = confirmCashOut;
-    const f = confirmFraction;
-    setConfirmCashOut(null);
-    await performCashOut(id, amount, f);
+  const onAcceptChanged = async (newOffer) => {
+    setCashoutChangedOffer(null);
+    setCashoutCurrentOffer(newOffer);
+    setCashoutProcessing(true);
+    setCashoutBusy(true);
+    setCashoutError(null);
+
+    try {
+      const f = confirmFraction;
+      const res = await executeCashout(confirmCashOut.id, newOffer, f);
+      const cash = res.bet.cashOut || 0;
+      const partial = f > 0 && f < 1;
+      adjustBalance(cash, partial ? `Partial cash-out: GHS ${fmt(cash)}. Remainder still in play.` : `Cashed out: GHS ${fmt(cash)}.`);
+      showWin({ ...res.bet, status: 'cashed_out', settledAt: res.bet.settledAt || new Date().toISOString() });
+      closeCashout();
+      await refresh();
+      toast(`Cash-out successful! GHS ${fmt(cash)} credited.`, 'success');
+    } catch (e) {
+      setCashoutProcessing(false);
+      setCashoutBusy(false);
+      setCashoutError(e.message || 'Cash-out failed on retry.');
+    }
   };
 
-  const setAutoTarget = (betId, raw) => {
+  const setAutoTarget = async (betId, raw) => {
     const v = Number(String(raw).replace(/,/g, ''));
-    setAutoTargets(prev => {
-      const next = { ...prev };
-      if (!Number.isFinite(v) || v <= 0) delete next[betId];
-      else next[betId] = v;
-      saveAutoTargets(next);
-      return next;
-    });
-    autoFiredRef.current[betId] = false;
+    try {
+      await apiSetAutoCashout(betId, v > 0 ? v : 0);
+      setAutoTargets(prev => {
+        const next = { ...prev };
+        if (!Number.isFinite(v) || v <= 0) delete next[betId];
+        else next[betId] = v;
+        saveAutoTargets(next);
+        return next;
+      });
+      autoFiredRef.current[betId] = false;
+    } catch (e) {
+      toast(e.message || 'Could not set auto cash-out.', 'error');
+    }
   };
 
   // ── Remix ──
@@ -790,6 +852,7 @@ export default function BetHistoryPage() {
                     autoTarget={autoTargets[b.id] || ''}
                     onAutoTargetChange={setAutoTarget}
                     onAutoClear={(id) => setAutoTarget(id, '')}
+                    cashoutBusy={cashoutBusy}
                   />
                 ))}
               </AnimatePresence>
@@ -817,52 +880,22 @@ export default function BetHistoryPage() {
         )}
       </div>
 
-      {/* ── Cashout confirm dialog ── */}
-      {confirmCashOut && (() => {
-        const isSystem = confirmCashOut.bet?.mode === 'system';
-        const payoutNow = Number((confirmCashOut.amount * confirmFraction).toFixed(2));
-        const remainStake = Number((confirmCashOut.bet.stake * (1 - confirmFraction)).toFixed(2));
-        const remainPotWin = Number((remainStake * confirmCashOut.bet.totalOdds * 1.08).toFixed(2));
-        const isPartial = confirmFraction > 0 && confirmFraction < 1;
-        const fractionOptions = isSystem ? [1] : [0.25, 0.5, 0.75, 1];
-        return (
-          <div className="xh-confirm-overlay" role="dialog" aria-modal="true" onClick={() => setConfirmCashOut(null)}>
-            <div className="xh-confirm-card" onClick={e => e.stopPropagation()}>
-              <h3>Confirm cash-out</h3>
-              <p className="xh-confirm-sub">Booking <code>{confirmCashOut.code}</code></p>
-              {!isSystem && (
-                <div className="xh-fraction-row">
-                  {fractionOptions.map(f => (
-                    <button key={f} type="button" className={`xh-fraction-chip${confirmFraction === f ? ' active' : ''}`} onClick={() => setConfirmFraction(f)}>
-                      {f === 1 ? 'Full' : `${Math.round(f * 100)}%`}
-                    </button>
-                  ))}
-                </div>
-              )}
-              <div className="xh-confirm-amount">
-                <span className="xh-confirm-amount-label">You'll receive</span>
-                <strong className="xh-confirm-amount-value">GHS {fmt(payoutNow)}</strong>
-              </div>
-              {isPartial && (
-                <div className="xh-confirm-residual">
-                  <span className="xh-confirm-residual-label">Remaining ticket</span>
-                  <div>
-                    <div>Stake <strong>GHS {fmt(remainStake)}</strong></div>
-                    <div>Potential win <strong>GHS {fmt(remainPotWin)}</strong></div>
-                  </div>
-                </div>
-              )}
-              <p className="xh-confirm-note">The offer can move between now and submission. We'll reject the cash-out if it drifts more than a few percent.</p>
-              <div className="xh-confirm-actions">
-                <button type="button" className="xh-confirm-cancel" onClick={() => setConfirmCashOut(null)}>Cancel</button>
-                <button type="button" className="xh-confirm-go" onClick={confirmAndCashOut}>
-                  {isPartial ? `Cash out ${Math.round(confirmFraction * 100)}%` : 'Confirm cash-out'}
-                </button>
-              </div>
-            </div>
-          </div>
-        );
-      })()}
+      {/* ── Cashout modal ── */}
+      {confirmCashOut && (
+        <CashoutModal
+          isOpen={!!confirmCashOut}
+          bet={confirmCashOut.bet}
+          currentOffer={cashoutCurrentOffer}
+          busy={cashoutBusy}
+          error={cashoutError}
+          processing={cashoutProcessing}
+          processingMessage={cashoutProcessingMsg}
+          changedOffer={cashoutChangedOffer}
+          onConfirm={confirmAndCashOut}
+          onCancel={closeCashout}
+          onAcceptChanged={onAcceptChanged}
+        />
+      )}
 
       {/* ── Ticket details overlay ── */}
       {activeTicket && (

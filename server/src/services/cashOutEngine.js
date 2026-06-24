@@ -1,48 +1,65 @@
 /**
- * Cash-out engine.
+ * Professional cash-out engine.
  *
  * Maintains a fixture → open bets index, recomputes cash-out offers on each
- * live tick, emits cashout:offer to the bet owner, and dedupes near-identical
- * offers.
+ * live tick, supports partial cash-out, auto-cashout triggers, and market
+ * suspension awareness.
  *
- * Storage is in-memory. The durable copy of `lastCashOutOffer` lives on the
- * bet receipt (see routes/bet.js). On server restart, callers should rebuild
- * the engine state from open receipts (see registerBet).
- *
- * v1 limitations:
- *   - System bets are skipped (computeOffer returns null).
- *   - No partial cash-out.
+ * Cash-out formula:
+ *   For each unfinished leg: impliedProb = 1 / currentOdds
+ *   fairValue = stake × totalOdds × product(impliedProb)
+ *   initialMargin = 1 - INITIAL_CASHOUT_FACTOR (configurable, default 5%)
+ *   After first tick, uses houseMargin from env.
+ *   offered = max(0, fairValue × (1 - houseMargin))
+ *   ceiling = stake × totalOdds × 0.99
+ *   return min(offered, ceiling)
  */
 import { emitToUser as defaultEmit } from './realtime.js';
 
+const DEDUP_THRESHOLD = 0.005;
+const DEFAULT_INITIAL_CASHOUT_FACTOR = 0.95;
+const DEFAULT_HOUSE_MARGIN = 0.05;
+const AUTO_CASHOUT_COOLDOWN_MS = 2000;
+
 let _emit = defaultEmit;
 
-const openBetsByFixture = new Map();   // fixtureKey -> Set<betId>
-const betsById          = new Map();   // betId -> bet receipt (shallow copy with live fields)
-const lastOfferByBet    = new Map();   // betId -> { cashOut, ts }
+const openBetsByFixture = new Map();
+const betsById = new Map();
+const lastOfferByBet = new Map();
+const autoCashoutTargets = new Map();
+const cashoutLocks = new Map();
+const partialCashoutCounts = new Map();
 
-const DEDUP_THRESHOLD = 0.005; // 0.5%
+let _onOffer = null;
+let _options = {
+  initialCashoutFactor: DEFAULT_INITIAL_CASHOUT_FACTOR,
+  houseMargin: DEFAULT_HOUSE_MARGIN,
+};
 
-/** Replace dependencies in tests. */
+export function configure(opts = {}) {
+  if (opts.initialCashoutFactor != null) _options.initialCashoutFactor = opts.initialCashoutFactor;
+  if (opts.houseMargin != null) _options.houseMargin = opts.houseMargin;
+}
+
 export function __resetForTests({ emitToUser } = {}) {
   _emit = emitToUser || defaultEmit;
   openBetsByFixture.clear();
   betsById.clear();
   lastOfferByBet.clear();
+  autoCashoutTargets.clear();
+  cashoutLocks.clear();
+  partialCashoutCounts.clear();
 }
 
 export function registerBet(bet) {
   if (!bet || bet.status !== 'open') return;
-  // Clone the receipt + each leg so engine-local mutations (e.g. marking
-  // legs finished in onLegSettled) don't write through to the shared bet
-  // store. The receipt-side `status`, `lastCashOutOffer`, and `cashOutHistory`
-  // are still updated by routes/bet.js via the store's set() method.
   const cloned = {
     id: bet.id,
     userId: bet.userId,
     mode: bet.mode,
     stake: bet.stake,
     totalOdds: bet.totalOdds,
+    potentialWin: bet.potentialWin,
     status: bet.status,
     legs: (bet.legs || []).map((l) => ({ ...l })),
   };
@@ -63,59 +80,120 @@ export function unregisterBet(betId) {
   }
   betsById.delete(betId);
   lastOfferByBet.delete(betId);
+  autoCashoutTargets.delete(betId);
+  cashoutLocks.delete(betId);
+  partialCashoutCounts.delete(betId);
 }
 
 export function getLastOffer(betId) {
   return lastOfferByBet.get(betId) || null;
 }
 
-/** Restore a persisted offer (e.g. after server restart). */
 export function restoreLastOffer(betId, { amount, ts }) {
   if (amount != null && ts != null) {
     lastOfferByBet.set(betId, { cashOut: amount, ts });
   }
 }
 
-/**
- * Pure function: compute the cash-out offer for a bet given a current-odds
- * lookup. Returns null when the bet shape isn't supported (system bets),
- * or 0 when any leg has already lost.
- *
- * @param {object}   bet         The bet receipt.
- * @param {function} oddsLookup  (fixtureKey, market, outcome) -> number | null
- * @param {number}   houseMargin 0..1
- */
+export function getAutoCashoutTarget(betId) {
+  return autoCashoutTargets.get(betId) || 0;
+}
+
+export function setAutoCashoutTarget(betId, target) {
+  if (target > 0) {
+    autoCashoutTargets.set(betId, target);
+  } else {
+    autoCashoutTargets.delete(betId);
+  }
+}
+
+export function getPartialCashoutCount(betId) {
+  return partialCashoutCounts.get(betId) || 0;
+}
+
+export function incrementPartialCashoutCount(betId) {
+  const count = (partialCashoutCounts.get(betId) || 0) + 1;
+  partialCashoutCounts.set(betId, count);
+  return count;
+}
+
+export function isCashoutLocked(betId) {
+  const lock = cashoutLocks.get(betId);
+  if (!lock) return false;
+  if (Date.now() - lock > AUTO_CASHOUT_COOLDOWN_MS) {
+    cashoutLocks.delete(betId);
+    return false;
+  }
+  return true;
+}
+
+export function setCashoutLock(betId) {
+  cashoutLocks.set(betId, Date.now());
+}
+
+export function releaseCashoutLock(betId) {
+  cashoutLocks.delete(betId);
+}
+
+export function computeInitialOffer(bet) {
+  if (!bet || bet.mode === 'system') return null;
+  if (bet.stake <= 0) return 0;
+  const raw = bet.stake * _options.initialCashoutFactor;
+  const offered = Number(raw.toFixed(2));
+  return Math.min(offered, bet.stake * bet.totalOdds * 0.99);
+}
+
 export function computeOffer(bet, oddsLookup, houseMargin) {
   if (!bet || bet.mode === 'system') return null;
+
   let probProduct = 1;
+  let anySuspended = false;
+  let anyUnavailable = false;
+
   for (const leg of bet.legs || []) {
     if (leg.finished && leg.won === false) return 0;
-    if (leg.finished && leg.won === true)  { probProduct *= 1; continue; }
+    if (leg.finished && leg.won === true) continue;
+
     const current = oddsLookup(leg.matchId, leg.market, leg.outcome);
-    if (!current || current < 1.0001) return 0; // no market or impossible price
+
+    if (current === null || current === undefined) {
+      anyUnavailable = true;
+      continue;
+    }
+    if (current === 0) {
+      anySuspended = true;
+      continue;
+    }
+    if (current < 1.0001) return 0;
+
     probProduct *= 1 / current;
   }
+
+  if (anySuspended) return 0;
+  if (anyUnavailable && probProduct === 1) return 0;
+
   const fair = bet.stake * bet.totalOdds * probProduct;
   const offered = Math.max(0, fair * (1 - houseMargin));
-  // Defensive clamp: never offer more than 99% of the max possible return.
   const ceiling = bet.stake * bet.totalOdds * 0.99;
   return Math.min(offered, ceiling);
 }
 
-/**
- * Trigger: a live tick touched this fixture. Recompute offers for every
- * open bet that has a leg on this fixture, emit only when materially changed.
- */
 export function onLiveChange(fixtureKey, oddsLookup, houseMargin) {
   const bets = openBetsByFixture.get(fixtureKey);
   if (!bets || bets.size === 0) return;
+
+  const results = [];
+
   for (const betId of bets) {
     const bet = betsById.get(betId);
     if (!bet || bet.status !== 'open') { unregisterBet(betId); continue; }
+
     const offer = computeOffer(bet, oddsLookup, houseMargin);
-    if (offer === null) continue; // system bets etc.
+    if (offer === null) continue;
+
     const last = lastOfferByBet.get(betId);
     if (last && Math.abs(offer - last.cashOut) / Math.max(last.cashOut, 1) < DEDUP_THRESHOLD) continue;
+
     const payload = {
       betId,
       cashOut: Number(offer.toFixed(2)),
@@ -123,36 +201,87 @@ export function onLiveChange(fixtureKey, oddsLookup, houseMargin) {
       ts: Date.now(),
       reason: 'tick',
     };
+
     lastOfferByBet.set(betId, { cashOut: payload.cashOut, ts: payload.ts });
     _emit(bet.userId, 'cashout:offer', payload);
-    if (_onOffer) try { _onOffer(bet, payload); } catch { /* never break the loop */ }
+    if (_onOffer) try { _onOffer(bet, payload); } catch {}
+
+    results.push({ bet, payload });
+  }
+
+  for (const { bet, payload } of results) {
+    checkAutoCashout(bet, payload);
   }
 }
 
-/**
- * Trigger: a leg settled. If it lost, every bet containing it must drop to
- * a zero offer immediately so the UI reflects bust state before final settle.
- */
 export function onLegSettled(fixtureKey, won) {
   const bets = openBetsByFixture.get(fixtureKey);
   if (!bets || bets.size === 0) return;
+
   for (const betId of bets) {
     const bet = betsById.get(betId);
     if (!bet || bet.status !== 'open') { unregisterBet(betId); continue; }
-    // Mark the legs on this fixture as finished/won in our cached copy.
+
     for (const leg of bet.legs) {
       if (leg.matchId === fixtureKey) { leg.finished = true; leg.won = !!won; }
     }
+
     if (!won) {
-      const payload = { betId, cashOut: 0, potentialWin: Number((bet.stake * bet.totalOdds).toFixed(2)), ts: Date.now(), reason: 'leg_lost' };
+      const payload = {
+        betId,
+        cashOut: 0,
+        potentialWin: Number((bet.stake * bet.totalOdds).toFixed(2)),
+        ts: Date.now(),
+        reason: 'leg_lost',
+      };
       lastOfferByBet.set(betId, { cashOut: 0, ts: payload.ts });
       _emit(bet.userId, 'cashout:offer', payload);
-      if (_onOffer) try { _onOffer(bet, payload); } catch { /* never break the loop */ }
+      if (_onOffer) try { _onOffer(bet, payload); } catch {}
     }
   }
 }
 
-/** Periodic cleanup — called every 60s from oddsAggregator. */
+export function onMarketSuspended(fixtureKey) {
+  const bets = openBetsByFixture.get(fixtureKey);
+  if (!bets || bets.size === 0) return;
+
+  for (const betId of bets) {
+    const payload = {
+      betId,
+      cashOut: 0,
+      potentialWin: 0,
+      ts: Date.now(),
+      reason: 'market_suspended',
+    };
+    lastOfferByBet.set(betId, { cashOut: 0, ts: payload.ts });
+    const bet = betsById.get(betId);
+    if (bet) {
+      _emit(bet.userId, 'cashout:offer', payload);
+      if (_onOffer) try { _onOffer(bet, payload); } catch {}
+    }
+  }
+}
+
+export function onMarketResumed(fixtureKey, oddsLookup, houseMargin) {
+  onLiveChange(fixtureKey, oddsLookup, houseMargin);
+}
+
+function checkAutoCashout(bet, payload) {
+  const target = autoCashoutTargets.get(bet.id);
+  if (!target || target <= 0) return;
+  if (payload.cashOut <= 0) return;
+  if (payload.cashOut < target) return;
+  if (isCashoutLocked(bet.id)) return;
+
+  setCashoutLock(bet.id);
+  _emit(bet.userId, 'cashout:auto-triggered', {
+    betId: bet.id,
+    amount: payload.cashOut,
+    target,
+    ts: Date.now(),
+  });
+}
+
 export function sweep() {
   for (const [fixtureKey, set] of openBetsByFixture) {
     for (const betId of set) {
@@ -161,8 +290,12 @@ export function sweep() {
     }
     if (set.size === 0) openBetsByFixture.delete(fixtureKey);
   }
+
+  for (const [betId, lockTs] of cashoutLocks) {
+    if (Date.now() - lockTs > AUTO_CASHOUT_COOLDOWN_MS * 2) {
+      cashoutLocks.delete(betId);
+    }
+  }
 }
 
-let _onOffer = null;
-/** Register a side-effect callback invoked every time cashout:offer is emitted. */
 export function onOffer(handler) { _onOffer = handler; }

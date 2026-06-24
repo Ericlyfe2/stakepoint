@@ -15,6 +15,7 @@ import { metricsMiddleware } from './services/metrics.js';
 
 import authRouter    from './routes/auth.js';
 import betRouter     from './routes/bet.js';
+import cashoutRouter from './routes/cashout.js';
 import walletRouter  from './routes/wallet.js';
 import profileRouter from './routes/profile.js';
 import supportRouter from './routes/support.js';
@@ -101,6 +102,7 @@ app.get('/api/settings/public', (_req, res) => {
 
 app.use('/api/auth',     authRouter);
 app.use('/api/bet',      betRouter);
+app.use('/api/cashout',  cashoutRouter);
 app.use('/api/wallet',   walletRouter);
 app.use('/api/profile',  profileRouter);
 app.use('/api/support',  supportRouter);
@@ -149,6 +151,11 @@ async function boot() {
   try {
     const { createStore } = await import('./db/store.js');
     const cashOutEngine = await import('./services/cashOutEngine.js');
+    const { CASHOUT, LIVE_BETTING } = await import('./config/env.js');
+    cashOutEngine.configure({
+      initialCashoutFactor: CASHOUT.initialFactor,
+      houseMargin: LIVE_BETTING.houseMargin,
+    });
     const betsStore = createStore('bets', {});
     for (const bet of Object.values(betsStore.all() || {})) {
       if (bet.status === 'open') {

@@ -81,6 +81,21 @@ export const LIVE_BETTING = {
   driftTolerance: Math.min(0.2, Math.max(0, Number(env.CASHOUT_DRIFT_TOLERANCE) || 0.01)),
 };
 
+// ---- Cashout settings -------------------------------------------------------
+export const CASHOUT = {
+  // Initial cashout factor (0-1) — how much of stake is offered immediately.
+  initialFactor: Math.min(1, Math.max(0.5, Number(env.CASHOUT_INITIAL_FACTOR) || 0.95)),
+  // Maximum partial cashouts allowed per bet.
+  maxPartialSingle: Number(env.CASHOUT_MAX_PARTIAL_SINGLE) || 10,
+  maxPartialMultiple: Number(env.CASHOUT_MAX_PARTIAL_MULTIPLE) || 5,
+  // Minimum delay for cashout processing (ms).
+  minDelayMs: Number(env.CASHOUT_MIN_DELAY_MS) || 1000,
+  // Maximum delay for cashout processing (ms).
+  maxDelayMs: Number(env.CASHOUT_MAX_DELAY_MS) || 5000,
+  // Auto cashout enabled.
+  autoCashoutEnabled: env.CASHOUT_AUTO_ENABLED !== 'false',
+};
+
 if (!LIVE_BETTING.apiFootballKey) {
   // Informational, not blocking — the live track now activates against any
   // enabled football provider (see services/oddsAggregator.js startLiveTrack).
