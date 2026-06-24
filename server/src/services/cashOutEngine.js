@@ -140,7 +140,7 @@ export function computeInitialOffer(bet) {
   if (bet.stake <= 0) return 0;
   const raw = bet.stake * _options.initialCashoutFactor;
   const offered = Number(raw.toFixed(2));
-  return Math.min(offered, bet.stake * bet.totalOdds * 0.99);
+  return Math.min(offered, bet.stake * 0.99);
 }
 
 export function computeOffer(bet, oddsLookup, houseMargin) {
@@ -174,7 +174,7 @@ export function computeOffer(bet, oddsLookup, houseMargin) {
 
   const fair = bet.stake * bet.totalOdds * probProduct;
   const offered = Math.max(0, fair * (1 - houseMargin));
-  const ceiling = bet.stake * bet.totalOdds * 0.99;
+  const ceiling = bet.stake * 0.99;
   return Math.min(offered, ceiling);
 }
 

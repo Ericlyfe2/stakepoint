@@ -376,4 +376,32 @@ const CM_CSS = `
 .cm-changed-value-new { font-size: 20px; font-weight: 800; color: var(--accent); }
 .cm-changed-arrow { font-size: 20px; color: var(--text-soft); }
 .cm-changed-actions { display: flex; gap: 10px; }
+
+/* ── Responsive small screens ── */
+@media (max-width: 420px) {
+  .cm-overlay { padding: 8px; }
+  .cm-card { padding: 16px; border-radius: 12px; }
+  .cm-title { font-size: 17px; }
+  .cm-partial-header { flex-direction: column; align-items: flex-start; gap: 4px; }
+  .cm-fraction-chip { padding: 9px 0; font-size: 11px; }
+  .cm-amount-card { padding: 12px; }
+  .cm-amount-value { font-size: 18px; }
+  .cm-residual-card { padding: 10px 12px; }
+  .cm-btn { font-size: 13px; padding: 12px 0; }
+  .cm-processing-title { font-size: 16px; }
+  .cm-processing-value { font-size: 20px; }
+  .cm-changed-value-new { font-size: 17px; }
+  .cm-changed-compare { gap: 8px; }
+}
+@media (max-width: 360px) {
+  .cm-card { padding: 12px; }
+  .cm-fraction-row { gap: 4px; }
+  .cm-fraction-chip { padding: 8px 0; font-size: 10px; border-radius: 6px; }
+  .cm-amount-card { padding: 10px; }
+  .cm-amount-label { font-size: 11px; }
+  .cm-amount-value { font-size: 16px; }
+  .cm-amount-subvalue { font-size: 12px; }
+  .cm-actions { gap: 6px; }
+  .cm-btn { font-size: 12px; padding: 11px 0; }
+}
 `;

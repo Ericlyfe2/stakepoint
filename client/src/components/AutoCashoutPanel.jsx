@@ -126,12 +126,13 @@ export default function AutoCashoutPanel({
                       <span className="ac-currency">GHS</span>
                       <input
                         type="number"
+                        inputMode="decimal"
                         className="ac-input"
                         placeholder="e.g. 500"
                         value={inputValue}
                         onChange={(e) => setInputValue(e.target.value)}
                         min={currentOffer + 1}
-                        step="1"
+                        step="0.01"
                         disabled={busy}
                       />
                     </div>
@@ -282,4 +283,26 @@ const AC_CSS = `
   transition: width .3s ease;
 }
 .ac-actions { display: flex; gap: 8px; }
+
+/* ── Responsive small screens ── */
+@media (max-width: 420px) {
+  .ac-toggle-text {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .ac-btn { font-size: 11px; padding: 9px 12px; }
+  .ac-input { font-size: 14px; }
+  .ac-currency { font-size: 12px; }
+  .ac-input-wrap { padding: 0 8px; }
+}
+@media (max-width: 360px) {
+  .ac-panel { border-radius: 6px; }
+  .ac-toggle { padding: 8px 10px; gap: 6px; font-size: 11px; }
+  .ac-content { padding: 0 10px 10px; }
+  .ac-input-row { gap: 6px; }
+  .ac-btn { font-size: 10px; padding: 8px 10px; }
+  .ac-actions { gap: 6px; flex-wrap: wrap; }
+  .ac-btn-change, .ac-btn-remove { flex: 1; text-align: center; }
+}
 `;

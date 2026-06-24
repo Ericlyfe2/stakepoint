@@ -69,7 +69,7 @@ describe('configure', () => {
     configure({ houseMargin: 0.1 });
     const offer = computeOffer(bet, lookup, 0.1);
     configure({ houseMargin: 0.05 });
-    const expected = Math.min(10 * 2 * (1 / 1.5) * 0.9, 10 * 2 * 0.99);
+    const expected = Math.min(10 * 2 * (1 / 1.5) * 0.9, 10 * 0.99);
     assert.equal(offer, expected);
   });
 });
@@ -94,10 +94,10 @@ describe('computeInitialOffer', () => {
     assert.equal(computeInitialOffer(bet), 5.22);
   });
 
-  test('clamps to stake * totalOdds * 0.99', () => {
+  test('clamps to stake * 0.99 (never exceeds stake)', () => {
     const bet = makeSingleBet({ stake: 10, totalOdds: 1.01 });
     const offer = computeInitialOffer(bet);
-    assert.ok(offer <= 10 * 1.01 * 0.99);
+    assert.ok(offer <= 10 * 0.99);
   });
 });
 
@@ -106,15 +106,20 @@ describe('computeOffer', () => {
   test('returns stake * totalOdds * prob * (1 - margin)', () => {
     const lookup = fakeOddsLookup({ 'f1:1X2:1': 1.5, 'f2:1X2:1': 2 });
     const bet = {
-      id: 'b1', userId: 'u1', mode: 'multiple', stake: 10, totalOdds: 6,
+      id: 'b1', userId: 'u1', mode: 'multiple', stake: 10, totalOdds: 3,
       status: 'open',
       legs: [
-        { matchId: 'f1', market: '1X2', outcome: '1', odds: 2, finished: false },
-        { matchId: 'f2', market: '1X2', outcome: '1', odds: 3, finished: false },
+        { matchId: 'f1', market: '1X2', outcome: '1', odds: 1.5, finished: false },
+        { matchId: 'f2', market: '1X2', outcome: '1', odds: 2, finished: false },
       ],
     };
     const offer = computeOffer(bet, lookup, 0.05);
-    assert.equal(Math.round(offer * 100), 1900);
+    // P(win) = 1/1.5 * 1/2 = 0.3333
+    // fair = 10 * 3 * 0.3333 = 10
+    // cashOut = 10 * 0.95 = 9.5
+    // ceiling = 10 * 0.99 = 9.9
+    // min(9.5, 9.9) = 9.5
+    assert.equal(Math.round(offer * 100), 950);
   });
 
   test('returns 0 when any leg is lost', () => {
@@ -131,21 +136,22 @@ describe('computeOffer', () => {
   test('finished + won leg treated as factor 1', () => {
     const lookup = fakeOddsLookup({ 'f2:1X2:1': 2 });
     const bet = makeSingleBet({
-      stake: 10, totalOdds: 6,
+      stake: 10, totalOdds: 2,
       legs: [
         { matchId: 'f1', market: '1X2', outcome: '1', odds: 2, finished: true, won: true },
         { matchId: 'f2', market: '1X2', outcome: '1', odds: 3, finished: false },
       ],
     });
     const offer = computeOffer(bet, lookup, 0.05);
-    assert.equal(Math.round(offer * 100), 2850);
+    // P(win) = 1 * (1/2) = 0.5; fair = 10*2*0.5 = 10; cashOut = 10*0.95 = 9.5; ceiling = 9.9
+    assert.equal(Math.round(offer * 100), 950);
   });
 
-  test('clamps to stake * totalOdds * 0.99', () => {
+  test('clamps to stake * 0.99 (never exceeds stake)', () => {
     const lookup = fakeOddsLookup({ 'f1:1X2:1': 1.0 });
     const bet = makeSingleBet({ stake: 10, totalOdds: 6, legs: [{ matchId: 'f1', market: '1X2', outcome: '1', odds: 2, finished: false }] });
     const offer = computeOffer(bet, lookup, 0);
-    assert.ok(offer <= 10 * 6 * 0.99);
+    assert.ok(offer <= 10 * 0.99);
   });
 
   test('returns null for system bets', () => {
@@ -172,7 +178,7 @@ describe('computeOffer', () => {
     const lookup = fakeOddsLookup({ 'f1:1X2:1': 1.8 });
     const bet = makeSingleBet({ stake: 50, totalOdds: 2.0 });
     const offer = computeOffer(bet, lookup, 0.05);
-    const expected = Math.min(50 * 2 * (1 / 1.8) * 0.95, 50 * 2 * 0.99);
+    const expected = Math.min(50 * 2 * (1 / 1.8) * 0.95, 50 * 0.99);
     assert.equal(offer, expected);
   });
 });
@@ -356,8 +362,8 @@ describe('onLiveChange', () => {
     __resetForTests({ emitToUser: fakeEmit });
     emits.length = 0;
     registerBet(makeSingleBet());
-    const lookup1 = fakeOddsLookup({ 'f1:1X2:1': 1.500 });
-    const lookup2 = fakeOddsLookup({ 'f1:1X2:1': 1.050 });
+    const lookup1 = fakeOddsLookup({ 'f1:1X2:1': 3.0 });
+    const lookup2 = fakeOddsLookup({ 'f1:1X2:1': 2.0 });
     onLiveChange('f1', lookup1, 0.05);
     onLiveChange('f1', lookup2, 0.05);
     assert.equal(emits.length, 2);
@@ -396,7 +402,7 @@ describe('onLiveChange', () => {
     emits.length = 0;
     configure({ houseMargin: 0 });
     registerBet(makeSingleBet({ stake: 100, totalOdds: 2 }));
-    setAutoCashoutTarget('b1', 190);
+    setAutoCashoutTarget('b1', 50);
     onLiveChange('f1', fakeOddsLookup({ 'f1:1X2:1': 1.05 }), 0);
     const autoEvents = emits.filter(e => e.event === 'cashout:auto-triggered');
     assert.ok(autoEvents.length >= 1, 'should emit cashout:auto-triggered');
