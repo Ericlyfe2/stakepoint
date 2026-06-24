@@ -129,6 +129,21 @@ function attachCashoutOffer(bet) {
 }
 
 /* ------------ schemas ------------ */
+const bookSchema = z.object({
+  mode: z.enum(['single', 'multiple', 'system']).default('multiple'),
+  stake: z.union([z.number(), z.string()]).transform((v) => {
+    const n = typeof v === 'number' ? v : parseFloat(String(v).replace(/,/g, ''));
+    return Number.isFinite(n) && n > 0 ? n : 1;
+  }).default(1),
+  systemType: z.string().optional(),
+  selections: z.array(z.object({
+    matchId: z.string().min(1),
+    market:  z.string().default('1X2'),
+    outcome: z.string().min(1),
+    odds:    z.union([z.number(), z.string()]).transform((v) => Number(v)),
+  })).min(1, 'Add at least one selection.'),
+});
+
 const placeSchema = z.object({
   mode: z.enum(['single', 'multiple', 'system']).default('multiple'),
   // For single/multiple this is the total stake. For system it's the
@@ -286,6 +301,90 @@ router.get('/code/:code', codeLookupLimiter, (req, res, next) => {
   };
   res.json({ bet: safe });
 });
+
+// Book a bet — generates a booking code WITHOUT deducting balance.
+// Auth is optional: logged-in users get the bet linked to their account;
+// anonymous users get a code they can share / load later.
+router.post('/book',
+  optionalAuth,
+  validate(bookSchema),
+  asyncHandler(async (req, res) => {
+    const { mode, stake, selections, systemType } = req.body;
+
+    const seen = new Set();
+    const normalized = [];
+    for (const sel of selections) {
+      const dedupe = `${sel.matchId}:${sel.market}:${sel.outcome}`;
+      if (seen.has(dedupe)) return res.json({ success: false, error: `Duplicate selection ${sel.market} ${sel.outcome}.` });
+      seen.add(dedupe);
+      const found = adminLookupSelection({ matchId: sel.matchId, market: sel.market, outcome: sel.outcome });
+      if (!found) return res.json({ success: false, error: `Invalid selection ${sel.market} ${sel.outcome} for match ${sel.matchId}.` });
+      const fxView = found.row?.match || found.row;
+      const hasRealResult = fxView?.finished && (fxView.finalSource === 'feed' || fxView.finalSource === 'manual');
+      if (hasRealResult || fxView?.suspended) {
+        return res.json({ success: false, error: 'Market closed — fixture is no longer available.', code: 'MARKET_CLOSED' });
+      }
+      if (found.market?.suspended || found.selection?.suspended) {
+        return res.json({ success: false, error: 'Selection suspended — refresh and try a different market.', code: 'SELECTION_SUSPENDED' });
+      }
+      const serverOdds = found.selection.odds;
+      normalized.push({
+        matchId: sel.matchId, market: sel.market, outcome: sel.outcome, odds: serverOdds,
+        home: found.row.match.home, away: found.row.match.away,
+        marketName: found.row.match.markets?.[sel.market]?.name || sel.market,
+      });
+    }
+    if (mode === 'single' && normalized.length > 1) return res.json({ success: false, error: 'Single mode allows only one selection.' });
+    if (mode === 'multiple' && normalized.length < 2) return res.json({ success: false, error: 'Multiple bets need at least two selections.' });
+
+    let totalOdds, totalStake, potentialWin, systemDef = null, linesCount = null, stakePerLine = null;
+
+    if (mode === 'system') {
+      const key = String(systemType || '').toLowerCase();
+      systemDef = SYSTEM_TYPES[key];
+      if (!systemDef) return res.json({ success: false, error: `Unknown system type "${systemType}".` });
+      if (normalized.length !== systemDef.selections) {
+        return res.json({ success: false, error: `${systemDef.label} needs exactly ${systemDef.selections} selections.` });
+      }
+      stakePerLine = Number(stake);
+      linesCount   = systemDef.totalLines;
+      totalStake   = Number((stakePerLine * linesCount).toFixed(2));
+      potentialWin = Number(maxSystemReturn(normalized.map((s) => s.odds), key, stakePerLine).toFixed(2));
+      totalOdds    = Number((potentialWin / totalStake).toFixed(4));
+    } else {
+      totalStake   = Number(stake);
+      totalOdds    = mode === 'single' ? normalized[0].odds : normalized.reduce((acc, s) => acc * s.odds, 1);
+      potentialWin = totalStake * totalOdds * (1 + BONUS_RATE);
+    }
+
+    const id = `bv-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const bookingCode = await uniqueBookingCode();
+    const receipt = {
+      id,
+      bookingCode,
+      userId: req.user?.id || null,
+      placedAt: new Date().toISOString(),
+      mode,
+      stake: Number(totalStake.toFixed(2)),
+      currency: CURRENCY,
+      totalOdds: Number(totalOdds.toFixed(4)),
+      potentialWin: Number(potentialWin.toFixed(2)),
+      bonusRate: BONUS_RATE,
+      legs: normalized,
+      status: 'booked',
+      lastCashOutOffer: null,
+      cashOutHistory: [],
+      ...(mode === 'system' && { systemType: systemType.toLowerCase(), systemLabel: systemDef.label, linesCount, stakePerLine }),
+    };
+    await pushBet(receipt);
+
+    if (req.user) {
+      logActivity(req.user.id, { kind: 'bet_booked', betId: id, stake: totalStake });
+    }
+
+    res.status(201).json({ ok: true, bet: receipt });
+  })
+);
 
 router.post('/place',
   requireAuth,

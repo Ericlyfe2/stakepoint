@@ -3,6 +3,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import {
   fetchMatches,
   placeBet,
+  bookBet,
   fetchBetByCode,
 } from '../api/betApi.js';
 import { useToast, useAccount } from '../layout/AppShell.jsx';
@@ -582,110 +583,35 @@ export default function Home({ initialChip }) {
       setSlipErr('Pick a valid number of selections for a system bet (3–8).'); return;
     }
     const linePrice = parseStake(stake);
-    if (linePrice <= 0) { setSlipErr('Enter a stake amount.'); return; }
-    const cost = betMode === 'system' ? linePrice * linesCount : linePrice;
-
-    // Place through API so the server generates and stores the real booking code
-    if (!account) {
-      setSlipOpen(false);
-      navigate('/login?next=/');
-      toast('Sign in to place a bet.');
-      return;
-    }
-    if (cost > account.balance) {
-      setSlipErr(`Insufficient balance — this ticket costs GHS ${formatAmt(cost)}.`);
-      return;
-    }
 
     setIsPlacing(true);
     try {
-      const res = await placeBet({
+      const res = await bookBet({
         mode: betMode,
-        stake: linePrice,
+        stake: linePrice > 0 ? linePrice : 1,
         ...(betMode === 'system' ? { systemType } : {}),
         selections: selections.map((s) => ({
           matchId: s.matchId, market: s.market, outcome: s.outcome, odds: s.odds,
         })),
       });
-      if (res.account) setAccount(res.account);
       setSelections([]);
       setSlipOpen(false);
       setSuccessBet(res.bet);
-      toast(`Ticket booked — code ${res.bet.bookingCode}.`);
+      toast(`Bet booked — code ${res.bet.bookingCode}.`);
     } catch (e) {
       if (e.status === 409) {
         setSlipErr(e.message || 'Odds changed or market closed — refreshing.');
         setSelections([]);
         try { setSnapshot(await fetchMatches(sportId)); } catch {/* ignore */}
       } else {
-        setSlipErr(e.message || 'Could not place bet.');
+        setSlipErr(e.message || 'Could not book bet.');
       }
     } finally {
       setIsPlacing(false);
     }
-  }, [selections, betMode, systemDef, stake, linesCount, totalOdds, payout, toast, account, navigate, sportId]);
+  }, [selections, betMode, systemDef, stake, linesCount, totalOdds, payout, toast, sportId]);
 
-  const onPlaceBet = async () => {
-    setSlipErr('');
-    if (!selections.length) { setSlipErr('Add at least one selection to your bet slip.'); return; }
-    if (betMode === 'multiple' && selections.length < 2) {
-      setSlipErr('Multiple bets need at least 2 selections.'); return;
-    }
-    if (betMode === 'system' && !systemDef) {
-      setSlipErr('Pick a valid number of selections for a system bet (3–8).'); return;
-    }
-    const linePrice = parseStake(stake);
-    if (linePrice <= 0) { setSlipErr('Enter a stake amount.'); return; }
-    const cost = betMode === 'system' ? linePrice * linesCount : linePrice;
-    if (cost < 2) { setSlipErr(`Minimum stake is GHS 2 (this ticket costs GHS ${formatAmt(cost)}).`); return; }
-    if (!account) { 
-      setSlipOpen(false);
-      navigate('/login?next=/');
-      toast('Sign in to place a bet.'); 
-      return; 
-    }
-    if (cost > account.balance) {
-      setSlipErr(`Insufficient balance — this ticket costs GHS ${formatAmt(cost)}.`); 
-      return;
-    }
-    
-    setIsPlacing(true);
-    // Optimistic balance update for instant feedback
-    adjustBalance(-cost);
-    try {
-      const res = await placeBet({
-        mode: betMode,
-        stake: linePrice,
-        ...(betMode === 'system' ? { systemType } : {}),
-        selections: selections.map((s) => ({
-          matchId: s.matchId, market: s.market, outcome: s.outcome, odds: s.odds,
-        })),
-      });
-      if (res.account) setAccount(res.account);
-      toast(`Bet placed — booking code ${res.bet.bookingCode}.`);
-      try {
-        const stored = localStorage.getItem('xenbet_recent_codes');
-        let list = stored ? JSON.parse(stored) : [];
-        list = [res.bet.bookingCode, ...list.filter((c) => c !== res.bet.bookingCode)].slice(0, 8);
-        localStorage.setItem('xenbet_recent_codes', JSON.stringify(list));
-      } catch { /* ignore */ }
-      setSelections([]);
-      setSlipOpen(false);
-      setSuccessBet(res.bet);
-    } catch (e) {
-      // Revert optimistic update on failure
-      adjustBalance(cost);
-      if (e.status === 409) {
-        setSlipErr(e.message || 'Odds changed or market closed — refreshing.');
-        setSelections([]); // Clear invalid selections
-        try { setSnapshot(await fetchMatches(sportId)); } catch {/* ignore */}
-      } else {
-        setSlipErr(e.message || 'Could not place bet.');
-      }
-    } finally {
-      setIsPlacing(false);
-    }
-  };
+  // onPlaceBet removed — booking only, no balance deduction
 
   const openMarkets = (league, match) => {
     setMarketsForMatch({ league, match });
@@ -1587,21 +1513,15 @@ export default function Home({ initialChip }) {
 
               {/* action footer */}
               <div className="sporty-footer-actions">
-                <button 
-                  type="button" 
-                  className="sporty-book-bet-btn" 
-                  onClick={onBookBet}
-                >
-                  Book Bet
-                </button>
-                <button 
-                  type="button" 
+                <button
+                  type="button"
                   className="sporty-place-bet-btn"
-                  onClick={onPlaceBet}
-                  disabled={isPlacing || (parseStake(stake) > (account?.balance || 0) && betRealMode === 'REAL')}
+                  onClick={onBookBet}
+                  disabled={isPlacing}
+                  style={{ flex: 1 }}
                 >
-                  <div className="btn-label">{isPlacing ? 'Placing...' : 'Place Bet'}</div>
-                  <div className="btn-subtext">About to pay {formatAmt(totalStake)}</div>
+                  <div className="btn-label">{isPlacing ? 'Booking...' : 'Book Bet'}</div>
+                  <div className="btn-subtext">{selections.length} selection{selections.length !== 1 ? 's' : ''} · Odds {totalOdds.toFixed(2)}</div>
                 </button>
               </div>
             </div>

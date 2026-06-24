@@ -8,10 +8,9 @@
  * Cash-out formula:
  *   For each unfinished leg: impliedProb = 1 / currentOdds
  *   fairValue = stake × totalOdds × product(impliedProb)
- *   initialMargin = 1 - INITIAL_CASHOUT_FACTOR (configurable, default 5%)
- *   After first tick, uses houseMargin from env.
- *   offered = max(0, fairValue × (1 - houseMargin))
- *   ceiling = stake × totalOdds × 0.99
+ *   Initial offer: stake × factor (factor varies 90-98% based on totalOdds risk)
+ *   Live offer:    offered = max(0, fairValue × (1 - houseMargin))
+ *                  ceiling = stake × totalOdds × 0.99  (can exceed stake when legs win)
  *   return min(offered, ceiling)
  */
 import { emitToUser as defaultEmit } from './realtime.js';
@@ -138,7 +137,9 @@ export function releaseCashoutLock(betId) {
 export function computeInitialOffer(bet) {
   if (!bet || bet.mode === 'system') return null;
   if (bet.stake <= 0) return 0;
-  const raw = bet.stake * _options.initialCashoutFactor;
+  const logOdds = Math.log2(Math.max(1.01, bet.totalOdds));
+  const factor = Math.min(0.98, Math.max(0.90, _options.initialCashoutFactor - 0.01 * logOdds));
+  const raw = bet.stake * factor;
   const offered = Number(raw.toFixed(2));
   return Math.min(offered, bet.stake * 0.99);
 }
@@ -174,8 +175,8 @@ export function computeOffer(bet, oddsLookup, houseMargin) {
 
   const fair = bet.stake * bet.totalOdds * probProduct;
   const offered = Math.max(0, fair * (1 - houseMargin));
-  const ceiling = bet.stake * 0.99;
-  return Math.min(offered, ceiling);
+  const ceiling = bet.stake * bet.totalOdds * 0.99;
+  return Number(Math.min(offered, ceiling).toFixed(2));
 }
 
 export function onLiveChange(fixtureKey, oddsLookup, houseMargin) {

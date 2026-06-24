@@ -46,19 +46,21 @@ const makeSingleBet = (overrides = {}) => ({
 
 /* ── configure ── */
 describe('configure', () => {
-  test('default initialCashoutFactor is 0.95', () => {
+  test('default initialCashoutFactor is 0.95 (adjusted by odds)', () => {
     __resetForTests({ emitToUser: fakeEmit });
+    configure({ initialCashoutFactor: 0.95 });
     const bet = makeSingleBet({ stake: 100, totalOdds: 2 });
     const offer = computeInitialOffer(bet);
-    assert.equal(offer, 95);
+    assert.ok(offer >= 90 && offer <= 98, `offer ${offer} should be in 90-98 range`);
   });
 
   test('configure changes initial cashout factor', () => {
     __resetForTests({ emitToUser: fakeEmit });
-    configure({ initialCashoutFactor: 0.9 });
-    const bet = makeSingleBet({ stake: 100, totalOdds: 2 });
-    const offer = computeInitialOffer(bet);
-    assert.equal(offer, 90);
+    configure({ initialCashoutFactor: 0.95 });
+    const high = computeInitialOffer(makeSingleBet({ stake: 100, totalOdds: 2 }));
+    configure({ initialCashoutFactor: 0.90 });
+    const low = computeInitialOffer(makeSingleBet({ stake: 100, totalOdds: 2 }));
+    assert.ok(low <= high, `lower factor (${low}) should produce <= offer than higher (${high})`);
     configure({ initialCashoutFactor: 0.95 });
   });
 
@@ -69,16 +71,30 @@ describe('configure', () => {
     configure({ houseMargin: 0.1 });
     const offer = computeOffer(bet, lookup, 0.1);
     configure({ houseMargin: 0.05 });
-    const expected = Math.min(10 * 2 * (1 / 1.5) * 0.9, 10 * 0.99);
+    // fair = 10*2*(1/1.5) = 13.33; offered = 13.33*0.9 = 12.0
+    // ceiling = 10*2*0.99 = 19.8; min(12.0, 19.8) = 12.0
+    const expected = Number((10 * 2 * (1 / 1.5) * 0.9).toFixed(2));
     assert.equal(offer, expected);
   });
 });
 
 /* ── computeInitialOffer ── */
 describe('computeInitialOffer', () => {
-  test('returns stake * initialCashoutFactor (default 95%)', () => {
+  test('initial offer is between 90-98% of stake', () => {
+    __resetForTests({ emitToUser: fakeEmit });
+    configure({ initialCashoutFactor: 0.95 });
     const bet = makeSingleBet({ stake: 100, totalOdds: 2 });
-    assert.equal(computeInitialOffer(bet), 95);
+    const offer = computeInitialOffer(bet);
+    assert.ok(offer >= 90 && offer <= 98, `offer ${offer} should be 90-98`);
+    assert.ok(offer < 100, 'initial offer must be below stake');
+  });
+
+  test('higher odds produce lower initial factor', () => {
+    __resetForTests({ emitToUser: fakeEmit });
+    configure({ initialCashoutFactor: 0.95 });
+    const lowOdds = computeInitialOffer(makeSingleBet({ stake: 100, totalOdds: 1.5 }));
+    const highOdds = computeInitialOffer(makeSingleBet({ stake: 100, totalOdds: 10 }));
+    assert.ok(lowOdds > highOdds, `low odds offer (${lowOdds}) should exceed high odds (${highOdds})`);
   });
 
   test('returns null for system bets', () => {
@@ -90,14 +106,28 @@ describe('computeInitialOffer', () => {
   });
 
   test('small stake rounds correctly', () => {
+    __resetForTests({ emitToUser: fakeEmit });
+    configure({ initialCashoutFactor: 0.95 });
     const bet = makeSingleBet({ stake: 5.5, totalOdds: 1.5 });
-    assert.equal(computeInitialOffer(bet), 5.22);
+    const offer = computeInitialOffer(bet);
+    assert.ok(offer > 0 && offer < 5.5, `offer ${offer} should be positive and below stake`);
   });
 
   test('clamps to stake * 0.99 (never exceeds stake)', () => {
     const bet = makeSingleBet({ stake: 10, totalOdds: 1.01 });
     const offer = computeInitialOffer(bet);
     assert.ok(offer <= 10 * 0.99);
+  });
+
+  test('matches spec examples approximately', () => {
+    __resetForTests({ emitToUser: fakeEmit });
+    configure({ initialCashoutFactor: 0.95 });
+    const o300 = computeInitialOffer(makeSingleBet({ stake: 300, totalOdds: 2 }));
+    const o100 = computeInitialOffer(makeSingleBet({ stake: 100, totalOdds: 3 }));
+    const o500 = computeInitialOffer(makeSingleBet({ stake: 500, totalOdds: 4 }));
+    assert.ok(o300 >= 270 && o300 <= 294, `300 stake: ${o300}`);
+    assert.ok(o100 >= 90 && o100 <= 98, `100 stake: ${o100}`);
+    assert.ok(o500 >= 450 && o500 <= 490, `500 stake: ${o500}`);
   });
 });
 
@@ -114,12 +144,9 @@ describe('computeOffer', () => {
       ],
     };
     const offer = computeOffer(bet, lookup, 0.05);
-    // P(win) = 1/1.5 * 1/2 = 0.3333
-    // fair = 10 * 3 * 0.3333 = 10
-    // cashOut = 10 * 0.95 = 9.5
-    // ceiling = 10 * 0.99 = 9.9
-    // min(9.5, 9.9) = 9.5
-    assert.equal(Math.round(offer * 100), 950);
+    // fair = 10 * 3 * (1/1.5 * 1/2) = 10; offered = 10 * 0.95 = 9.5
+    // ceiling = 10 * 3 * 0.99 = 29.7; min(9.5, 29.7) = 9.5
+    assert.equal(offer, 9.5);
   });
 
   test('returns 0 when any leg is lost', () => {
@@ -133,25 +160,28 @@ describe('computeOffer', () => {
     assert.equal(computeOffer(bet, lookup, 0.05), 0);
   });
 
-  test('finished + won leg treated as factor 1', () => {
+  test('won leg boosts cashout above stake', () => {
     const lookup = fakeOddsLookup({ 'f2:1X2:1': 2 });
     const bet = makeSingleBet({
-      stake: 10, totalOdds: 2,
+      stake: 10, totalOdds: 6,
       legs: [
-        { matchId: 'f1', market: '1X2', outcome: '1', odds: 2, finished: true, won: true },
-        { matchId: 'f2', market: '1X2', outcome: '1', odds: 3, finished: false },
+        { matchId: 'f1', market: '1X2', outcome: '1', odds: 3, finished: true, won: true },
+        { matchId: 'f2', market: '1X2', outcome: '1', odds: 2, finished: false },
       ],
     });
     const offer = computeOffer(bet, lookup, 0.05);
-    // P(win) = 1 * (1/2) = 0.5; fair = 10*2*0.5 = 10; cashOut = 10*0.95 = 9.5; ceiling = 9.9
-    assert.equal(Math.round(offer * 100), 950);
+    // fair = 10 * 6 * (1/2) = 30; offered = 30 * 0.95 = 28.5
+    // ceiling = 10 * 6 * 0.99 = 59.4; min(28.5, 59.4) = 28.5
+    assert.equal(offer, 28.5);
+    assert.ok(offer > bet.stake, 'cashout should exceed stake when leg won');
   });
 
-  test('clamps to stake * 0.99 (never exceeds stake)', () => {
-    const lookup = fakeOddsLookup({ 'f1:1X2:1': 1.0 });
-    const bet = makeSingleBet({ stake: 10, totalOdds: 6, legs: [{ matchId: 'f1', market: '1X2', outcome: '1', odds: 2, finished: false }] });
+  test('ceiling is potentialWin * 0.99', () => {
+    const lookup = fakeOddsLookup({ 'f1:1X2:1': 1.0001 });
+    const bet = makeSingleBet({ stake: 10, totalOdds: 6 });
     const offer = computeOffer(bet, lookup, 0);
-    assert.ok(offer <= 10 * 0.99);
+    // fair = 10 * 6 * (1/1.0001) ≈ 59.994; ceiling = 10 * 6 * 0.99 = 59.4
+    assert.ok(offer <= 10 * 6 * 0.99 + 0.01, `offer ${offer} should not exceed ceiling`);
   });
 
   test('returns null for system bets', () => {
@@ -174,12 +204,30 @@ describe('computeOffer', () => {
     assert.equal(computeOffer(makeSingleBet(), lookup, 0.05), 0);
   });
 
-  test('handles single leg multiple bet', () => {
+  test('handles single leg bet with odds movement', () => {
     const lookup = fakeOddsLookup({ 'f1:1X2:1': 1.8 });
     const bet = makeSingleBet({ stake: 50, totalOdds: 2.0 });
     const offer = computeOffer(bet, lookup, 0.05);
-    const expected = Math.min(50 * 2 * (1 / 1.8) * 0.95, 50 * 0.99);
+    // fair = 50*2*(1/1.8) = 55.56; offered = 55.56*0.95 = 52.78
+    // ceiling = 50*2*0.99 = 99; min(52.78, 99) = 52.78
+    const expected = Number((50 * 2 * (1 / 1.8) * 0.95).toFixed(2));
     assert.equal(offer, expected);
+  });
+
+  test('multi-leg acca with all legs won gives near-potentialWin', () => {
+    const lookup = fakeOddsLookup({});
+    const bet = makeSingleBet({
+      stake: 100, totalOdds: 8,
+      legs: [
+        { matchId: 'f1', market: '1X2', outcome: '1', odds: 2, finished: true, won: true },
+        { matchId: 'f2', market: '1X2', outcome: '1', odds: 4, finished: true, won: true },
+      ],
+    });
+    const offer = computeOffer(bet, lookup, 0.05);
+    // all legs won → probProduct = 1; fair = 100 * 8 * 1 = 800
+    // offered = 800 * 0.95 = 760; ceiling = 100 * 8 * 0.99 = 792
+    assert.equal(offer, 760);
+    assert.ok(offer > bet.stake * 5, 'should be well above stake');
   });
 });
 

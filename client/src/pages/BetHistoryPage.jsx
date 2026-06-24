@@ -33,7 +33,11 @@ function placedAtLabel(iso) {
 
 function computeOffer(b) {
   if (b.status !== 'open') return 0;
-  return b.lastCashOutOffer?.amount ?? b.cashoutOffer ?? Number((b.stake * 0.95).toFixed(2));
+  if (b.lastCashOutOffer?.amount > 0) return b.lastCashOutOffer.amount;
+  if (b.cashoutOffer > 0) return b.cashoutOffer;
+  const logOdds = Math.log2(Math.max(1.01, b.totalOdds || 1));
+  const factor = Math.min(0.98, Math.max(0.90, 0.95 - 0.01 * logOdds));
+  return Number((b.stake * factor).toFixed(2));
 }
 
 function stableHash(key) {
@@ -125,7 +129,7 @@ function SvgSearch({ size = 16 }) { return (<svg width={size} height={size} view
 function SvgTrendUp({ size = 12 }) { return (<svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>); }
 function SvgTrendDown({ size = 12 }) { return (<svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"/><polyline points="17 18 23 18 23 12"/></svg>); }
 
-/* ─────────── Ticket Details Overlay ─────────── */
+/* ─────────── Ticket Details Overlay (SportyBet-style) ─────────── */
 function TicketDetails({ bet, onClose, onRemix, onShare }) {
   useEffect(() => {
     const prev = document.body.style.overflow;
@@ -138,7 +142,8 @@ function TicketDetails({ bet, onClose, onRemix, onShare }) {
   const modeLabel = bet.mode === 'single' ? 'Single' : bet.mode === 'multiple' ? 'Multiple' : bet.mode === 'system' ? 'System' : (bet.mode || 'Bet');
   const totalReturn = bet.status === 'won' ? Number(bet.totalReturn || bet.potentialWin || 0) : bet.status === 'cashed_out' ? Number(bet.cashOut || 0) : 0;
   const totalOdds = Number(bet.totalOdds || 0);
-  const profit = totalReturn > 0 && bet.stake > 0 ? totalReturn - Number(bet.stake) : 0;
+  const code = bet.bookingCode || toBookingCode(bet.id);
+  const ticketId = String(stableHash(bet?.id || '')).slice(0, 6).padStart(6, '0');
 
   const legResult = (i) => {
     if (bet.status === 'open') return 'pending';
@@ -154,156 +159,134 @@ function TicketDetails({ bet, onClose, onRemix, onShare }) {
   const resolvedScore = (i) => {
     if (bet.legsResolved && bet.legsResolved[i]) {
       const r = bet.legsResolved[i];
-      if (r.scoreHome != null && r.scoreAway != null) return { home: r.scoreHome, away: r.scoreAway, str: `${r.scoreHome}:${r.scoreAway}` };
+      if (r.scoreHome != null && r.scoreAway != null) return `${r.scoreHome}:${r.scoreAway}`;
     }
     return null;
   };
 
+  const legDate = (l) => {
+    if (l.matchTime) return l.matchTime;
+    const d = new Date(bet.placedAt || Date.now());
+    return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  };
+
   return (
-    <div className="td-overlay" role="dialog" aria-modal="true" aria-labelledby="td-title">
-      <div className="td-sheet">
-        <header className="td-top">
-          <button type="button" className="td-back" onClick={onClose} aria-label="Back">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+    <div className="td-overlay" role="dialog" aria-modal="true" onClick={onClose}>
+      <div className="td-sheet" onClick={e => e.stopPropagation()}>
+        {/* ── Green header bar ── */}
+        <header className="td-header">
+          <button type="button" className="td-header-back" onClick={onClose}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+            <span>Back</span>
           </button>
-          <h2 id="td-title">Ticket Details</h2>
-          <div className="td-top-actions">
-            <button type="button" className="td-icon-btn" aria-label="Share" onClick={() => onShare?.(bet)}>
-              <SvgShare size={18} />
-            </button>
-            <button type="button" className="td-icon-btn" aria-label="Close" onClick={onClose}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-            </button>
-          </div>
+          <h2 className="td-header-title">Ticket Details</h2>
+          <button type="button" className="td-header-share" onClick={() => onShare?.(bet)} aria-label="Share">
+            <SvgShare size={18} />
+          </button>
         </header>
 
-        <div className="td-body">
-          <section className={`td-banner td-banner-${head.cls}`}>
-            <span className="td-banner-icon">{head.icon}</span>
-            <span className="td-banner-label">{head.label}</span>
+        <div className="td-scroll">
+          {/* ── Ticket info card ── */}
+          <section className="td-info">
+            <div className="td-info-id-row">
+              <span className="td-info-id">Ticket ID: {ticketId}</span>
+              <span className="td-info-date">{ticketTimeFull(bet.placedAt)}</span>
+            </div>
+
+            <div className="td-info-mode-row">
+              <span className="td-info-mode">{modeLabel}</span>
+              <span className={`td-info-badge td-info-badge-${head.cls}`}>
+                {head.icon} {head.label.replace('BET ', '')}
+              </span>
+            </div>
+
+            <div className="td-info-return">
+              <span className="td-info-return-label">Total Xenbet Return</span>
+              <span className={`td-info-return-value td-info-return-${head.cls}`}>
+                {status === 'won' || status === 'cashed_out' ? fmt(totalReturn) : status === 'lost' ? '0.00' : fmt(bet.potentialWin)}
+              </span>
+            </div>
+
+            <div className="td-info-grid">
+              <div className="td-info-grid-item">
+                <span className="td-info-grid-label">Total Stake</span>
+                <strong className="td-info-grid-value">{fmt(bet.stake)}</strong>
+              </div>
+              <div className="td-info-grid-item">
+                <span className="td-info-grid-label">Total Odds</span>
+                <strong className="td-info-grid-value">{bet.mode === 'system' ? 'System' : totalOdds.toFixed(2)}</strong>
+              </div>
+              <div className="td-info-grid-item">
+                <span className="td-info-grid-label">Potential Win</span>
+                <strong className="td-info-grid-value">{fmt(bet.potentialWin)}</strong>
+              </div>
+            </div>
           </section>
 
-          <section className="td-summary">
-            <div className="td-summary-row td-summary-ticket">
-              <span className="td-summary-label">Bet ID:</span>
-              <span className="td-summary-value">{String(stableHash(bet?.id || '')).slice(0, 6).padStart(6, '0')}</span>
-              <span className="td-summary-dot" />
-              <span className="td-summary-time">{ticketTimeFull(bet.placedAt)}</span>
-            </div>
-            {bet.bookingCode && (
-              <div className="td-summary-row td-summary-code">
-                <span className="td-summary-label">Booking Code:</span>
-                <span className="td-summary-value td-summary-code-value">{bet.bookingCode}</span>
-              </div>
+          {/* ── Action buttons ── */}
+          <div className="td-actions-row">
+            {onShare && (
+              <button type="button" className="td-action-btn td-action-showoff" onClick={() => onShare(bet)}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+                Show Off
+              </button>
             )}
-            <div className="td-summary-row td-summary-mode">
-              <span className="td-mode">{modeLabel}</span>
-              <span className={`td-badge td-badge-${head.cls}`}>{head.label.replace('BET ', '')}</span>
-            </div>
-            <div className="td-summary-divider" />
-
-            <div className="td-summary-grid">
-              <div className="td-summary-item">
-                <span className="td-summary-item-label">Stake</span>
-                <strong className="td-summary-item-value">GHS {fmt(bet.stake)}</strong>
-              </div>
-              <div className="td-summary-item">
-                <span className="td-summary-item-label">Total Odds</span>
-                <strong className="td-summary-item-value td-summary-odds">{bet.mode === 'system' ? 'System' : totalOdds.toFixed(2)}</strong>
-              </div>
-              <div className="td-summary-item">
-                <span className="td-summary-item-label">Potential Win</span>
-                <strong className="td-summary-item-value td-summary-pot">GHS {fmt(bet.potentialWin)}</strong>
-              </div>
-              {(status === 'won' || status === 'cashed_out') && (
-                <div className="td-summary-item td-summary-item-highlight">
-                  <span className="td-summary-item-label">Total Return</span>
-                  <strong className="td-summary-item-value is-positive">GHS {fmt(totalReturn)}</strong>
-                </div>
-              )}
-              {status === 'won' && profit > 0 && (
-                <div className="td-summary-item td-summary-item-profit">
-                  <span className="td-summary-item-label">Profit</span>
-                  <strong className="td-summary-item-value is-positive">+GHS {fmt(profit)}</strong>
-                </div>
-              )}
-              {status === 'cashed_out' && (
-                <>
-                  <div className="td-summary-item td-summary-item-profit">
-                    <span className="td-summary-item-label">Cashout Amount</span>
-                    <strong className="td-summary-item-value is-positive">GHS {fmt(bet.cashOut)}</strong>
-                  </div>
-                  <div className="td-summary-item td-summary-item-profit">
-                    <span className="td-summary-item-label">P&amp;L</span>
-                    <strong className={`td-summary-item-value ${profit >= 0 ? 'is-positive' : 'is-negative'}`}>{profit >= 0 ? '+' : ''}GHS {fmt(Math.abs(profit))}</strong>
-                  </div>
-                </>
-              )}
-              {status === 'lost' && (
-                <div className="td-summary-item td-summary-item-loss">
-                  <span className="td-summary-item-label">Total Return</span>
-                  <strong className="td-summary-item-value is-negative">GHS 0.00</strong>
-                </div>
-              )}
-            </div>
-
-            {bet.settledAt && (
-              <div className="td-summary-settled">
-                <span className="td-summary-label">Settled:</span>
-                <span className="td-summary-time">{ticketTimeFull(bet.settledAt)}</span>
-              </div>
+            {onRemix && (
+              <button type="button" className="td-action-btn td-action-remix" onClick={onRemix}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+                Remix Bet
+              </button>
             )}
-          </section>
+          </div>
 
+          {/* ── Booking code ── */}
+          <div className="td-code-bar">
+            <span className="td-code-label">Booking Code:</span>
+            <span className="td-code-value">{code}</span>
+          </div>
+
+          {/* ── Bet legs ── */}
           <section className="td-legs">
             {(bet.legs || []).map((leg, i) => {
               const res = legResult(i);
-              const resolved = resolvedScore(i);
-              const score = resolved || null;
+              const score = resolvedScore(i);
               const pick = getPickName(leg.outcome);
               const market = getMarketName(leg.market);
+              const gameId = String(stableHash(`${bet?.id}-${leg?.matchId || i}`)).slice(0, 5).padStart(5, '0');
               return (
-                <article key={i} className={`td-leg td-leg-${res}`}>
-                  <div className="td-leg-head">
-                    <span className="td-leg-game">
-                      Game ID: <strong>{String(stableHash(`${bet?.id}-${leg?.matchId || i}`)).slice(0, 5).padStart(5, '0')}</strong>
-                    </span>
-                    <span className={`td-leg-status td-leg-status-${res}`}>
-                      {res === 'won' && <><span className="td-leg-status-icon">✓</span> WON</>}
-                      {res === 'lost' && <><span className="td-leg-status-icon">✕</span> LOST</>}
-                      {res === 'void' && <><span className="td-leg-status-icon">⚪</span> VOID</>}
-                      {res === 'pending' && <><span className="td-leg-status-icon">⏳</span> Pending</>}
-                    </span>
+                <article key={i} className="td-leg">
+                  <div className="td-leg-header">
+                    <span className="td-leg-gameid">Game ID: {gameId}</span>
+                    <span className="td-leg-gamedate">{legDate(leg)}</span>
                   </div>
                   <div className="td-leg-body">
-                    <div className="td-leg-teams-wrapper">
+                    <div className="td-leg-teams">
                       <span className="td-leg-home">{leg.home}</span>
-                      <span className="td-leg-vs">vs</span>
+                      <span className="td-leg-separator">&gt;</span>
                       <span className="td-leg-away">{leg.away}</span>
                     </div>
                     {score && (
                       <div className="td-leg-score">
-                        <span className="td-leg-score-label">Final Score:</span>
-                        <span className="td-leg-score-value">{score.str}</span>
+                        <span className="td-leg-score-label">FT</span>
+                        <span className="td-leg-score-value">{score}</span>
                       </div>
                     )}
-                    <div className="td-leg-details">
-                      <div className="td-leg-detail">
-                        <span className="td-leg-detail-label">Pick</span>
-                        <span className="td-leg-detail-value">{pick}</span>
+                    <div className="td-leg-pick-row">
+                      <div className="td-leg-pick-info">
+                        <span className="td-leg-pick-label">Pick:</span>
+                        <span className={`td-leg-pick-value td-leg-pick-${res}`}>{pick}</span>
                       </div>
-                      <div className="td-leg-detail">
-                        <span className="td-leg-detail-label">Market</span>
-                        <span className="td-leg-detail-value td-leg-detail-market">{market}</span>
-                      </div>
-                      <div className="td-leg-detail">
-                        <span className="td-leg-detail-label">Selection</span>
-                        <span className="td-leg-detail-value">{pick}</span>
-                      </div>
-                      <div className="td-leg-detail">
-                        <span className="td-leg-detail-label">Odds</span>
-                        <span className="td-leg-detail-value td-leg-detail-odds">@{Number(leg.odds).toFixed(2)}</span>
-                      </div>
+                      <span className={`td-leg-odds td-leg-odds-${res}`}>@{Number(leg.odds).toFixed(2)}</span>
+                    </div>
+                    <div className="td-leg-market-row">
+                      <span className="td-leg-market-label">Market:</span>
+                      <span className="td-leg-market-value">{market}</span>
+                    </div>
+                    <div className={`td-leg-result td-leg-result-${res}`}>
+                      {res === 'won' && <><span className="td-leg-result-icon">✓</span> Won</>}
+                      {res === 'lost' && <><span className="td-leg-result-icon">✕</span> Lost</>}
+                      {res === 'void' && <><span className="td-leg-result-icon">⚪</span> Void</>}
+                      {res === 'pending' && <><span className="td-leg-result-icon">⏳</span> Pending</>}
                     </div>
                   </div>
                 </article>
@@ -311,26 +294,17 @@ function TicketDetails({ bet, onClose, onRemix, onShare }) {
             })}
           </section>
 
-          <section className="td-actions">
-            {onRemix && (
-              <button type="button" className="td-action-btn td-action-remix" onClick={onRemix}>
-                <span className="td-action-icon">↺</span>
-                <span className="td-action-text">
-                  <span className="td-action-title">Remix Bet</span>
-                  <span className="td-action-sub">Rebuild with same selections</span>
-                </span>
-              </button>
+          {/* ── Bottom info ── */}
+          <div className="td-bottom">
+            <div className="td-bottom-row">
+              <span className="td-bottom-label">Number of Bets: {(bet.legs || []).length}</span>
+            </div>
+            {bet.settledAt && (
+              <div className="td-bottom-row">
+                <span className="td-bottom-dim">Settled: {ticketTimeFull(bet.settledAt)}</span>
+              </div>
             )}
-            {onShare && (
-              <button type="button" className="td-action-btn td-action-share" onClick={() => onShare(bet)}>
-                <span className="td-action-icon">⟳</span>
-                <span className="td-action-text">
-                  <span className="td-action-title">Show Off</span>
-                  <span className="td-action-sub">Share your ticket</span>
-                </span>
-              </button>
-            )}
-          </section>
+          </div>
         </div>
       </div>
     </div>
@@ -1083,4 +1057,102 @@ const XH_CSS = `
 .xh-confirm-residual-label { color: var(--text-dim); font-weight: 600; }
 .xh-confirm-residual > div { text-align: right; }
 .xh-confirm-residual strong { font-variant-numeric: tabular-nums; }
+
+/* ═══════════════════════════════════════════════
+   TICKET DETAILS OVERLAY (SportyBet-style)
+   ═══════════════════════════════════════════════ */
+.td-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.7); z-index: 9999; display: flex; justify-content: center; animation: xhFade .18s ease-out both; }
+.td-sheet { width: 100%; max-width: 560px; height: 100%; background: var(--bg); display: flex; flex-direction: column; animation: tdSlideUp .28s cubic-bezier(.2,1,.3,1) both; overflow: hidden; }
+@keyframes tdSlideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+/* ── Header ── */
+.td-header { display: flex; align-items: center; justify-content: space-between; padding: 0 12px; height: 48px; background: linear-gradient(135deg, #0a4a2e, #116f43); flex-shrink: 0; }
+.td-header-back { display: flex; align-items: center; gap: 4px; background: none; border: none; color: #fff; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit; padding: 6px 4px; }
+.td-header-title { font-size: 15px; font-weight: 800; color: #fff; margin: 0; letter-spacing: .02em; }
+.td-header-share { background: none; border: none; color: rgba(255,255,255,.8); cursor: pointer; padding: 6px; display: grid; place-items: center; }
+.td-header-share:hover { color: #fff; }
+
+/* ── Scrollable body ── */
+.td-scroll { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+
+/* ── Info card ── */
+.td-info { background: var(--surface); margin: 8px; border-radius: var(--r); border: 1px solid var(--line); padding: 14px; }
+.td-info-id-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+.td-info-id { font-size: 11px; color: var(--text-dim); font-weight: 600; }
+.td-info-date { font-size: 11px; color: var(--text-dim); }
+.td-info-mode-row { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+.td-info-mode { font-size: 15px; font-weight: 800; color: var(--text); }
+.td-info-badge { font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 4px; letter-spacing: .03em; }
+.td-info-badge-won { background: rgba(22,163,74,.15); color: #16a34a; }
+.td-info-badge-lost { background: rgba(229,57,53,.15); color: #e53935; }
+.td-info-badge-cashed { background: rgba(20,184,166,.15); color: #14b8a6; }
+.td-info-badge-void { background: rgba(245,166,35,.15); color: #f5a623; }
+.td-info-badge-open { background: rgba(79,139,255,.15); color: #4f8bff; }
+
+.td-info-return { margin-bottom: 14px; }
+.td-info-return-label { display: block; font-size: 11px; color: var(--text-dim); font-weight: 600; margin-bottom: 2px; }
+.td-info-return-value { font-size: 28px; font-weight: 900; font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+.td-info-return-won { color: #16a34a; }
+.td-info-return-lost { color: #e53935; }
+.td-info-return-cashed { color: #14b8a6; }
+.td-info-return-void { color: #f5a623; }
+.td-info-return-open { color: var(--accent); }
+
+.td-info-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--line); border-radius: 6px; overflow: hidden; border: 1px solid var(--line); }
+.td-info-grid-item { background: var(--bg); padding: 10px 8px; text-align: center; }
+.td-info-grid-label { display: block; font-size: 10px; color: var(--text-dim); font-weight: 600; margin-bottom: 3px; text-transform: uppercase; letter-spacing: .04em; }
+.td-info-grid-value { font-size: 14px; font-weight: 800; color: var(--text); font-variant-numeric: tabular-nums; }
+
+/* ── Action buttons row ── */
+.td-actions-row { display: flex; gap: 8px; padding: 0 8px; margin-bottom: 8px; }
+.td-action-btn { flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 10px 12px; border-radius: var(--r-sm); border: 1.5px solid #116f43; background: transparent; color: #1aa46a; font-size: 13px; font-weight: 700; cursor: pointer; font-family: inherit; transition: all .15s; }
+.td-action-btn:hover { background: rgba(26,164,106,.08); }
+.td-action-btn:active { background: rgba(26,164,106,.15); }
+
+/* ── Booking code bar ── */
+.td-code-bar { display: flex; align-items: center; justify-content: space-between; margin: 0 8px 8px; padding: 10px 14px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-sm); }
+.td-code-label { font-size: 11px; color: var(--text-dim); font-weight: 600; }
+.td-code-value { font-size: 12px; font-weight: 800; color: var(--accent); font-family: 'JetBrains Mono', monospace; letter-spacing: .04em; }
+
+/* ── Bet legs ── */
+.td-legs { display: flex; flex-direction: column; gap: 8px; padding: 0 8px; margin-bottom: 8px; }
+.td-leg { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; }
+.td-leg-header { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: linear-gradient(135deg, #0a4a2e, #116f43); }
+.td-leg-gameid { font-size: 11px; color: rgba(255,255,255,.8); font-weight: 600; }
+.td-leg-gamedate { font-size: 11px; color: rgba(255,255,255,.6); }
+.td-leg-body { padding: 12px; }
+.td-leg-teams { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
+.td-leg-home, .td-leg-away { font-size: 13px; font-weight: 700; color: var(--text); }
+.td-leg-separator { font-size: 11px; color: var(--text-dim); font-weight: 600; }
+.td-leg-score { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; padding: 6px 10px; background: var(--bg); border-radius: 4px; }
+.td-leg-score-label { font-size: 10px; color: var(--text-dim); font-weight: 700; text-transform: uppercase; }
+.td-leg-score-value { font-size: 14px; font-weight: 800; color: var(--text); font-variant-numeric: tabular-nums; }
+.td-leg-pick-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+.td-leg-pick-info { display: flex; align-items: center; gap: 6px; }
+.td-leg-pick-label { font-size: 11px; color: var(--text-dim); font-weight: 600; }
+.td-leg-pick-value { font-size: 13px; font-weight: 700; }
+.td-leg-pick-won { color: #16a34a; }
+.td-leg-pick-lost { color: #e53935; }
+.td-leg-pick-void { color: #f5a623; }
+.td-leg-pick-pending { color: var(--accent); }
+.td-leg-odds { font-size: 13px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.td-leg-odds-won { color: #16a34a; }
+.td-leg-odds-lost { color: #e53935; }
+.td-leg-odds-void { color: #f5a623; }
+.td-leg-odds-pending { color: var(--accent); }
+.td-leg-market-row { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
+.td-leg-market-label { font-size: 11px; color: var(--text-dim); font-weight: 600; }
+.td-leg-market-value { font-size: 12px; color: var(--text-soft); font-weight: 600; }
+.td-leg-result { display: flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 4px; width: fit-content; }
+.td-leg-result-won { background: rgba(22,163,74,.12); color: #16a34a; }
+.td-leg-result-lost { background: rgba(229,57,53,.12); color: #e53935; }
+.td-leg-result-void { background: rgba(245,166,35,.12); color: #f5a623; }
+.td-leg-result-pending { background: rgba(79,139,255,.12); color: #4f8bff; }
+.td-leg-result-icon { font-size: 10px; }
+
+/* ── Bottom info ── */
+.td-bottom { padding: 12px 16px; border-top: 1px solid var(--line); margin: 0 8px 8px; }
+.td-bottom-row { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; }
+.td-bottom-label { font-size: 13px; font-weight: 700; color: var(--text); }
+.td-bottom-dim { font-size: 12px; color: var(--text-dim); }
 `;

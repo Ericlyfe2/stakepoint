@@ -9,7 +9,7 @@ import { adjustBalance, logActivity } from '../db/users.js';
 import { pushTx } from './wallet.js';
 import { emitToUser, emitAdmin } from '../services/realtime.js';
 import * as cashOutEngine from '../services/cashOutEngine.js';
-import { LIVE_BETTING } from '../config/env.js';
+import { LIVE_BETTING, CASHOUT } from '../config/env.js';
 import { uniqueBookingCode, pushBet } from './bet.js';
 import { BONUS_RATE } from '../matchesData.js';
 
@@ -136,7 +136,7 @@ router.post('/offer/:betId',
       totalOdds: bet.totalOdds,
       mode: bet.mode,
       partialCashoutCount: partialCount,
-      maxPartialCashouts: bet.mode === 'multiple' ? 5 : 10,
+      maxPartialCashouts: bet.mode === 'multiple' ? CASHOUT.maxPartialMultiple : CASHOUT.maxPartialSingle,
       autoCashoutTarget: autoTarget,
     });
   })
@@ -150,7 +150,7 @@ router.post('/execute/:betId',
     const { bet, currentOffer, cashOutAmount, fractionVal, residualStake } =
       await validateAndComputeCashout(req.params.betId, req.user.id, acceptedAmount, fraction);
 
-    const delayMs = Math.floor(Math.random() * 4000) + 1000;
+    const delayMs = CASHOUT.minDelayMs + Math.floor(Math.random() * (CASHOUT.maxDelayMs - CASHOUT.minDelayMs));
 
     if (delayMs > 0) {
       await new Promise((resolve) => setTimeout(resolve, delayMs));
