@@ -4898,8 +4898,8 @@ html[data-theme="light"] .gfab-input:focus {
 /* Footer split actions */
 .sporty-footer-actions {
   display: grid;
-  grid-template-columns: 100px 1fr;
-  gap: 8px;
+  grid-template-columns: auto 1fr;
+  gap: 0;
   margin-top: 14px;
 }
 
@@ -4909,10 +4909,11 @@ html[data-theme="light"] .gfab-input:focus {
   color: var(--accent);
   font-size: 12.5px;
   font-weight: 800;
-  padding: 10px 0;
-  border-radius: 6px;
+  padding: 10px 16px;
+  border-radius: 6px 0 0 6px;
   cursor: pointer;
   transition: all 0.15s ease;
+  white-space: nowrap;
 }
 
 .sporty-book-bet-btn:active {
@@ -4923,7 +4924,7 @@ html[data-theme="light"] .gfab-input:focus {
   background: var(--accent);
   border: none;
   color: var(--text-inv);
-  border-radius: 6px;
+  border-radius: 0 6px 6px 0;
   cursor: pointer;
   padding: 6px 0;
   transition: all 0.15s ease;
