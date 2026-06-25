@@ -894,14 +894,41 @@ export default function Home({ initialChip }) {
 
   return (
     <>
-      {/* ─── Hero Banner ─── */}
-      <div className="xb-hero-banner">
-        <img
-          src="/images/hero-banner.png"
-          alt="Xenbet — Official Betting Partner in Africa"
-          className="xb-hero-img"
-          onError={(e) => { e.target.style.display = 'none'; }}
-        />
+      {/* ─── Hero + Promo Carousel ─── */}
+      <div className="xb-promo-track-wrap">
+        <div className="xb-promo-track">
+          {[0, 1].map((dup) => (
+            <div className="xb-promo-set" key={dup}>
+              <div className="xb-promo-card xb-promo-card-hero">
+                <img src="/images/hero-banner.png" alt="Xenbet — Official Betting Partner in Africa" className="xb-hero-img"
+                  onError={(e) => { e.target.style.display = 'none'; }} />
+              </div>
+              <div className="xb-promo-card">
+                <div className="xb-promo-card-inner xb-promo-payout">
+                  <span className="xb-promo-tag">FAST PAYOUTS</span>
+                  <h3>Instant MoMo Withdrawals</h3>
+                  <p>Deposit and withdraw with MTN, Telecel Cash and AirtelTigo Money.</p>
+                  <div className="xb-promo-btns">
+                    <button type="button" className="xb-promo-btn-primary" onClick={() => navigate('/wallet')}>Get Bonus</button>
+                    <button type="button" className="xb-promo-btn-outline" onClick={() => navigate('/referral')}>Referral</button>
+                  </div>
+                </div>
+              </div>
+              <div className="xb-promo-card">
+                <div className="xb-promo-card-inner xb-promo-bonus">
+                  <div className="xb-promo-bonus-icon">💰</div>
+                  <span className="xb-promo-tag xb-promo-tag-green">WELCOME BONUS</span>
+                  <h3>Free $8 Signup Bonus</h3>
+                  <p>Claim your bonus balance and start betting on top football matches.</p>
+                  <div className="xb-promo-btns">
+                    <button type="button" className="xb-promo-btn-primary" onClick={() => navigate('/wallet')}>Get Bonus</button>
+                    <button type="button" className="xb-promo-btn-outline" onClick={() => navigate('/referral')}>Referral</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* ─── Category Grid ─── */}
