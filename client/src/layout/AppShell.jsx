@@ -102,11 +102,56 @@ function MobileHeader({ account, onSignIn, onSignUp, onAvatar, onSearch, onBalan
 /* ─── Feature Promo Icons (SportyBet-style) ─── */
 function FeaturePromos() {
   const promos = [
-    { label: 'Lucky Numbers', emoji: '🎰', bg: 'linear-gradient(135deg,#6c2dc7,#9f5de2)', to: '/casino' },
-    { label: 'Daily Rains', emoji: '🌧️', bg: 'linear-gradient(135deg,#1a7a4c,#27ae60)', to: '/promos' },
-    { label: 'Instant Win', emoji: '⚡', bg: 'linear-gradient(135deg,#c87f00,#f5a623)', to: '/casino' },
-    { label: 'JACKPOT', emoji: '💰', bg: 'linear-gradient(135deg,#c5993d,#ffd700)', to: '/jackpot' },
-    { label: 'AutoBet', emoji: '🤖', bg: 'linear-gradient(135deg,#2a5298,#4a90d9)', to: '/' },
+    {
+      label: 'Lucky Numbers',
+      bg: 'linear-gradient(135deg,#6c2dc7,#9f5de2)',
+      to: '/casino',
+      icon: (
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="2" y="4" width="20" height="16" rx="3" /><line x1="2" y1="10" x2="22" y2="10" /><circle cx="8" cy="15" r="1.5" fill="#fff" stroke="none" /><circle cx="12" cy="15" r="1.5" fill="#fff" stroke="none" /><circle cx="16" cy="15" r="1.5" fill="#fff" stroke="none" /><rect x="6" y="6" width="4" height="2.5" rx="0.5" fill="#fff" fillOpacity="0.3" stroke="none" /><rect x="11" y="6" width="4" height="2.5" rx="0.5" fill="#fff" fillOpacity="0.3" stroke="none" />
+        </svg>
+      ),
+    },
+    {
+      label: 'Daily Rains',
+      bg: 'linear-gradient(135deg,#1a7a4c,#27ae60)',
+      to: '/promos',
+      icon: (
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M20 17.58A5 5 0 0 0 18 8h-1.26A8 8 0 1 0 4 16.25" /><line x1="8" y1="16" x2="8" y2="20" /><line x1="12" y1="18" x2="12" y2="22" /><line x1="16" y1="16" x2="16" y2="20" />
+        </svg>
+      ),
+    },
+    {
+      label: 'Instant Win',
+      bg: 'linear-gradient(135deg,#c87f00,#f5a623)',
+      to: '/casino',
+      icon: (
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" fill="#fff" fillOpacity="0.2" />
+        </svg>
+      ),
+    },
+    {
+      label: 'JACKPOT',
+      bg: 'linear-gradient(135deg,#c5993d,#ffd700)',
+      to: '/jackpot',
+      icon: (
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M12 2v2" /><path d="M12 20v2" /><circle cx="12" cy="12" r="8" /><path d="M14.5 9c-.4-.8-1.3-1.2-2.5-1.2-1.6 0-2.5.8-2.5 1.8 0 1.2 1 1.6 2.5 2 1.5.4 2.5 1 2.5 2.2 0 1.1-.9 1.9-2.5 1.9-1.3 0-2.2-.5-2.5-1.3" /><line x1="12" y1="7" x2="12" y2="8" /><line x1="12" y1="16.5" x2="12" y2="17.5" />
+        </svg>
+      ),
+    },
+    {
+      label: 'AutoBet',
+      bg: 'linear-gradient(135deg,#2a5298,#4a90d9)',
+      to: '/',
+      icon: (
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="4" y="4" width="16" height="16" rx="4" fill="#fff" fillOpacity="0.15" stroke="#fff" /><circle cx="9" cy="10" r="1.5" fill="#fff" stroke="none" /><circle cx="15" cy="10" r="1.5" fill="#fff" stroke="none" /><path d="M8 15c1 1.5 3 2 4 2s3-.5 4-2" /><line x1="12" y1="2" x2="12" y2="4" /><line x1="12" y1="2" x2="10" y2="0.5" /><line x1="12" y1="2" x2="14" y2="0.5" />
+        </svg>
+      ),
+    },
   ];
 
   return (
@@ -114,7 +159,7 @@ function FeaturePromos() {
       {promos.map((p) => (
         <NavLink key={p.label} to={p.to} className="sb-feature-promo">
           <div className="sb-feature-icon" style={{ background: p.bg }}>
-            <span>{p.emoji}</span>
+            {p.icon}
           </div>
           <span className="sb-feature-label">{p.label}</span>
         </NavLink>
