@@ -7,7 +7,8 @@ import {
   fetchBetByCode,
 } from '../api/betApi.js';
 import { useToast, useAccount } from '../layout/AppShell.jsx';
-import BookingCodeOverlay from '../components/BookingCodeOverlay.jsx';
+import { toBookingCode } from '../components/BetSuccessModal.jsx';
+import BetPlacementSuccessModal from '../components/bets/BetPlacementSuccessModal.jsx';
 import OddsGauge from '../components/OddsGauge.jsx';
 import NumericKeypad from '../components/NumericKeypad.jsx';
 import { useFavouriteLeagues } from '../hooks/useFavourites.js';
@@ -1688,33 +1689,28 @@ export default function Home({ initialChip }) {
         })()}
       </dialog>
 
-      <BookingCodeOverlay
-        bet={successBet}
-        toast={toast}
+      <BetPlacementSuccessModal
+        isOpen={!!successBet}
         onClose={() => setSuccessBet(null)}
-        onConfirm={() => { setSuccessBet(null); navigate('/my-bets'); }}
-        onRebet={() => {
-          if (!successBet?.legs) return;
-          setSelections(successBet.legs.map((l) => ({
-            id: `sel-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-            matchId: l.matchId,
-            market: l.market,
-            outcome: l.outcome,
-            odds: l.odds,
-            home: l.home || '',
-            away: l.away || '',
-            marketName: l.marketName || l.market,
-            marketLabel: l.marketName || l.market,
-            pickLabel: pickLabel(l.market, l.outcome, { home: l.home || '', away: l.away || '' }),
-            meta: `${l.home || ''} vs ${l.away || ''}`.replace(/^ vs | vs $/g, '').trim(),
-            league: l.league || '',
-            minute: '',
-            kickoff: '',
-            trend: null,
-          })));
-          setBetMode(successBet.legs.length === 1 ? 'single' : 'multiple');
+        onShare={() => {
+          const code = successBet?.bookingCode || 'XX00000';
+          const text = `Check out my bet on Xenbet!\nBooking Code: ${code}`;
+          if (navigator.share) {
+            navigator.share({ title: 'Xenbet Booking Code', text, url: `https://xenbet.vercel.app/ticket/${code}` }).catch(() => {});
+          } else {
+            navigator.clipboard.writeText(code).then(() => toast('Booking code copied!', 'success')).catch(() => {});
+          }
+        }}
+        onViewOpenBets={() => { setSuccessBet(null); navigate('/bet-history'); }}
+        onAddToBetslip={(code) => {
+          setSuccessBet(null);
+          setPayslip(code);
           setSlipOpen(true);
         }}
+        totalStake={successBet?.stake ?? totalStake}
+        potentialWin={successBet?.potentialWin ?? payout}
+        bookingCode={successBet?.bookingCode || (successBet?.id ? toBookingCode(successBet.id) : 'XX00000')}
+        sport={sportId === 'football' ? 'Football' : sportId.charAt(0).toUpperCase() + sportId.slice(1)}
       />
 
       {/* ─── Booking code modal ─── */}
