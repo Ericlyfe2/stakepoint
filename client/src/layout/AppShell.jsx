@@ -5,7 +5,6 @@ import { useTheme } from '../providers/ThemeProvider.jsx';
 import { fetchMatches } from '../api/betApi.js';
 import NotificationBell from '../components/NotificationBell.jsx';
 import XenFooter from '../components/layout/XenFooter.jsx';
-import SmartQuickActionBar from '../components/ui/SmartQuickActionBar.jsx';
 export { useAccount, useToast } from '../providers/AccountProvider.jsx';
 
 function formatAmt(n) {
@@ -336,7 +335,6 @@ export default function AppShell() {
 
       {/* === mobile-only feature promos === */}
       <FeaturePromos />
-      <SmartQuickActionBar />
 
       {/* === desktop shell (kept for ≥961px) === */}
       <div className="ticker">
