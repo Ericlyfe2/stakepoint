@@ -4920,6 +4920,11 @@ html[data-theme="light"] .gfab-input:focus {
   background: rgba(197, 255, 61, 0.08);
 }
 
+.sporty-book-bet-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 .sporty-place-bet-btn {
   background: var(--accent);
   border: none;

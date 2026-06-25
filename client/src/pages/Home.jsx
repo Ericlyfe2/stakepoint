@@ -149,6 +149,7 @@ export default function Home({ initialChip }) {
   const [featuredTab, setFeaturedTab] = useState('featured');
   const [activeCategory, setActiveCategory] = useState(null);
   const [slipErr, setSlipErr] = useState('');
+  const [isBooking, setIsBooking] = useState(false);
   const [isPlacing, setIsPlacing] = useState(false);
   const [showKeypad, setShowKeypad] = useState(false);
   const [betRealMode, setBetRealMode] = useState('REAL');
@@ -584,12 +585,19 @@ export default function Home({ initialChip }) {
       setSlipErr('Pick a valid number of selections for a system bet (3–8).'); return;
     }
     const linePrice = parseStake(stake);
+    if (linePrice <= 0) { setSlipErr('Enter a stake amount.'); return; }
+    if (!account) {
+      setSlipOpen(false);
+      navigate('/login?next=/');
+      toast('Sign in to book a bet.');
+      return;
+    }
 
-    setIsPlacing(true);
+    setIsBooking(true);
     try {
       const res = await bookBet({
         mode: betMode,
-        stake: linePrice > 0 ? linePrice : 1,
+        stake: linePrice,
         ...(betMode === 'system' ? { systemType } : {}),
         selections: selections.map((s) => ({
           matchId: s.matchId, market: s.market, outcome: s.outcome, odds: s.odds,
@@ -608,9 +616,9 @@ export default function Home({ initialChip }) {
         setSlipErr(e.message || 'Could not book bet.');
       }
     } finally {
-      setIsPlacing(false);
+      setIsBooking(false);
     }
-  }, [selections, betMode, systemDef, stake, linesCount, totalOdds, payout, toast, sportId]);
+  }, [selections, betMode, systemDef, stake, linesCount, totalOdds, payout, toast, sportId, account, navigate]);
 
   const onPlaceBet = useCallback(async () => {
     setSlipErr('');
@@ -1576,17 +1584,18 @@ export default function Home({ initialChip }) {
                   type="button"
                   className="sporty-book-bet-btn"
                   onClick={onBookBet}
+                  disabled={isBooking}
                 >
-                  Book Bet
+                  {isBooking ? 'Booking...' : 'Book Bet'}
                 </button>
                 <button
                   type="button"
                   className="sporty-place-bet-btn"
                   onClick={onPlaceBet}
-                  disabled={isPlacing || (parseStake(stake) > (account?.balance || 0) && betRealMode === 'REAL')}
+                  disabled={isPlacing || !selections.length || parseStake(stake) <= 0 || (parseStake(stake) > (account?.balance || 0) && betRealMode === 'REAL')}
                 >
                   <div className="btn-label">{isPlacing ? 'Placing...' : 'Place Bet'}</div>
-                  <div className="btn-subtext">About to pay GHS {formatAmt(totalStake)}</div>
+                  <div className="btn-subtext">{betRealMode === 'SIM' ? `Simulation · GHS ${formatAmt(totalStake)}` : `About to pay GHS ${formatAmt(totalStake)}`}</div>
                 </button>
               </div>
             </div>
