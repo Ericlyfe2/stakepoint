@@ -135,7 +135,7 @@ export default function Home({ initialChip }) {
   const [selections, setSelections]   = useState([]);
   const [betMode, setBetMode]         = useState('multiple');
   const [systemType, setSystemType]   = useState(null);
-  const [stake, setStake]   = useState('300.00');
+  const [stake, setStake]   = useState('400.00');
   const [activeLeague, setActiveLeague] = useState(null);
 
   // new mobile-first UI state
@@ -634,7 +634,7 @@ export default function Home({ initialChip }) {
     const linePrice = parseStake(stake);
     if (linePrice <= 0) { setSlipErr('Enter a stake amount.'); return; }
     const cost = betMode === 'system' ? linePrice * linesCount : linePrice;
-    if (cost < 2) { setSlipErr(`Minimum stake is GHS 2 (this ticket costs GHS ${formatAmt(cost)}).`); return; }
+    if (cost < 400) { setSlipErr(`Minimum stake is GHS 400 (this ticket costs GHS ${formatAmt(cost)}).`); return; }
     if (!account) {
       setSlipOpen(false);
       navigate('/login?next=/');
@@ -894,219 +894,50 @@ export default function Home({ initialChip }) {
 
   return (
     <>
-      {/* ─── Sport tabs (with Live) ─── */}
+      {/* ─── Hero Banner ─── */}
+      <div className="xb-hero-banner">
+        <img
+          src="/images/hero-banner.png"
+          alt="Xenbet — Official Betting Partner in Africa"
+          className="xb-hero-img"
+          onError={(e) => { e.target.style.display = 'none'; }}
+        />
+      </div>
+
+      {/* ─── Category Grid ─── */}
+      <div className="xb-cat-grid">
+        {[
+          { icon: '🌍', label: 'Europe', action: () => { setActiveCategory('epl'); scrollToLeague('pl'); } },
+          { icon: '🏟️', label: 'Conference', action: () => setSubTab('highlights') },
+          { icon: '🏆', label: 'World Cup', action: () => setSubTab('highlights') },
+          { icon: '📅', label: 'Upcoming', action: () => setSubTab('today') },
+          { icon: '🔴', label: 'Live', action: () => setSubTab('live') },
+          { icon: '🎰', label: 'Casino', action: () => navigate('/casino') },
+          { icon: '🎁', label: 'Referral', action: () => navigate('/referral') },
+        ].map((cat) => (
+          <button key={cat.label} type="button" className="xb-cat-item" onClick={cat.action}>
+            <span className="xb-cat-icon">{cat.icon}</span>
+            <span className="xb-cat-label">{cat.label}</span>
+          </button>
+        ))}
+      </div>
+
+      {/* ─── Verified Sports Payouts ticker ─── */}
+      <div className="xb-payouts-ticker">
+        <span className="xb-ticker-badge">✅ Verified Sports Payouts</span>
+        <span className="xb-ticker-date">Updated {new Date().toLocaleDateString('en-GB', { month: 'short', day: 'numeric' })}</span>
+      </div>
+
+      {/* ─── Sport tabs ─── */}
       <div className="sb-sport-tabs">
-        <button
-          type="button"
-          className="sb-sport-tab"
-          style={{ fontWeight: 800, color: 'var(--text)' }}
-        >
-          Sports
-        </button>
+        <button type="button" className="sb-sport-tab" style={{ fontWeight: 800, color: 'var(--text)' }}>Sports</button>
         {sportTabs.map((s) => (
-          <button
-            key={s.id}
-            type="button"
-            className={`sb-sport-tab${sportId === s.id ? ' active' : ''}`}
-            onClick={() => {
-              window.history.replaceState({}, '', `?sport=${s.id}`);
-              setSportId(s.id);
-              setActiveLeague(null);
-            }}
-          >
-            {s.name}
-            {s.count != null && <span className="ct">{s.count}</span>}
+          <button key={s.id} type="button" className={`sb-sport-tab${sportId === s.id ? ' active' : ''}`}
+            onClick={() => { window.history.replaceState({}, '', `?sport=${s.id}`); setSportId(s.id); setActiveLeague(null); }}>
+            {s.name}{s.count != null && <span className="ct">{s.count}</span>}
           </button>
         ))}
       </div>
-
-      {/* ─── Category quick links (SportyBet-style) ─── */}
-      <div className="sb-category-pills">
-        <button
-          type="button"
-          className={`sb-category-pill${subTab === 'live' ? ' active' : ''}`}
-          onClick={() => {
-            setSubTab(subTab === 'live' ? 'highlights' : 'live');
-            requestAnimationFrame(() => {
-              window.scrollTo({ top: 0, behavior: 'smooth' });
-            });
-          }}
-          style={{
-            background: subTab === 'live' ? 'linear-gradient(135deg,#ff3d3d,#c81e1e)' : undefined,
-            color: subTab === 'live' ? '#fff' : undefined,
-            fontWeight: 800,
-          }}
-        >
-          🔴 LIVE
-        </button>
-        {categoryLinks.map((cat) => (
-          <button
-            key={cat.id}
-            type="button"
-            className={`sb-category-pill${activeCategory === cat.id ? ' active' : ''}`}
-            onClick={() => {
-              setActiveCategory(cat.id);
-              if (cat.leagueId) scrollToLeague(cat.leagueId);
-            }}
-          >
-            {cat.label}
-          </button>
-        ))}
-      </div>
-
-      {/* ─── Featured section (SportyBet Codes style) — hidden on Live tab so live matches sit above the fold ─── */}
-      {subTab !== 'live' && (
-      <section className="sb-featured">
-        <div className="sb-featured-tabs">
-          {[
-            ['featured',  'Featured'],
-            ['codes',     'Load Code'],
-            ['matches',   'Matches'],
-            ['games',     'Games'],
-            ['virtuals',  'Virtuals'],
-          ].map(([key, label]) => (
-            <button
-              key={key}
-              type="button"
-              className={`sb-featured-tab${featuredTab === key ? ' active' : ''}`}
-              onClick={() => setFeaturedTab(key)}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-
-        {/* Booking-code loader — always visible on every tab */}
-        <form
-          onSubmit={onFeaturedCodeLoad}
-          style={{
-            display: 'flex', gap: 8, padding: '10px 12px 4px',
-            alignItems: 'stretch',
-          }}
-        >
-          <input
-            type="text"
-            value={featuredCode}
-            onChange={(e) => setFeaturedCode(e.target.value.toUpperCase().replace(/\s+/g, ''))}
-            placeholder="Enter booking code (e.g. ME94621)"
-            maxLength={12}
-            autoCapitalize="characters"
-            spellCheck={false}
-            style={{
-              flex: 1, padding: '12px 14px', borderRadius: 10,
-              border: '1px solid var(--surface-border, #2a2a2a)',
-              background: 'var(--surface, #161616)',
-              color: 'var(--text, #fff)',
-              fontSize: 14, fontWeight: 700, letterSpacing: '0.06em',
-              outline: 'none',
-            }}
-          />
-          <button
-            type="submit"
-            disabled={!featuredCode.trim()}
-            style={{
-              padding: '0 18px', borderRadius: 10, border: 'none',
-              background: featuredCode.trim() ? '#116f43' : '#2a2a2a',
-              color: '#fff', fontWeight: 800, fontSize: 13, cursor: featuredCode.trim() ? 'pointer' : 'not-allowed',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            Load Slip
-          </button>
-        </form>
-
-        <div className="sb-featured-body">
-          {featuredTab === 'codes' && featuredCards.length === 0 && (
-            <div style={{ padding: '20px 12px', textAlign: 'center', color: 'var(--text-dim)', fontSize: 13 }}>
-              Enter a booking code above to load its selections onto your slip.
-            </div>
-          )}
-
-          {featuredTab !== 'codes' && featuredCards.length === 0 && (
-            <div style={{ padding: '20px 12px', textAlign: 'center', color: 'var(--text-dim)', fontSize: 13 }}>
-              No featured cards available — check back after the next odds refresh.
-            </div>
-          )}
-
-          {(featuredTab === 'featured' || featuredTab === 'codes' || featuredTab === 'matches') &&
-            featuredCards.map((sc) => (
-              <div key={sc.id} className="sb-code-card">
-                <div className="sb-code-header">
-                  <span className="sb-code-id">{sc.code}</span>
-                  <div className="sb-code-meta">
-                    <span>Folds: <strong>{sc.folds}</strong></span>
-                    <span>Odds: <span className="odds-val">{sc.odds.toFixed(2)}</span></span>
-                  </div>
-                </div>
-                {sc.legs.map((leg, li) => (
-                  <div key={li} className="sb-code-leg">
-                    <span className={`sb-code-leg-dot ${leg.dot}`} />
-                    <div className="sb-code-leg-info">
-                      <div className="sb-code-leg-pick">{leg.pick} | {leg.type}</div>
-                      <div className="sb-code-leg-match">{leg.match}</div>
-                    </div>
-                    <span className="sb-code-leg-time">{leg.time}</span>
-                  </div>
-                ))}
-                <div className="sb-code-actions">
-                  <button
-                    type="button"
-                    className="sb-code-share"
-                    onClick={async () => {
-                      try {
-                        if (navigator.share) {
-                          await navigator.share({ title: 'Xenbet slip', text: `Check out this slip on Xenbet — booking idea ${sc.code}` });
-                        } else {
-                          await navigator.clipboard?.writeText(sc.code);
-                          toast(`Code ${sc.code} copied.`);
-                        }
-                      } catch {/* user cancelled */}
-                    }}
-                  >
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
-                      <polyline points="16 6 12 2 8 6" />
-                      <line x1="12" y1="2" x2="12" y2="15" />
-                    </svg>
-                    Share
-                  </button>
-                  <button type="button" className="sb-code-add" onClick={() => loadCardToSlip(sc)}>
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                      <line x1="12" y1="5" x2="12" y2="19" />
-                      <line x1="5" y1="12" x2="19" y2="12" />
-                    </svg>
-                    Add to Betslip
-                  </button>
-                </div>
-              </div>
-            ))}
-
-          {featuredTab === 'games' && (
-            <div style={{ padding: '24px 12px', textAlign: 'center' }}>
-              <button
-                type="button"
-                onClick={() => navigate('/casino')}
-                style={{ padding: '12px 20px', borderRadius: 10, border: 'none', background: '#116f43', color: '#fff', fontWeight: 800, cursor: 'pointer', fontSize: 14 }}
-              >
-                Open Casino
-              </button>
-            </div>
-          )}
-
-          {featuredTab === 'virtuals' && (
-            <div style={{ padding: '24px 12px', textAlign: 'center' }}>
-              <button
-                type="button"
-                onClick={() => navigate('/virtuals')}
-                style={{ padding: '12px 20px', borderRadius: 10, border: 'none', background: '#116f43', color: '#fff', fontWeight: 800, cursor: 'pointer', fontSize: 14 }}
-              >
-                Open Virtuals
-              </button>
-            </div>
-          )}
-        </div>
-      </section>
-      )}
 
       {/* ─── Secondary tabs ─── */}
       <div className="sb-sub-tabs">
@@ -1377,230 +1208,187 @@ export default function Home({ initialChip }) {
 
       {/* ─── Slip bottom sheet ─── */}
       <dialog ref={slipDlg} className="sb-sheet sporty-betslip-sheet" onClose={() => setSlipOpen(false)}>
-        <div className="sporty-sheet-header">
-          <div className="sporty-header-left">
-            <span className="sporty-count-circle">{selections.length}</span>
-            <div className="sporty-toggle-wrap">
-              <button 
-                type="button" 
-                className={`sporty-toggle-btn ${betRealMode === 'REAL' ? 'active' : ''}`}
-                onClick={() => setBetRealMode('REAL')}
-              >
-                REAL
-              </button>
-              <button 
-                type="button" 
-                className={`sporty-toggle-btn ${betRealMode === 'SIM' ? 'active' : ''}`}
-                onClick={() => setBetRealMode('SIM')}
-              >
-                SIM
-              </button>
-            </div>
+        <div className="xb-sheet-header">
+          <div className="xb-header-left">
+            <span className="xb-count-badge">{selections.length}</span>
+            <span className="xb-header-title">Bet Slip</span>
           </div>
-          
-          <button type="button" className="sporty-minimize-btn" onClick={() => setSlipOpen(false)} aria-label="Minimize">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="6 9 12 15 18 9" />
-            </svg>
-          </button>
-          
-          <div className="sporty-header-right">
-            <span className="sporty-balance">GHS {formatAmt(account?.balance || 0)}</span>
+          <div className="xb-header-right">
+            <span className="xb-balance">Bal: GHS {formatAmt(account?.balance || 0)}</span>
+            <button type="button" className="xb-minimize-btn" onClick={() => setSlipOpen(false)} aria-label="Minimize">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="6 9 12 15 18 9" />
+              </svg>
+            </button>
           </div>
         </div>
 
         <div className="sb-sheet-body" style={{ padding: '0 0 max(80px, env(safe-area-inset-bottom))' }}>
-          <div className="sporty-pins-row">
-            <div className="sporty-pins-left">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: 6 }}>
-                <path d="M12 2a8 8 0 0 0-8 8c0 5.25 8 12 8 12s8-6.75 8-12a8 8 0 0 0-8-8z" />
-                <circle cx="12" cy="10" r="3" />
-              </svg>
-              My Pins
-            </div>
-            <div className="sporty-pins-right">
-              <button type="button" className="sporty-pin-action" onClick={clearSlip} title="Clear Slip">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-                  <polyline points="3 6 5 6 21 6" />
-                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                </svg>
+          {/* Clear slip button */}
+          <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '4px 12px 0' }}>
+            {selections.length > 0 && (
+              <button type="button" onClick={clearSlip} style={{ background: 'none', border: 0, color: '#d32f2f', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+                Clear All
               </button>
-              <button type="button" className="sporty-pin-action" title="Settings">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-                  <circle cx="12" cy="12" r="3" />
-                  <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
-                </svg>
-              </button>
-            </div>
+            )}
           </div>
 
           <div className="betslip" style={{ padding: '0 12px 12px' }}>
-            <div className="slip-mode">
-              {(['single', 'multiple', 'system']).map((m) => (
-                <button key={m} type="button" className={`mode-btn${betMode === m ? ' active' : ''}`} onClick={() => setBetMode(m)}>
-                  {m === 'single' ? 'Single' : m === 'multiple' ? 'Multiple' : 'System'}
-                </button>
-              ))}
+            {/* Mode tabs — Multiple / Single */}
+            <div className="xb-mode-tabs">
+              <button type="button" className={`xb-mode-tab${betMode === 'multiple' ? ' active' : ''}`} onClick={() => setBetMode('multiple')}>Multiple</button>
+              <button type="button" className={`xb-mode-tab${betMode === 'single' ? ' active' : ''}`} onClick={() => setBetMode('single')}>Single</button>
+              <button type="button" className="xb-mode-close" onClick={() => setSlipOpen(false)} aria-label="Close">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              </button>
             </div>
 
-            <div className="sporty-market-indicator">
-              {selections.length > 0 ? Array.from(new Set(selections.map(s => s.marketLabel))).join(', ') : '1X2'}
-            </div>
-
-            <div className="sporty-banner-alert" onClick={() => toast('Recommendations loaded!')}>
-              <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span className="emoji-flag">⛳</span> People also bet on...
-              </span>
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="6 9 12 15 18 9" /></svg>
-            </div>
-
-            <div className="sporty-bonus-boost-banner">
-              Add more qualifying selections to boost your bonus
-            </div>
-
+            {/* Selections list */}
             {selections.length === 0 ? (
-              <p style={{ fontSize: 12, color: 'var(--text-dim)', padding: '24px 0', textAlign: 'center' }}>
-                Tap any odds to add a selection. Mix markets across matches.
+              <p style={{ fontSize: 13, color: '#888', padding: '24px 0', textAlign: 'center' }}>
+                Tap any odds to add a selection.
               </p>
             ) : (
-              <div className="selections" style={{ maxHeight: '180px', overflowY: 'auto', marginBottom: 12 }}>
+              <div className="xb-selections" style={{ maxHeight: '220px', overflowY: 'auto' }}>
                 {selections.map((s) => (
-                  <div key={s.id} className="selection" style={{ padding: '8px 10px', background: 'var(--surface-2)', border: '1px solid var(--line)', borderRadius: 8, marginBottom: 6 }}>
-                    <button type="button" className="x" aria-label="Remove" onClick={() => removeById(s.id)}>×</button>
-                    <div className="sel-pick" style={{ fontWeight: 800, color: 'var(--text)' }}>{s.pickLabel}</div>
-                    <div className="sel-market" style={{ fontSize: 11, color: 'var(--text-soft)' }}>{s.marketLabel}</div>
-                    <div className="sel-teams" style={{ fontSize: 11, color: 'var(--text-dim)' }}>{s.meta}</div>
-                    <div className="sel-odds">
-                      <span className="sel-odds-val" style={{ color: 'var(--accent)' }}>{s.odds.toFixed(2)}</span>
+                  <div key={s.id} className="xb-sel-card">
+                    <div className="xb-sel-top">
+                      <div className="xb-sel-info">
+                        <div className="xb-sel-teams">{s.meta}</div>
+                        <div className="xb-sel-pick">{s.pickLabel} @ {s.odds.toFixed(2)}</div>
+                      </div>
+                      <div className="xb-sel-actions">
+                        <button type="button" className="xb-view-match" onClick={() => {/* navigate to match */}}>View Match</button>
+                        <button type="button" className="xb-sel-remove" aria-label="Remove" onClick={() => removeById(s.id)}>
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                        </button>
+                      </div>
                     </div>
+                    {/* Single mode: individual stake per selection */}
+                    {betMode === 'single' && (
+                      <div className="xb-sel-stake-row">
+                        <div className="xb-sel-stake-input">
+                          <input
+                            type="text"
+                            value={stake}
+                            onChange={(e) => setStake(e.target.value)}
+                            inputMode="decimal"
+                            placeholder="Enter stake (USD)"
+                          />
+                        </div>
+                        <div className="xb-sel-win">
+                          <span className="xb-sel-win-label">Single Win</span>
+                          <span className="xb-sel-win-val">${payout > 0 ? formatAmt(s.odds * parseStake(stake)) : '0.00'}</span>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
             )}
 
-            <div className="stake-block" style={{ border: 'none', background: 'transparent', padding: 0 }}>
-              {/* Total Stake Input Area */}
-              <div className="sporty-stake-input-container">
-                <span className="sporty-stake-label">Total Stake</span>
-                <div className="sporty-stake-input-box-wrapper">
-                  <span className="currency-label">GHS</span>
-                  <div 
-                    className={`sporty-stake-input-box ${parseStake(stake) > (account?.balance || 0) && betRealMode === 'REAL' ? 'insufficient-border' : ''}`}
-                    onClick={() => setShowKeypad(true)}
-                  >
+            {/* Summary section */}
+            <div className="xb-summary">
+              {betMode === 'single' && (
+                <div className="xb-summary-row">
+                  <span>Selections</span>
+                  <span>{selections.length}</span>
+                </div>
+              )}
+              {betMode === 'multiple' && (
+                <div className="xb-summary-row">
+                  <span>Total Odds</span>
+                  <span>{selections.length ? totalOdds.toFixed(2) : '—'}</span>
+                </div>
+              )}
+              <div className="xb-summary-row">
+                <span>Total Stake</span>
+                <span>${formatAmt(totalStake)}</span>
+              </div>
+              <div className="xb-summary-row">
+                <span>Potential Win</span>
+                <span>${payout > 0 ? formatAmt(payout) : '0.00'}</span>
+              </div>
+            </div>
+
+            {/* Multiple mode: single stake input + quick buttons */}
+            {betMode === 'multiple' && (
+              <div className="xb-stake-section">
+                <div className="xb-stake-row">
+                  <span className="xb-stake-label">Stake</span>
+                  <div className="xb-stake-input-wrap">
                     <input
                       type="text"
                       value={stake}
                       onChange={(e) => setStake(e.target.value)}
                       inputMode="decimal"
+                      placeholder="Enter stake (USD)"
                       autoComplete="off"
-                      readOnly={showKeypad}
-                      onFocus={() => setShowKeypad(true)}
                     />
                   </div>
                 </div>
               </div>
+            )}
 
-              {/* Insufficient Balance Message */}
-              {parseStake(stake) > (account?.balance || 0) && betRealMode === 'REAL' && (
-                <div className="sporty-insufficient-msg">
-                  You need a balance of GHS {formatAmt(parseStake(stake))} to place this bet. Please deposit an additional GHS {formatAmt(parseStake(stake) - (account?.balance || 0))}
-                  <a href="#deposit" className="deposit-link" onClick={(e) => { e.preventDefault(); setSlipOpen(false); openDeposit(); }}>
-                    Go to Deposit &gt;
-                  </a>
-                </div>
-              )}
+            {/* Quick stake add buttons */}
+            <div className="xb-quick-stakes">
+              {[100, 200, 300, 400, 500, 600, 700, 800, 900, 1000].map((amt) => (
+                <button key={amt} type="button" className="xb-quick-btn" onClick={() => setStake(formatAmt(parseStake(stake) + amt))}>+{amt}</button>
+              ))}
+            </div>
 
-              {/* Quick stake buttons row */}
-              <div className="sporty-quick-stakes-row">
-                <div className="sporty-quick-stake-btns">
-                  <button type="button" className="sporty-quick-stake" onClick={() => setStake(formatAmt(parseStake(stake) + 3))}>+3</button>
-                  <button type="button" className="sporty-quick-stake" onClick={() => setStake(formatAmt(parseStake(stake) + 5))}>+5</button>
-                  <button type="button" className="sporty-quick-stake" onClick={() => setStake(formatAmt(parseStake(stake) + 10))}>+10</button>
-                </div>
-                <label className="sporty-default-stake-checkbox">
-                  <input type="checkbox" />
-                  <span>Update default stake</span>
-                </label>
+            {/* Minimum stake warning */}
+            {parseStake(stake) > 0 && parseStake(stake) < 400 && (
+              <div className="xb-warn">Enter stake on each selection above.</div>
+            )}
+
+            {/* Insufficient balance */}
+            {parseStake(stake) > (account?.balance || 0) && betRealMode === 'REAL' && (
+              <div className="xb-warn" style={{ color: '#d32f2f' }}>
+                Insufficient balance. <a href="#deposit" className="xb-deposit-link" onClick={(e) => { e.preventDefault(); setSlipOpen(false); openDeposit(); }}>Deposit</a>
               </div>
+            )}
 
-              {showKeypad && (
-                <NumericKeypad
-                  onInput={(k) => {
-                    setStake((prev) => {
-                      const raw = prev === '0' || prev === '0.00' ? '' : prev.replace(/,/g, '');
-                      return raw + k;
-                    });
-                  }}
-                  onClear={() => setStake('0')}
-                  onDelete={() => {
-                    setStake((prev) => {
-                      const raw = prev.replace(/,/g, '');
-                      if (raw.length <= 1) return '0';
-                      return raw.slice(0, -1);
-                    });
-                  }}
-                  onDone={() => {
-                    setStake(formatAmt(parseStake(stake)));
-                    setShowKeypad(false);
-                  }}
+            {slipErr && <div className="xb-warn" style={{ color: '#d32f2f' }}>{slipErr}</div>}
+
+            {/* Booking code section */}
+            <div className="xb-booking-section">
+              <div className="xb-booking-title">Booking Code</div>
+              <div className="xb-booking-row">
+                <input
+                  type="text"
+                  className="xb-booking-input"
+                  placeholder="Enter booking code"
+                  value={payslip}
+                  onChange={(e) => setPayslip(e.target.value)}
                 />
-              )}
-
-              {/* sporty options row */}
-              <div className="sporty-options-row">
-                <span className="sporty-badge-insure">Insure <span className="info-mark">i</span></span>
-                <div className="sporty-options-list">
-                  <label className="sporty-option-checkbox">
-                    <input type="checkbox" />
-                    <span>Flexi</span>
-                  </label>
-                  <label className="sporty-option-checkbox">
-                    <input type="checkbox" />
-                    <span>1UP ▾</span>
-                  </label>
-                  <label className="sporty-option-checkbox">
-                    <input type="checkbox" disabled />
-                    <span style={{ opacity: 0.4 }}>EarlyGoals</span>
-                  </label>
-                  <span className="more-trigger">More ▾</span>
-                </div>
+                <button type="button" className="xb-booking-load" onClick={async () => {
+                  if (!payslip.trim()) return;
+                  const ok = await loadFromCode(payslip);
+                  if (ok) { setPayslip(''); toast('Selections loaded!'); }
+                  else toast('Booking code not found.');
+                }}>Load</button>
               </div>
+            </div>
 
-              {/* summary block */}
-              <div className="sporty-summary-block">
-                <div className="sporty-summary-row">
-                  <span className="lbl">Total Odds</span>
-                  <span className="val">{selections.length ? totalOdds.toFixed(2) : '—'}</span>
-                </div>
-                <div className="sporty-summary-row">
-                  <span className="lbl">Potential Win</span>
-                  <span className="val highlight-win">GHS {payout > 0 ? formatAmt(payout) : '0.00'}</span>
-                </div>
-              </div>
-
-              {slipErr && <div style={{ color: 'var(--accent-hot)', fontSize: 12, textAlign: 'center', margin: '8px 0', fontWeight: 800 }}>{slipErr}</div>}
-
-              {/* action footer */}
-              <div className="sporty-footer-actions">
-                <button
-                  type="button"
-                  className="sporty-book-bet-btn"
-                  onClick={onBookBet}
-                  disabled={isBooking}
-                >
-                  {isBooking ? 'Booking...' : 'Book Bet'}
-                </button>
-                <button
-                  type="button"
-                  className="sporty-place-bet-btn"
-                  onClick={onPlaceBet}
-                  disabled={isPlacing || !selections.length || parseStake(stake) <= 0 || (parseStake(stake) > (account?.balance || 0) && betRealMode === 'REAL')}
-                >
-                  <div className="btn-label">{isPlacing ? 'Placing...' : 'Place Bet'}</div>
-                  <div className="btn-subtext">{betRealMode === 'SIM' ? `Simulation · GHS ${formatAmt(totalStake)}` : `About to pay GHS ${formatAmt(totalStake)}`}</div>
-                </button>
-              </div>
+            {/* Action buttons */}
+            <div className="xb-actions">
+              <button
+                type="button"
+                className="xb-book-btn"
+                onClick={onBookBet}
+                disabled={isBooking}
+              >
+                {isBooking ? 'Booking...' : 'Book Bet'}
+              </button>
+              <button
+                type="button"
+                className="xb-place-btn"
+                onClick={onPlaceBet}
+                disabled={isPlacing || !selections.length || parseStake(stake) <= 0 || (parseStake(stake) > (account?.balance || 0) && betRealMode === 'REAL')}
+              >
+                {isPlacing ? 'Placing...' : 'Place Bet'}
+              </button>
             </div>
           </div>
         </div>

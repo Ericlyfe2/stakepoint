@@ -2874,6 +2874,440 @@ nav a:active { transform: scale(.96); }
   box-shadow: none;
 }
 
+/* ===== Xenbet Hero Banner ===== */
+.xb-hero-banner {
+  margin: 8px 12px 12px;
+  border-radius: 16px;
+  overflow: hidden;
+}
+.xb-hero-img {
+  width: 100%;
+  height: auto;
+  display: block;
+  border-radius: 16px;
+}
+
+/* ===== Category Grid ===== */
+.xb-cat-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  padding: 0 12px 14px;
+}
+.xb-cat-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 14px 6px;
+  background: var(--surface, #1a1a1a);
+  border: 1px solid var(--line, rgba(255,255,255,0.06));
+  border-radius: 14px;
+  cursor: pointer;
+  transition: background .15s, transform .1s;
+  font-family: inherit;
+  color: var(--text, #fff);
+}
+.xb-cat-item:hover {
+  background: var(--surface-2, #222);
+  transform: translateY(-1px);
+}
+.xb-cat-icon {
+  font-size: 24px;
+  line-height: 1;
+}
+.xb-cat-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-soft, #aaa);
+}
+
+/* ===== Payouts Ticker ===== */
+.xb-payouts-ticker {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  margin: 0 12px 10px;
+  background: var(--surface, #1a1a1a);
+  border: 1px solid var(--line, rgba(255,255,255,0.06));
+  border-radius: 10px;
+}
+.xb-ticker-badge {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text, #fff);
+}
+.xb-ticker-date {
+  font-size: 11px;
+  color: var(--text-dim, #666);
+}
+
+/* ===== New Xenbet Bet Slip (xb-*) ===== */
+.xb-sheet-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: #1a6b3c;
+  color: #fff;
+}
+.xb-header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.xb-count-badge {
+  background: #fff;
+  color: #1a6b3c;
+  width: 24px; height: 24px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+  font-weight: 800;
+}
+.xb-header-title {
+  font-size: 15px;
+  font-weight: 700;
+}
+.xb-header-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.xb-balance {
+  font-size: 13px;
+  font-weight: 700;
+  background: rgba(255,255,255,0.15);
+  padding: 4px 10px;
+  border-radius: 6px;
+}
+.xb-minimize-btn {
+  background: none;
+  border: 0;
+  color: #fff;
+  cursor: pointer;
+  padding: 4px;
+}
+
+/* Mode tabs */
+.xb-mode-tabs {
+  display: flex;
+  align-items: center;
+  background: #e8f0e8;
+  border-radius: 999px;
+  padding: 3px;
+  margin-bottom: 14px;
+}
+.xb-mode-tab {
+  flex: 1;
+  padding: 10px 16px;
+  border: 0;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all .2s;
+  font-family: inherit;
+  background: transparent;
+  color: #555;
+  text-align: center;
+}
+.xb-mode-tab.active {
+  background: #1a6b3c;
+  color: #fff;
+}
+.xb-mode-close {
+  background: none;
+  border: 0;
+  color: #555;
+  cursor: pointer;
+  padding: 8px;
+  margin-left: 4px;
+  border-radius: 50%;
+}
+.xb-mode-close:hover { background: #e0e0e0; }
+
+/* Selection cards */
+.xb-selections {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.xb-sel-card {
+  background: #f7faf7;
+  border: 1px solid #d5e0d5;
+  border-radius: 10px;
+  padding: 12px 14px;
+  border-left: 3px solid #1a6b3c;
+}
+.xb-sel-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+}
+.xb-sel-info { flex: 1; min-width: 0; }
+.xb-sel-teams {
+  font-size: 14px;
+  font-weight: 700;
+  color: #1a1a1a;
+  margin-bottom: 2px;
+}
+.xb-sel-pick {
+  font-size: 13px;
+  color: #1a6b3c;
+  font-weight: 600;
+}
+.xb-sel-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.xb-view-match {
+  font-size: 11px;
+  font-weight: 700;
+  color: #1a6b3c;
+  background: #fff;
+  border: 1.5px solid #1a6b3c;
+  border-radius: 999px;
+  padding: 4px 10px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.xb-sel-remove {
+  background: none;
+  border: 0;
+  color: #d32f2f;
+  cursor: pointer;
+  padding: 4px;
+}
+
+/* Single mode stake per selection */
+.xb-sel-stake-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed #d5e0d5;
+}
+.xb-sel-stake-input {
+  flex: 1;
+}
+.xb-sel-stake-input input {
+  width: 100%;
+  border: 1.5px solid #d0d5d1;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 13px;
+  font-family: inherit;
+  background: #fff;
+  color: #1a1a1a;
+}
+.xb-sel-stake-input input:focus {
+  outline: none;
+  border-color: #1a6b3c;
+}
+.xb-sel-win {
+  text-align: right;
+  flex-shrink: 0;
+}
+.xb-sel-win-label {
+  display: block;
+  font-size: 11px;
+  color: #888;
+}
+.xb-sel-win-val {
+  font-size: 15px;
+  font-weight: 800;
+  color: #1a6b3c;
+}
+
+/* Summary */
+.xb-summary {
+  padding: 10px 0;
+  border-top: 1px solid #e5e8e5;
+  margin-top: 4px;
+}
+.xb-summary-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 4px 0;
+  font-size: 14px;
+  color: #333;
+}
+.xb-summary-row span:last-child {
+  font-weight: 700;
+}
+
+/* Stake input for multiple mode */
+.xb-stake-section {
+  margin: 8px 0;
+}
+.xb-stake-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.xb-stake-label {
+  font-size: 14px;
+  color: #555;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.xb-stake-input-wrap {
+  flex: 1;
+}
+.xb-stake-input-wrap input {
+  width: 100%;
+  border: 1.5px solid #d0d5d1;
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 14px;
+  font-family: inherit;
+  background: #fff;
+  color: #1a1a1a;
+  text-align: right;
+}
+.xb-stake-input-wrap input:focus {
+  outline: none;
+  border-color: #1a6b3c;
+}
+
+/* Quick stake buttons */
+.xb-quick-stakes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 10px 0;
+}
+.xb-quick-btn {
+  padding: 6px 12px;
+  border: 1.5px solid #1a6b3c;
+  border-radius: 6px;
+  background: #fff;
+  color: #1a6b3c;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all .15s;
+  font-family: inherit;
+}
+.xb-quick-btn:hover {
+  background: #1a6b3c;
+  color: #fff;
+}
+.xb-quick-btn:active {
+  transform: scale(0.95);
+}
+
+/* Warning / info messages */
+.xb-warn {
+  background: #fff8e1;
+  color: #b8860b;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 10px 14px;
+  border-radius: 8px;
+  text-align: center;
+  margin: 8px 0;
+  font-style: italic;
+}
+.xb-deposit-link {
+  color: #1a6b3c;
+  font-weight: 700;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+/* Booking code section */
+.xb-booking-section {
+  background: #f7faf7;
+  border: 1px solid #e0e5e0;
+  border-radius: 10px;
+  padding: 14px;
+  margin: 12px 0;
+}
+.xb-booking-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #1a1a1a;
+  margin-bottom: 8px;
+}
+.xb-booking-row {
+  display: flex;
+  gap: 8px;
+}
+.xb-booking-input {
+  flex: 1;
+  border: 1.5px solid #d0d5d1;
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 14px;
+  font-family: inherit;
+  background: #fff;
+  color: #1a1a1a;
+}
+.xb-booking-input:focus {
+  outline: none;
+  border-color: #1a6b3c;
+}
+.xb-booking-load {
+  background: #d32f2f;
+  color: #fff;
+  border: 0;
+  border-radius: 8px;
+  padding: 10px 18px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+}
+.xb-booking-load:hover {
+  background: #b71c1c;
+}
+
+/* Action buttons */
+.xb-actions {
+  display: grid;
+  grid-template-columns: 1fr 1.4fr;
+  gap: 10px;
+  margin-top: 8px;
+}
+.xb-book-btn {
+  padding: 14px 16px;
+  border: 2px solid #1a6b3c;
+  border-radius: 10px;
+  background: #fff;
+  color: #1a6b3c;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all .15s;
+}
+.xb-book-btn:hover { background: #f0f7f0; }
+.xb-book-btn:disabled { opacity: .5; cursor: not-allowed; }
+.xb-place-btn {
+  padding: 14px 16px;
+  border: 0;
+  border-radius: 10px;
+  background: #1a6b3c;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all .15s;
+}
+.xb-place-btn:hover { background: #145530; }
+.xb-place-btn:disabled { opacity: .5; cursor: not-allowed; }
+
 /* ----- desktop accent retouches (keep current layout, just polish chips) ----- */
 @media (min-width: 961px) {
   .sb-mobile-page-pad { padding-bottom: 24px; }
