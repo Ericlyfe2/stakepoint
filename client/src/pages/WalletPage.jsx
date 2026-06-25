@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAccount, useToast } from '../providers/AccountProvider.jsx';
-import { fetchTransactions } from '../api/betApi.js';
+import { fetchTransactions, fetchWalletRules } from '../api/betApi.js';
 import PageBack from '../components/PageBack.jsx';
 import { readTxCache, writeTxCache, mergeTxLists } from '../lib/txCache.js';
 
@@ -36,14 +36,16 @@ export default function WalletPage() {
   const navigate = useNavigate();
   const { account, openDeposit, openWithdraw } = useAccount();
   const { toast } = useToast();
-  const [txs, setTxs]   = useState([]);
-  const [busy, setBusy] = useState(false);
+  const [txs, setTxs]     = useState([]);
+  const [busy, setBusy]   = useState(false);
+  const [minWithdraw, setMinWithdraw] = useState(0);
 
   useEffect(() => {
     if (!account) { navigate('/login?next=/wallet'); return; }
     let alive = true;
     // Prime from local cache so the list is never blank between fetches.
     setTxs(readTxCache(account.id));
+    fetchWalletRules().then((r) => { if (alive) setMinWithdraw(r.minWithdraw ?? 550); }).catch(() => {});
     (async () => {
       try {
         setBusy(true);
@@ -127,7 +129,7 @@ export default function WalletPage() {
               </header>
               <p className="wallet-split-desc">Cash out your winnings directly to your mobile money.</p>
               <ul className="wallet-list">
-                <li><span>Minimum withdrawal</span><strong>GHS {fmt(stageMinWithdraw)}</strong></li>
+                <li><span>Minimum withdrawal</span><strong>GHS {fmt(minWithdraw)}</strong></li>
                 <li><span>Processing</span><strong>Within 24 hours</strong></li>
                 <li><span>Methods</span><strong>MoMo to phone on file</strong></li>
               </ul>
@@ -137,7 +139,7 @@ export default function WalletPage() {
               </button>
               <ol className="wallet-withdraw-rules">
                 <li>Maximum per transaction is GHS 95,000.00</li>
-                <li>Minimum per transaction is GHS {fmt(stageMinWithdraw)}</li>
+                <li>Minimum per transaction is GHS {fmt(minWithdraw)}</li>
                 <li>Withdrawal is free, no fee transaction.</li>
               </ol>
             </div>
