@@ -102,6 +102,21 @@ function MobileHeader({ account, onSignIn, onSignUp, onAvatar, onSearch, onBalan
 
 /* ─── Feature Promo Icons (SportyBet-style) ─── */
 function FeaturePromos() {
+  const location = useLocation();
+  const isSports = location.pathname === '/';
+  const isProfile = location.pathname === '/profile';
+  const [hidden, setHidden] = useState(false);
+
+  useEffect(() => {
+    setHidden(false);
+    if (!isProfile) return;
+    const t = setTimeout(() => setHidden(true), 3000);
+    return () => clearTimeout(t);
+  }, [isProfile, location.pathname]);
+
+  if (!isSports && !isProfile) return null;
+  if (isProfile && hidden) return null;
+
   const promos = [
     {
       label: 'Lucky Numbers',
