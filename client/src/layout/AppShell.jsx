@@ -333,8 +333,7 @@ export default function AppShell() {
         onBalanceClick={() => walletMenuDlg.current?.showModal()}
       />
 
-      {/* === mobile-only feature promos === */}
-      <FeaturePromos />
+      {/* feature promos removed */}
 
       {/* === desktop shell (kept for ≥961px) === */}
       <div className="ticker">
