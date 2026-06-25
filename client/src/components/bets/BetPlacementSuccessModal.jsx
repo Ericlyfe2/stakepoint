@@ -84,10 +84,11 @@ export default function BetPlacementSuccessModal({
         size: 4 + Math.random() * 8,
         rotation: Math.random() * 360,
         drift: (Math.random() - 0.5) * 40,
+        radius: Math.random() > 0.5 ? '50%' : '2px',
       });
     }
     return pieces;
-  }, [mounted]);
+  }, [mounted, isBooked]);
 
   if (!isOpen) return null;
 
@@ -95,6 +96,7 @@ export default function BetPlacementSuccessModal({
     <AnimatePresence>
       {isOpen && (
         <motion.div
+          key="bpsm-overlay"
           className="bpsm-overlay"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -113,7 +115,7 @@ export default function BetPlacementSuccessModal({
                   width: p.size,
                   height: p.size * 1.4,
                   backgroundColor: p.color,
-                  borderRadius: Math.random() > 0.5 ? '50%' : '2px',
+                  borderRadius: p.radius,
                 }}
                 initial={{ y: -20, x: 0, rotate: 0, opacity: 1 }}
                 animate={{
@@ -130,7 +132,7 @@ export default function BetPlacementSuccessModal({
                 }}
               />
             ))}
-          </div>
+          </div>}
 
           <motion.div
             className="bpsm-card"
