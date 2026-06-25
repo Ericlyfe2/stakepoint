@@ -2993,19 +2993,31 @@ nav a:active { transform: scale(.96); }
 }
 .xb-promo-btn-outline:hover { border-color: rgba(255,255,255,.5); }
 
-/* ===== Category Grid ===== */
+/* ===== Category Grid (auto-slide) ===== */
 .xb-cat-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  overflow: hidden;
+  padding: 0 0 14px;
+}
+.xb-cat-track {
+  display: flex;
   gap: 10px;
-  padding: 0 12px 14px;
+  width: max-content;
+  animation: xb-cat-scroll 12s linear infinite;
+}
+.xb-cat-track:hover { animation-play-state: paused; }
+@keyframes xb-cat-scroll {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
 }
 .xb-cat-item {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 6px;
-  padding: 14px 6px;
+  padding: 14px 12px;
+  min-width: 80px;
+  flex-shrink: 0;
+  scroll-snap-align: start;
   background: var(--surface, #1a1a1a);
   border: 1px solid var(--line, rgba(255,255,255,0.06));
   border-radius: 14px;
@@ -3021,6 +3033,11 @@ nav a:active { transform: scale(.96); }
 .xb-cat-icon {
   font-size: 24px;
   line-height: 1;
+}
+.xb-cat-img {
+  width: 36px;
+  height: 36px;
+  object-fit: contain;
 }
 .xb-cat-label {
   font-size: 11px;
@@ -3044,9 +3061,84 @@ nav a:active { transform: scale(.96); }
   font-weight: 700;
   color: var(--text, #fff);
 }
+.xb-ticker-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--text-dim, #999);
+}
+.xb-paid-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #22c55e;
+  display: inline-block;
+}
 .xb-ticker-date {
   font-size: 11px;
   color: var(--text-dim, #666);
+}
+
+/* ===== Winners Carousel ===== */
+.xb-winners-wrap {
+  overflow: hidden;
+  margin: 0 0 12px;
+}
+.xb-winners-track {
+  display: flex;
+  width: max-content;
+  animation: xb-winners-scroll 18s linear infinite;
+}
+.xb-winners-track:hover { animation-play-state: paused; }
+.xb-winners-set {
+  display: flex;
+  gap: 12px;
+  padding-right: 12px;
+}
+@keyframes xb-winners-scroll {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+.xb-winner-card {
+  min-width: 160px;
+  background: linear-gradient(135deg, #1a3325 0%, #14532d 50%, #0f2518 100%);
+  border: 1px solid rgba(74, 222, 128, 0.12);
+  border-radius: 12px;
+  padding: 14px 14px 12px;
+  flex-shrink: 0;
+}
+.xb-winner-top {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+.xb-winner-trophy {
+  font-size: 14px;
+}
+.xb-winner-phone {
+  font-size: 11.5px;
+  color: rgba(255,255,255,.65);
+  font-weight: 500;
+}
+.xb-winner-amount {
+  font-size: 22px;
+  font-weight: 800;
+  color: #fff;
+  margin-bottom: 8px;
+}
+.xb-winner-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  color: rgba(255,255,255,.5);
+  background: rgba(255,255,255,.06);
+  padding: 4px 8px;
+  border-radius: 6px;
+  letter-spacing: .03em;
 }
 
 /* ===== New Xenbet Bet Slip (xb-*) ===== */

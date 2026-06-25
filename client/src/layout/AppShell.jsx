@@ -215,18 +215,6 @@ function BottomNav({ openCount }) {
       ),
     },
     {
-      to: '/casino',
-      label: 'Games',
-      active: is('/casino') || is('/virtuals') || is('/jackpot'),
-      isGames: true,
-      icon: (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-          <rect x="2" y="6" width="20" height="12" rx="3" />
-          <path d="M6 12h4M8 10v4M15 11h.01M17 13h.01" />
-        </svg>
-      ),
-    },
-    {
       to: '/my-bets',
       label: 'Open Bets',
       active: is('/my-bets'),
@@ -235,6 +223,18 @@ function BottomNav({ openCount }) {
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
           <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l.73-.73" />
           <path d="M12 8v8M14 9.5a1.5 1.5 0 0 0-1.5-1.5h-1A1.5 1.5 0 0 0 10 11.5v0A1.5 1.5 0 0 0 11.5 13h1A1.5 1.5 0 0 1 14 14.5v0A1.5 1.5 0 0 1 12.5 16h-1A1.5 1.5 0 0 1 10 14.5" />
+        </svg>
+      ),
+    },
+    {
+      to: '/casino',
+      label: 'Games',
+      active: is('/casino') || is('/virtuals') || is('/jackpot'),
+      isGames: true,
+      icon: (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <rect x="2" y="6" width="20" height="12" rx="3" />
+          <path d="M6 12h4M8 10v4M15 11h.01M17 13h.01" />
         </svg>
       ),
     },

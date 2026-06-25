@@ -931,28 +931,65 @@ export default function Home({ initialChip }) {
         </div>
       </div>
 
-      {/* ─── Category Grid ─── */}
+      {/* ─── Category Grid (auto-slide) ─── */}
       <div className="xb-cat-grid">
-        {[
-          { icon: '🌍', label: 'Europe', action: () => { setActiveCategory('epl'); scrollToLeague('pl'); } },
-          { icon: '🏟️', label: 'Conference', action: () => setSubTab('highlights') },
-          { icon: '🏆', label: 'World Cup', action: () => setSubTab('highlights') },
-          { icon: '📅', label: 'Upcoming', action: () => setSubTab('today') },
-          { icon: '🔴', label: 'Live', action: () => setSubTab('live') },
-          { icon: '🎰', label: 'Casino', action: () => navigate('/casino') },
-          { icon: '🎁', label: 'Referral', action: () => navigate('/referral') },
-        ].map((cat) => (
-          <button key={cat.label} type="button" className="xb-cat-item" onClick={cat.action}>
-            <span className="xb-cat-icon">{cat.icon}</span>
-            <span className="xb-cat-label">{cat.label}</span>
-          </button>
-        ))}
+        <div className="xb-cat-track">
+          {[0, 1].map((dup) => {
+            const cats = [
+              { img: '/images/cat-europe.png', label: 'Europe', action: () => { setActiveCategory('epl'); scrollToLeague('pl'); } },
+              { img: '/images/cat-conference.png', label: 'Conference', action: () => setSubTab('highlights') },
+              { img: '/images/cat-worldcup.png', label: 'World Cup', action: () => setSubTab('highlights') },
+              { icon: '📅', label: 'Upcoming', action: () => setSubTab('today') },
+              { icon: '🔴', label: 'Live', action: () => setSubTab('live') },
+              { icon: '🎰', label: 'Casino', action: () => navigate('/casino') },
+              { icon: '🎁', label: 'Referral', action: () => navigate('/referral') },
+            ];
+            return cats.map((cat) => (
+              <button key={`${dup}-${cat.label}`} type="button" className="xb-cat-item" onClick={cat.action}>
+                {cat.img
+                  ? <img src={cat.img} alt={cat.label} className="xb-cat-img" />
+                  : <span className="xb-cat-icon">{cat.icon}</span>}
+                <span className="xb-cat-label">{cat.label}</span>
+              </button>
+            ));
+          })}
+        </div>
       </div>
 
-      {/* ─── Verified Sports Payouts ticker ─── */}
+      {/* ─── Verified Sports Payouts ─── */}
       <div className="xb-payouts-ticker">
         <span className="xb-ticker-badge">✅ Verified Sports Payouts</span>
-        <span className="xb-ticker-date">Updated {new Date().toLocaleDateString('en-GB', { month: 'short', day: 'numeric' })}</span>
+        <span className="xb-ticker-right">
+          <span className="xb-paid-dot" />Paid winners
+          <span className="xb-ticker-date">Updated {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}, {new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}</span>
+        </span>
+      </div>
+      <div className="xb-winners-wrap">
+        <div className="xb-winners-track">
+          {[0, 1].map((dup) => (
+            <div className="xb-winners-set" key={dup}>
+              {[
+                { phone: '059*****782', amount: 'GHS 187,340' },
+                { phone: '055****081', amount: 'GHS 42,650' },
+                { phone: '059*****602', amount: 'GHS 128,900' },
+                { phone: '050*****439', amount: 'GHS 73,210' },
+                { phone: '024****391', amount: 'GHS 15,870' },
+                { phone: '053*****117', amount: 'GHS 96,500' },
+                { phone: '020****845', amount: 'GHS 154,280' },
+                { phone: '026*****963', amount: 'GHS 61,740' },
+              ].map((w, i) => (
+                <div className="xb-winner-card" key={`${dup}-${i}`}>
+                  <div className="xb-winner-top">
+                    <span className="xb-winner-trophy">🏆</span>
+                    <span className="xb-winner-phone">{w.phone} won</span>
+                  </div>
+                  <div className="xb-winner-amount">{w.amount}</div>
+                  <div className="xb-winner-badge">⏱ SPORTS · PAID</div>
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* ─── Sport tabs ─── */}
