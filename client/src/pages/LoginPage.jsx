@@ -8,13 +8,13 @@ import PageBack from '../components/PageBack.jsx';
 
 function EyeIcon({ open }) {
   return open ? (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
          strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z" />
       <circle cx="12" cy="12" r="3" />
     </svg>
   ) : (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
          strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="M17.94 17.94A10.94 10.94 0 0 1 12 20c-7 0-11-8-11-8a19.58 19.58 0 0 1 4.22-5.36" />
       <path d="M9.9 4.24A10.94 10.94 0 0 1 12 4c7 0 11 8 11 8a19.5 19.5 0 0 1-2.16 3.19" />
@@ -24,22 +24,12 @@ function EyeIcon({ open }) {
   );
 }
 
-// Block open-redirects via ?next= / ?redirect= — only allow same-origin
-// paths that start with a single "/" (rejects "//evil.com", "http://...",
-// "javascript:", etc).
 function safePath(raw, fallback = '/') {
   if (typeof raw !== 'string') return fallback;
   if (!raw.startsWith('/')) return fallback;
   if (raw.startsWith('//') || raw.startsWith('/\\')) return fallback;
   return raw;
 }
-
-const PROMO_BENEFITS = [
-  ['🎁',  '200% welcome bonus on your first deposit'],
-  ['⚡',  'Instant MoMo, Vodafone Cash & card deposits'],
-  ['🏆',  'Mega-13 jackpot · GHS 1.84M up for grabs'],
-  ['📈',  'Sharper odds across 30+ leagues, live & pre-match'],
-];
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -54,12 +44,11 @@ export default function LoginPage() {
   const [confirm, setConfirm]       = useState('');
   const [country, setCountry]       = useState('GH');
   const [showPw, setShowPw]         = useState(false);
-  const [agree, setAgree]           = useState(false);
+  const [showPw2, setShowPw2]       = useState(false);
   const [err, setErr]               = useState('');
   const [busy, setBusy]             = useState(false);
-  const [firstName, setFirstName]   = useState('');
-  const [lastName, setLastName]     = useState('');
   const [phone, setPhone]           = useState('');
+  const [referralCode, setReferralCode] = useState('');
   const [authConfig, setAuthConfig] = useState({ googleEnabled: false, googleClientId: null });
 
   useEffect(() => {
@@ -75,59 +64,9 @@ export default function LoginPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  useEffect(() => {
-    if (!authConfig.googleEnabled) return;
-    const id = 'gsi-script';
-    if (document.getElementById(id)) { renderGoogle(); return; }
-    const s = document.createElement('script');
-    s.id = id;
-    s.src = 'https://accounts.google.com/gsi/client';
-    s.async = true;
-    s.defer = true;
-    s.onload = renderGoogle;
-    document.head.appendChild(s);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authConfig]);
-
-  function renderGoogle() {
-    const g = window.google;
-    if (!g?.accounts?.id) return;
-    g.accounts.id.initialize({
-      client_id: authConfig.googleClientId,
-      callback: async ({ credential }) => {
-        try {
-          setBusy(true);
-          const data = await googleSignIn(credential, country);
-          signIn(data);
-          navigate('/', { replace: true });
-        } catch (e) {
-          setErr(e.message || 'Google sign-in failed.');
-        } finally { setBusy(false); }
-      },
-    });
-    const target = document.getElementById('google-btn-mount');
-    if (target) {
-      target.innerHTML = '';
-      g.accounts.id.renderButton(target, { theme: 'filled_black', size: 'large', shape: 'rectangular', width: 200 });
-    }
-  }
-
   const isEmail = useMemo(() => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(identifier), [identifier]);
   const isPhone = useMemo(() => /^\+?\d{9,15}$/.test(identifier.replace(/\s|-/g, '')), [identifier]);
   const idValid = isEmail || isPhone;
-
-  const pwStrength = useMemo(() => {
-    if (!password) return 0;
-    let s = 0;
-    if (password.length >= 8)  s++;
-    if (password.length >= 12) s++;
-    if (/[A-Z]/.test(password) && /[a-z]/.test(password)) s++;
-    if (/\d/.test(password)) s++;
-    if (/[^\w]/.test(password)) s++;
-    return Math.min(s, 4);
-  }, [password]);
-
-  const reset = () => setErr('');
 
   const phoneTrim = phone.replace(/\s|-/g, '');
   const phoneValid = /^\+?\d{9,15}$/.test(phoneTrim);
@@ -135,25 +74,22 @@ export default function LoginPage() {
   const regIsPhone = phoneValid;
   const regIdValid = regIsEmail || regIsPhone;
 
+  const reset = () => setErr('');
+
   const validate = () => {
     if (mode === 'register') {
-      if (!firstName.trim())            return 'Enter your first name.';
-      if (!lastName.trim())             return 'Enter your last name.';
-      if (!phone.trim())                return 'Enter your phone or email.';
-      if (!regIdValid)                  return 'Enter a valid email or phone (e.g. you@email.com or 233241234567).';
-      if (!password)                    return 'Enter your password.';
       if (!country)                     return 'Select your country.';
+      if (!phone.trim())                return 'Enter your phone number.';
+      if (!regIdValid)                  return 'Enter a valid phone number (e.g. 233241234567).';
+      if (!password)                    return 'Enter your password.';
       if (password.length < 8)          return 'Password must be at least 8 characters.';
-      if (!/[A-Z]/.test(password) || !/[a-z]/.test(password)) return 'Password must mix upper- and lower-case letters.';
-      if (!/\d/.test(password))         return 'Password must include a digit.';
       if (password !== confirm)         return 'Passwords don’t match.';
-      if (!agree)                       return 'Accept the terms to create an account.';
       return null;
     }
-    if (!identifier.trim())  return 'Enter your phone or email.';
-    if (!idValid)            return 'Enter a valid email or phone (e.g. 233241234567).';
-    if (!password)           return 'Enter your password.';
     if (!country)            return 'Select your country.';
+    if (!identifier.trim())  return 'Enter your phone number.';
+    if (!idValid)            return 'Enter a valid phone number or email.';
+    if (!password)           return 'Enter your password.';
     return null;
   };
 
@@ -177,13 +113,13 @@ export default function LoginPage() {
     try {
       setBusy(true);
       if (mode === 'register') {
-        const fullName = `${firstName.trim()} ${lastName.trim()}`.trim();
         const idValue = regIsEmail ? phone.trim().toLowerCase() : phoneTrim;
         const data = await register({
           email: idValue,
           password,
-          displayName: fullName || idValue,
+          displayName: idValue,
           country,
+          ...(referralCode.trim() ? { referralCode: referralCode.trim() } : {}),
         });
         toast(`Welcome to Xenbet, ${data.account?.displayName || data.account?.email}!`);
         routeAfterLogin(data);
@@ -202,181 +138,92 @@ export default function LoginPage() {
 
   return (
     <div className="login-page-v2">
-      <div style={{ padding: '12px 16px 0' }}>
-        <PageBack fallback="/" />
-      </div>
-      <Link className="back" to="/">← Back to sports</Link>
+      <div className="auth-bg-left" />
+      <div className="auth-bg-right" />
 
-      <div className="auth-shell">
-        <aside className="auth-aside">
-          <div className="logo">
-            <div className="logo-mark"><span>X</span></div>
-            <div className="logo-text">Xen<em>bet</em></div>
-          </div>
-          <h2 className="auth-tagline">
-            {mode === 'signin' ? 'Welcome back. Your slip is waiting.' : 'Join thousands betting smarter.'}
-          </h2>
-          <ul className="auth-benefits">
-            {PROMO_BENEFITS.map(([icon, text]) => (
-              <li key={text}><span className="b-icon">{icon}</span>{text}</li>
-            ))}
-          </ul>
-          <div className="auth-trust">
-            <span>🛡️ Licensed by Gaming Commission of Ghana · 18+</span>
-          </div>
-        </aside>
+      <main className="auth-card">
+        <div className="auth-tabs">
+          <button type="button" className={`auth-tab${mode === 'register' ? ' active' : ''}`}
+                  onClick={() => { setMode('register'); reset(); }}>Register</button>
+          <button type="button" className={`auth-tab${mode === 'signin' ? ' active' : ''}`}
+                  onClick={() => { setMode('signin'); reset(); }}>Login</button>
+        </div>
 
-        <main className="auth-card">
-          <div className="auth-tabs">
-            <button type="button" className={`auth-tab${mode === 'signin' ? ' active' : ''}`}
-                    onClick={() => { setMode('signin'); reset(); }}>Sign in</button>
-            <button type="button" className={`auth-tab${mode === 'register' ? ' active' : ''}`}
-                    onClick={() => { setMode('register'); reset(); }}>Create account</button>
-          </div>
+        <form onSubmit={submit} noValidate>
+          <label htmlFor="auth-country">Country</label>
+          <CountrySelect
+            id="auth-country"
+            value={country}
+            onChange={setCountry}
+            invalid={!country}
+            placeholder="Select your country"
+          />
 
-          <h1 className="auth-h1">
-            {mode === 'signin' ? 'Sign in to Xenbet' : 'Create your account'}
-          </h1>
-          <p className="auth-sub">
-            {mode === 'signin' ? 'Use your phone or email and password.' : 'Sign up in 30 seconds and claim a GHS 50 starter bonus.'}
-          </p>
+          <label htmlFor={mode === 'register' ? 'auth-phone' : 'auth-id'}>Phone Number</label>
+          {mode === 'register' ? (
+            <div className="field">
+              <input id="auth-phone" type="tel"
+                     autoComplete="tel"
+                     inputMode="tel"
+                     placeholder=""
+                     value={phone} onChange={(e) => setPhone(e.target.value)} />
+            </div>
+          ) : (
+            <div className="field">
+              <input id="auth-id" type="text" autoComplete="username"
+                     placeholder=""
+                     value={identifier} onChange={(e) => setIdentifier(e.target.value)} autoFocus />
+            </div>
+          )}
 
-          <form onSubmit={submit} noValidate>
-            {mode === 'register' ? (
-              <>
-                <div className="name-grid">
-                  <div>
-                    <label htmlFor="auth-fn">First name</label>
-                    <div className="field">
-                      <span className="field-icon">👤</span>
-                      <input id="auth-fn" type="text" autoComplete="given-name"
-                             placeholder="First name"
-                             value={firstName} onChange={(e) => setFirstName(e.target.value)} autoFocus />
-                    </div>
-                  </div>
-                  <div>
-                    <label htmlFor="auth-ln">Last name</label>
-                    <div className="field">
-                      <span className="field-icon">👤</span>
-                      <input id="auth-ln" type="text" autoComplete="family-name"
-                             placeholder="Last name"
-                             value={lastName} onChange={(e) => setLastName(e.target.value)} />
-                    </div>
-                  </div>
-                </div>
-
-                <label htmlFor="auth-phone">Phone or email</label>
-                <div className={`field${phone && !regIdValid ? ' invalid' : ''}`}>
-                  <span className="field-icon">{regIsEmail ? '✉' : regIsPhone ? '📱' : '👤'}</span>
-                  <input id="auth-phone" type="text"
-                         autoComplete={regIsEmail ? 'email' : 'tel'}
-                         inputMode={regIsEmail ? 'email' : 'tel'}
-                         placeholder="233241234567 or you@email.com"
-                         value={phone} onChange={(e) => setPhone(e.target.value)} />
-                </div>
-
-                <label htmlFor="auth-pw">Password</label>
-                <div className="field">
-                  <span className="field-icon">🔒</span>
-                  <input id="auth-pw" type={showPw ? 'text' : 'password'}
-                         autoComplete="new-password"
-                         placeholder="At least 8 chars, with a digit and mixed case"
-                         value={password} onChange={(e) => setPassword(e.target.value)} />
-                  <button type="button" className="field-suffix field-eye" onClick={() => setShowPw((v) => !v)}
-                          aria-label={showPw ? 'Hide password' : 'Show password'}
-                          title={showPw ? 'Hide password' : 'Show password'}>
-                    <EyeIcon open={showPw} />
-                  </button>
-                </div>
-
-                <div className="pw-strength">
-                  <span className={`s s-${pwStrength}`} />
-                  <span className={`s s-${pwStrength}`} />
-                  <span className={`s s-${pwStrength}`} />
-                  <span className={`s s-${pwStrength}`} />
-                  <span className="s-label">{['Too short','Weak','Okay','Strong','Excellent'][pwStrength] || ''}</span>
-                </div>
-
-                <label htmlFor="auth-pw2">Confirm password</label>
-                <div className={`field${confirm && confirm !== password ? ' invalid' : ''}`}>
-                  <span className="field-icon">🔒</span>
-                  <input id="auth-pw2" type={showPw ? 'text' : 'password'} autoComplete="new-password"
-                         placeholder="Re-enter your password"
-                         value={confirm} onChange={(e) => setConfirm(e.target.value)} />
-                </div>
-
-                <label htmlFor="auth-country" style={{ marginTop: 12 }}>Country</label>
-                <CountrySelect
-                  id="auth-country"
-                  value={country}
-                  onChange={setCountry}
-                  invalid={!country}
-                  placeholder="Select your country…"
-                />
-              </>
-            ) : (
-              <>
-                <label htmlFor="auth-id">Phone or email</label>
-                <div className={`field${identifier && !idValid ? ' invalid' : ''}`}>
-                  <span className="field-icon">{isEmail ? '✉' : isPhone ? '📱' : '👤'}</span>
-                  <input id="auth-id" type="text" autoComplete="username"
-                         placeholder="233241234567 or you@email.com"
-                         value={identifier} onChange={(e) => setIdentifier(e.target.value)} autoFocus />
-                </div>
-
-                <label htmlFor="auth-pw">Password</label>
-                <div className="field">
-                  <span className="field-icon">🔒</span>
-                  <input id="auth-pw" type={showPw ? 'text' : 'password'} autoComplete="current-password"
-                         placeholder="Enter your password"
-                         value={password} onChange={(e) => setPassword(e.target.value)} />
-                  <button type="button" className="field-suffix field-eye" onClick={() => setShowPw((v) => !v)}
-                          aria-label={showPw ? 'Hide password' : 'Show password'}
-                          title={showPw ? 'Hide password' : 'Show password'}>
-                    <EyeIcon open={showPw} />
-                  </button>
-                </div>
-
-                <label htmlFor="auth-country" style={{ marginTop: 12 }}>Country</label>
-                <CountrySelect
-                  id="auth-country"
-                  value={country}
-                  onChange={setCountry}
-                  invalid={!country}
-                  placeholder="Select your country…"
-                />
-              </>
-            )}
-
-            {mode === 'register' && (
-              <label className="check check-block" style={{ marginTop: 14 }}>
-                <input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)} />
-                I am 18+ and accept the <Link className="link" to="/info#terms" target="_blank" rel="noopener noreferrer">Terms</Link> and <Link className="link" to="/info#responsible-gaming" target="_blank" rel="noopener noreferrer">Responsible Gaming Policy</Link>.
-              </label>
-            )}
-
-            <div className="err" aria-live="polite">{err}</div>
-
-            <button type="submit" className="auth-primary" disabled={busy}>
-              {busy ? (mode === 'signin' ? 'Signing in…' : 'Creating account…')
-                    : (mode === 'signin' ? 'Sign in' : 'Create account')}
+          <label htmlFor="auth-pw">Password</label>
+          <div className="field">
+            <input id="auth-pw" type={showPw ? 'text' : 'password'}
+                   autoComplete={mode === 'register' ? 'new-password' : 'current-password'}
+                   placeholder=""
+                   value={password} onChange={(e) => setPassword(e.target.value)} />
+            <button type="button" className="field-eye" onClick={() => setShowPw((v) => !v)}
+                    aria-label={showPw ? 'Hide password' : 'Show password'}>
+              <EyeIcon open={showPw} />
             </button>
+          </div>
 
-            <div className="auth-divider"><span>or continue with</span></div>
-            {authConfig.googleEnabled
-              ? <div id="google-btn-mount" style={{ display: 'flex', justifyContent: 'center' }} />
-              : <button type="button" className="provider" onClick={() => setErr('Google sign-in is not configured on this server. Set GOOGLE_CLIENT_ID in .env to enable it.')}>
-                  <span className="p-icon">G</span> Continue with Google
-                </button>}
+          {mode === 'register' && (
+            <>
+              <label htmlFor="auth-pw2">Confirm Password</label>
+              <div className="field">
+                <input id="auth-pw2" type={showPw2 ? 'text' : 'password'} autoComplete="new-password"
+                       placeholder=""
+                       value={confirm} onChange={(e) => setConfirm(e.target.value)} />
+                <button type="button" className="field-eye" onClick={() => setShowPw2((v) => !v)}
+                        aria-label={showPw2 ? 'Hide password' : 'Show password'}>
+                  <EyeIcon open={showPw2} />
+                </button>
+              </div>
 
-            <p className="auth-foot">
-              {mode === 'signin'
-                ? <>New to Xenbet? <a className="link" onClick={() => { setMode('register'); reset(); }}>Create an account</a></>
-                : <>Already have an account? <a className="link" onClick={() => { setMode('signin'); reset(); }}>Sign in</a></>}
-            </p>
-          </form>
-        </main>
-      </div>
+              <label htmlFor="auth-ref">Referral Code (optional)</label>
+              <div className="field">
+                <input id="auth-ref" type="text" autoComplete="off"
+                       placeholder=""
+                       value={referralCode} onChange={(e) => setReferralCode(e.target.value)} />
+              </div>
+            </>
+          )}
+
+          {err && <div className="err" aria-live="polite">{err}</div>}
+
+          <button type="submit" className="auth-primary" disabled={busy}>
+            {busy ? (mode === 'signin' ? 'Logging in…' : 'Registering…')
+                  : (mode === 'signin' ? 'Login' : 'Register')}
+          </button>
+
+          {mode === 'signin' && (
+            <div className="auth-forgot">
+              <Link className="forgot-link" to="/forgot-password">Forgot password?</Link>
+            </div>
+          )}
+        </form>
+      </main>
     </div>
   );
 }
