@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 export default function BetPlacementSuccessModal({
   isOpen,
+  betType = 'placed',
   onClose,
   onShare,
   onViewOpenBets,
@@ -15,6 +16,7 @@ export default function BetPlacementSuccessModal({
   isPrivate = false,
   recommendedCodes = [],
 }) {
+  const isBooked = betType === 'booked';
   const [copied, setCopied] = useState(false);
   const [privateNote, setPrivateNote] = useState('');
   const [mounted, setMounted] = useState(false);
@@ -69,7 +71,7 @@ export default function BetPlacementSuccessModal({
   };
 
   const confettiPieces = useMemo(() => {
-    if (!mounted) return [];
+    if (!mounted || isBooked) return [];
     const pieces = [];
     const colors = ['#c5ff3d', '#ffd700', '#00d26a', '#ff6b6b', '#4ecdc4', '#ffffff'];
     for (let i = 0; i < 50; i++) {
@@ -100,8 +102,8 @@ export default function BetPlacementSuccessModal({
           transition={{ duration: 0.25 }}
           onClick={onClose}
         >
-          {/* Confetti Layer */}
-          <div className="bpsm-confetti-layer" aria-hidden="true">
+          {/* Confetti Layer — only for placed bets */}
+          {!isBooked && <div className="bpsm-confetti-layer" aria-hidden="true">
             {confettiPieces.map((p) => (
               <motion.div
                 key={p.id}
@@ -154,53 +156,71 @@ export default function BetPlacementSuccessModal({
                 animate={{ scale: 1 }}
                 transition={{ type: 'spring', stiffness: 400, damping: 12, delay: 0.1 }}
               >
-                <svg width="64" height="64" viewBox="0 0 24 24" fill="var(--accent)" stroke="none">
-                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
-                </svg>
+                {isBooked ? (
+                  <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" /><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" fill="var(--accent)" fillOpacity="0.15" /><polyline points="9 10 12 13 16 9" stroke="var(--accent)" strokeWidth="2.2" />
+                  </svg>
+                ) : (
+                  <svg width="64" height="64" viewBox="0 0 24 24" fill="var(--accent)" stroke="none">
+                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                  </svg>
+                )}
               </motion.div>
-              <h2 className="bpsm-title">Bet Successful</h2>
+              <h2 className="bpsm-title">{isBooked ? 'Bet Booked' : 'Bet Placed'}</h2>
+              {isBooked && <p className="bpsm-subtitle">Share this code so anyone can load and place it.</p>}
 
-              {/* Trophy with float animation */}
-              <motion.div
-                className="bpsm-trophy"
-                animate={{ y: [0, -10, 0] }}
-                transition={{ duration: 2.5, repeat: Infinity, ease: 'easeInOut' }}
-              >
-                <svg width="48" height="48" viewBox="0 0 24 24" fill="none">
-                  <defs>
-                    <linearGradient id="trophy-gold" x1="0%" y1="0%" x2="100%" y2="100%">
-                      <stop offset="0%" stopColor="#ffd700" />
-                      <stop offset="50%" stopColor="#ffec8b" />
-                      <stop offset="100%" stopColor="#daa520" />
-                    </linearGradient>
-                  </defs>
-                  <path d="M6 9H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h2" stroke="url(#trophy-gold)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-                  <path d="M18 9h2a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2h-2" stroke="url(#trophy-gold)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-                  <path d="M12 15v4" stroke="url(#trophy-gold)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-                  <path d="M8 21h8" stroke="url(#trophy-gold)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-                  <path d="M6 9a6 6 0 0 0 12 0V3H6v6z" stroke="url(#trophy-gold)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" fill="url(#trophy-gold)" fillOpacity="0.15"/>
-                </svg>
-              </motion.div>
+              {/* Trophy with float animation — only for placed bets */}
+              {!isBooked && (
+                <motion.div
+                  className="bpsm-trophy"
+                  animate={{ y: [0, -10, 0] }}
+                  transition={{ duration: 2.5, repeat: Infinity, ease: 'easeInOut' }}
+                >
+                  <svg width="48" height="48" viewBox="0 0 24 24" fill="none">
+                    <defs>
+                      <linearGradient id="trophy-gold" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stopColor="#ffd700" />
+                        <stop offset="50%" stopColor="#ffec8b" />
+                        <stop offset="100%" stopColor="#daa520" />
+                      </linearGradient>
+                    </defs>
+                    <path d="M6 9H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h2" stroke="url(#trophy-gold)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                    <path d="M18 9h2a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2h-2" stroke="url(#trophy-gold)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                    <path d="M12 15v4" stroke="url(#trophy-gold)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                    <path d="M8 21h8" stroke="url(#trophy-gold)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                    <path d="M6 9a6 6 0 0 0 12 0V3H6v6z" stroke="url(#trophy-gold)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" fill="url(#trophy-gold)" fillOpacity="0.15"/>
+                  </svg>
+                </motion.div>
+              )}
             </motion.div>
 
             {/* Stage 2: Bet Summary Card */}
             <motion.div className="bpsm-summary-card" variants={fadeUp}>
               <div className="bpsm-summary-row">
-                <span className="bpsm-summary-label">Total Stake</span>
+                <span className="bpsm-summary-label">{isBooked ? 'Suggested Stake' : 'Total Stake'}</span>
                 <span className="bpsm-summary-value">{currency} {formatAmt(totalStake)}</span>
               </div>
               <div className="bpsm-summary-row">
                 <span className="bpsm-summary-label">Potential Win</span>
                 <span className="bpsm-summary-value bpsm-win">{currency} {formatAmt(potentialWin)}</span>
               </div>
-              <div className="bpsm-summary-row">
-                <span className="bpsm-summary-label">Reward Progress</span>
-                <button type="button" className="bpsm-link-btn" onClick={onViewOpenBets}>View</button>
-              </div>
-              <div className="bpsm-summary-row">
-                <span className="bpsm-summary-label">Open Bets</span>
-                <button type="button" className="bpsm-link-btn" onClick={onViewOpenBets}>View</button>
-              </div>
+              {isBooked ? (
+                <div className="bpsm-summary-row">
+                  <span className="bpsm-summary-label">Status</span>
+                  <span className="bpsm-summary-value bpsm-booked-badge">Not yet placed</span>
+                </div>
+              ) : (
+                <>
+                  <div className="bpsm-summary-row">
+                    <span className="bpsm-summary-label">Reward Progress</span>
+                    <button type="button" className="bpsm-link-btn" onClick={onViewOpenBets}>View</button>
+                  </div>
+                  <div className="bpsm-summary-row">
+                    <span className="bpsm-summary-label">Open Bets</span>
+                    <button type="button" className="bpsm-link-btn" onClick={onViewOpenBets}>View</button>
+                  </div>
+                </>
+              )}
             </motion.div>
 
             {/* Stage 3: Booking Code Actions */}
@@ -381,6 +401,14 @@ const BPSM_CSS = `
   margin: 0;
 }
 
+.bpsm-subtitle {
+  font-size: 13px;
+  color: var(--text-dim);
+  font-weight: 500;
+  margin: 0;
+  text-align: center;
+}
+
 .bpsm-trophy {
   margin-top: 4px;
   line-height: 0;
@@ -430,6 +458,15 @@ const BPSM_CSS = `
   padding: 0;
 }
 .bpsm-link-btn:hover { text-decoration: underline; }
+
+.bpsm-booked-badge {
+  background: var(--surface-3);
+  color: var(--text-soft);
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  padding: 3px 8px;
+  border-radius: 6px;
+}
 
 /* Stage 3: Booking Code */
 .bpsm-code-section {

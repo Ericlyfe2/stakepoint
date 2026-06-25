@@ -145,6 +145,7 @@ export default function Home({ initialChip }) {
   const [slipOpen, setSlipOpen]       = useState(false);
   const [payslip, setPayslip]         = useState('');
   const [successBet, setSuccessBet]   = useState(null);
+  const [successType, setSuccessType] = useState('placed');
   const [marketsForMatch, setMarketsForMatch] = useState(null);
   const [featuredTab, setFeaturedTab] = useState('featured');
   const [activeCategory, setActiveCategory] = useState(null);
@@ -605,6 +606,7 @@ export default function Home({ initialChip }) {
       });
       setSelections([]);
       setSlipOpen(false);
+      setSuccessType('booked');
       setSuccessBet(res.bet);
       toast(`Bet booked — code ${res.bet.bookingCode}.`);
     } catch (e) {
@@ -665,6 +667,7 @@ export default function Home({ initialChip }) {
       } catch { /* ignore */ }
       setSelections([]);
       setSlipOpen(false);
+      setSuccessType('placed');
       setSuccessBet(res.bet);
     } catch (e) {
       adjustBalance(cost);
@@ -1700,7 +1703,8 @@ export default function Home({ initialChip }) {
 
       <BetPlacementSuccessModal
         isOpen={!!successBet}
-        onClose={() => setSuccessBet(null)}
+        betType={successType}
+        onClose={() => { setSuccessBet(null); setSuccessType('placed'); }}
         onShare={() => {
           const code = successBet?.bookingCode || 'XX00000';
           const text = `Check out my bet on Xenbet!\nBooking Code: ${code}`;
