@@ -16,7 +16,7 @@ services:
         # the site is served from (the Vercel project URL, custom domains,
         # any branch alias you still rely on). The server parses on commas
         # and trims whitespace.
-        value: https://betxentra.vercel.app,https://stakepoint-client.vercel.app,https://oddsify-client.vercel.app
+        value: https://xenbet.vercel.app,https://betxentra.vercel.app,https://stakepoint-client.vercel.app,https://oddsify-client.vercel.app
       - key: CORS_ALLOW_VERCEL
         # Vercel project name whose preview URLs (https://<name>-*.vercel.app)
         # should also be allowed. Prevents redeploying the backend on every
