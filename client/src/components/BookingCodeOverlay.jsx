@@ -102,7 +102,7 @@ export default function BookingCodeOverlay({ bet, onClose, onConfirm, onRebet, t
             {/* Share Row */}
             <div className="bco-share-row">
               {navigator.share && (
-                <button type="button" className="bco-share-btn" onClick={() => navigator.share({ title: 'Xenbet Booking Code', text: shareText, url: ticketUrl }).catch(() => {})}>
+                <button type="button" className="bco-share-btn" onClick={() => navigator.share({ title: 'BetXentra Booking Code', text: shareText, url: ticketUrl }).catch(() => {})}>
                   <div className="bco-share-icon">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
                   </div>
@@ -139,7 +139,7 @@ export default function BookingCodeOverlay({ bet, onClose, onConfirm, onRebet, t
             <div className="bco-footer">
               <div className="bco-footer-brand">
                 <span className="bco-footer-logo">X</span>
-                <span className="bco-footer-name">xenbet.com</span>
+                <span className="bco-footer-name">betxentra.com</span>
               </div>
               <button type="button" className="bco-footer-more" onClick={onConfirm} aria-label="More">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>

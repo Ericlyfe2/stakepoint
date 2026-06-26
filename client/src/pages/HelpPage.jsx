@@ -26,7 +26,7 @@ const FAQ = [
   },
   {
     q: 'I forgot my password — what do I do?',
-    a: 'Email support@xenbet.gh from your registered address with the subject “Password reset”. We will verify and re-set it within an hour.',
+    a: 'Email support@betxentra.gh from your registered address with the subject “Password reset”. We will verify and re-set it within an hour.',
   },
 ];
 
@@ -97,7 +97,7 @@ export default function HelpPage() {
         <h2 style={{ fontSize: 18, marginBottom: 6 }}>Contact us</h2>
         <p style={{ color: 'var(--text-soft)', fontSize: 13, marginBottom: 18 }}>
           We reply to most messages within 30 minutes.
-          Or email <a href="mailto:support@xenbet.gh" style={{ color: 'var(--accent)' }}>support@xenbet.gh</a>.
+          Or email <a href="mailto:support@betxentra.gh" style={{ color: 'var(--accent)' }}>support@betxentra.gh</a>.
         </p>
         <form onSubmit={submit} style={{ display: 'grid', gap: 12 }}>
           <div style={{ display: 'grid', gap: 12, gridTemplateColumns: '1fr 1fr' }}>

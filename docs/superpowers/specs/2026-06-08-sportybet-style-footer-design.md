@@ -1,11 +1,11 @@
 # SportyBet-style Home footer redesign
 
 **Date:** 2026-06-08
-**Scope:** Visual redesign of the bottom region of the Home page (`client/src/pages/Home.jsx` lines 1137–1163) to match a SportyBet-style mockup while keeping the existing "Xenbet GH" brand identity.
+**Scope:** Visual redesign of the bottom region of the Home page (`client/src/pages/Home.jsx` lines 1137–1163) to match a SportyBet-style mockup while keeping the existing "BetXentra GH" brand identity.
 
 ## Goal
 
-Replace the current sparse two-block bottom region (`.sb-compliance` + `.sb-payslip`) with a five-block stacked footer that visually matches the reference mockup. Keep all current behavior: booking-code lookup, brand text "Xenbet GH", existing routes.
+Replace the current sparse two-block bottom region (`.sb-compliance` + `.sb-payslip`) with a five-block stacked footer that visually matches the reference mockup. Keep all current behavior: booking-code lookup, brand text "BetXentra GH", existing routes.
 
 ## Non-goals
 
@@ -20,7 +20,7 @@ Replace the current sparse two-block bottom region (`.sb-compliance` + `.sb-pays
 1. **18+ chip** — single circular outlined badge, centered. Reuses existing `.badge18` styling, slightly larger.
 
 2. **Sponsor card** (light/white surface, rounded 14px):
-   - Brand row: "Xenbet GH" wordmark, with subtitle "Official Sponsor · Betting Partner" beneath.
+   - Brand row: "BetXentra GH" wordmark, with subtitle "Official Sponsor · Betting Partner" beneath.
    - Logo row: two stylized chips rendered with inline SVG + CSS:
      - **Real Madrid** placeholder — white shield silhouette outlined in navy, monogram "RM".
      - **LaLiga** placeholder — red gradient pill with "LaLiga" wordmark.
@@ -41,8 +41,8 @@ Replace the current sparse two-block bottom region (`.sb-compliance` + `.sb-pays
      - GTBank — orange (`#e95a0c`) pill with white "GTBank" text.
 
 5. **Legal block:**
-   - Small "Xenbet GH" wordmark.
-   - Paragraph: *"Age 18 and above only. Play Responsibly. Betting is addictive and can be psychologically harmful. Xenbet GH is licensed by the Gaming Commission of Ghana under Licence No 0006027."*
+   - Small "BetXentra GH" wordmark.
+   - Paragraph: *"Age 18 and above only. Play Responsibly. Betting is addictive and can be psychologically harmful. BetXentra GH is licensed by the Gaming Commission of Ghana under Licence No 0006027."*
    - Inline link row separated by middle dots: **Terms & Conditions** · **About Us** · **System Status**.
      - Routes: `/terms` (already redirects to `/info#terms`), `/info`, `/help`.
 
@@ -58,7 +58,7 @@ Replace the current sparse two-block bottom region (`.sb-compliance` + `.sb-pays
 
 ## Brand & legal approach
 
-- Brand text stays "Xenbet GH" everywhere — the SportyBet mockup is a visual reference only.
+- Brand text stays "BetXentra GH" everywhere — the SportyBet mockup is a visual reference only.
 - Logo and payment-method chips are CSS-styled placeholders that read as logos at a glance. No raster art for Real Madrid / LaLiga / MTN / telecel / VISA / GTBank ships with the repo, avoiding any trademark exposure.
 
 ## Behavior preserved
@@ -80,4 +80,4 @@ Replace the current sparse two-block bottom region (`.sb-compliance` + `.sb-pays
 - Booking-code lookup still works (manual: enter a code, hit Check, confirm existing behavior).
 - No horizontal overflow on a 320 px viewport.
 - No console errors or warnings introduced.
-- Brand text reads "Xenbet GH" — no stray "SportyBet" copy.
+- Brand text reads "BetXentra GH" — no stray "SportyBet" copy.

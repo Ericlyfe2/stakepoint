@@ -205,8 +205,8 @@ export default function AppProviders({ children }) {
     const onForceLogout = () => {
       setAccount(null);
     };
-    window.addEventListener('xenbet:force-logout', onForceLogout);
-    return () => window.removeEventListener('xenbet:force-logout', onForceLogout);
+    window.addEventListener('betxentra:force-logout', onForceLogout);
+    return () => window.removeEventListener('betxentra:force-logout', onForceLogout);
   }, [setAccount]);
 
   // Poll for freshly-settled wins the user hasn't seen.
@@ -459,7 +459,7 @@ export default function AppProviders({ children }) {
             const code = celebration?.bet?.bookingCode;
             if (code) {
               const url = `${window.location.origin}/ticket/${code}`;
-              if (navigator.share) { navigator.share({ title: 'XenBet Win', text: `I just won GHS ${celebration?.winAmount ?? 0} on XenBet!`, url }).catch(() => {}); }
+              if (navigator.share) { navigator.share({ title: 'BetXentra Win', text: `I just won GHS ${celebration?.winAmount ?? 0} on BetXentra!`, url }).catch(() => {}); }
               else { navigator.clipboard?.writeText(url).catch(() => {}); }
             }
             setCelebration(null);

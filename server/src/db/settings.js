@@ -14,7 +14,7 @@ const DEFAULTS = {
   maxSystemStake: 250000,
   bonusRate: 0.08,
   referralBonus: 10,
-  contactEmail: 'support@xenbet.gh',
+  contactEmail: 'support@betxentra.gh',
   featureJackpot: true,
   featureCasino: true,
   featureVirtuals: true,

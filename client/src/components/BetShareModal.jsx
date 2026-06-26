@@ -102,7 +102,7 @@ export default function BetShareModal({
   const [linkCopied, setLinkCopied] = useState(false);
 
   const defaultUrl = shareUrl || `${window.location.origin}/ticket/${bookingCode}`;
-  const shareText = `Check out my bet on XENBET — code ${bookingCode}!`;
+  const shareText = `Check out my bet on BETXENTRA — code ${bookingCode}!`;
 
   const handleCopyCode = useCallback(async () => {
     try {

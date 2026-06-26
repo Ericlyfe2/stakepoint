@@ -14,12 +14,12 @@ export default function XenFooter({ className = '' }) {
     <footer className={`sporty-footer${className ? ` ${className}` : ''}`}>
       <div className="sporty-footer-top">
         <span className="sporty-18">18+</span>
-        <span className="sporty-copy">© {new Date().getFullYear()} Xenbet GH · Licensed by the Gaming Commission of Ghana</span>
+        <span className="sporty-copy">© {new Date().getFullYear()} BetXentra GH · Licensed by the Gaming Commission of Ghana</span>
       </div>
 
       <div className="sporty-footer-brand">
         <div className="sporty-brand-row">
-          <span className="sporty-brand-name">Xen<em>bet</em></span>
+          <span className="sporty-brand-name">Bet<em>Xentra</em></span>
           <span className="sporty-brand-tag">Official Sports<br/>Betting Partner</span>
           <svg className="sporty-brand-logo" viewBox="0 0 60 20" width="50" height="18" aria-label="Real Madrid">
             <rect x="0" y="2" width="16" height="16" rx="2" fill="#fabe00" />
@@ -55,7 +55,7 @@ export default function XenFooter({ className = '' }) {
 
       <p className="sporty-footer-legal">
         Age 18 and above to play. Please play responsibly. Betting is addictive and can be psychologically harmful.
-        Xenbet Ghana Limited is licensed by the Gaming Commission of Ghana under licence: GC/B01/2137.
+        BetXentra Ghana Limited is licensed by the Gaming Commission of Ghana under licence: GC/B01/2137.
       </p>
 
       <div className="sporty-footer-links">

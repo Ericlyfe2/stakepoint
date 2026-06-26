@@ -34,8 +34,8 @@ export default function GlobalFAB() {
       setSelectionCount(e.detail?.count ?? 0);
       setTotalOdds(e.detail?.odds ?? 0);
     };
-    window.addEventListener('xenbet:slip-update', handler);
-    return () => window.removeEventListener('xenbet:slip-update', handler);
+    window.addEventListener('betxentra:slip-update', handler);
+    return () => window.removeEventListener('betxentra:slip-update', handler);
   }, []);
 
   // Listen for bet placement (clear state)
@@ -45,8 +45,8 @@ export default function GlobalFAB() {
       setTotalOdds(0);
       setLoadedTicket(null);
     };
-    window.addEventListener('xenbet:bet-placed', handler);
-    return () => window.removeEventListener('xenbet:bet-placed', handler);
+    window.addEventListener('betxentra:bet-placed', handler);
+    return () => window.removeEventListener('betxentra:bet-placed', handler);
   }, []);
 
   // Hide on auth/admin pages
@@ -102,7 +102,7 @@ export default function GlobalFAB() {
 
       // Dispatch event so Home page can hydrate the slip
       window.dispatchEvent(
-        new CustomEvent('xenbet:load-code', { detail: { code: trimmed, bet } }),
+        new CustomEvent('betxentra:load-code', { detail: { code: trimmed, bet } }),
       );
 
       // Navigate to home if not already there
@@ -126,11 +126,11 @@ export default function GlobalFAB() {
 
   const openBetslip = () => {
     if (location.pathname === '/') {
-      window.dispatchEvent(new CustomEvent('xenbet:open-slip'));
+        window.dispatchEvent(new CustomEvent('betxentra:open-slip'));
     } else {
       navigate('/');
       setTimeout(() => {
-        window.dispatchEvent(new CustomEvent('xenbet:open-slip'));
+      window.dispatchEvent(new CustomEvent('betxentra:open-slip'));
       }, 500);
     }
   };
@@ -317,7 +317,7 @@ function RecentCodes({ onSelect }) {
 
   useEffect(() => {
     try {
-      const stored = localStorage.getItem('xenbet_recent_codes');
+      const stored = localStorage.getItem('betxentra_recent_codes');
       if (stored) setCodes(JSON.parse(stored).slice(0, 5));
     } catch { /* ignore */ }
   }, []);
@@ -346,9 +346,9 @@ function RecentCodes({ onSelect }) {
 // Helper: save a code to recent list
 export function saveRecentCode(code) {
   try {
-    const stored = localStorage.getItem('xenbet_recent_codes');
+    const stored = localStorage.getItem('betxentra_recent_codes');
     let list = stored ? JSON.parse(stored) : [];
     list = [code, ...list.filter((c) => c !== code)].slice(0, 8);
-    localStorage.setItem('xenbet_recent_codes', JSON.stringify(list));
+    localStorage.setItem('betxentra_recent_codes', JSON.stringify(list));
   } catch { /* ignore */ }
 }

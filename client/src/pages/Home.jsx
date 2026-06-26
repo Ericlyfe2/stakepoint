@@ -163,14 +163,14 @@ export default function Home({ initialChip }) {
   const [commentsMatch, setCommentsMatch] = useState(null);
   const [allComments, setAllComments] = useState(() => {
     try {
-      const stored = localStorage.getItem('xenbet_comments');
+      const stored = localStorage.getItem('betxentra_comments');
       return stored ? JSON.parse(stored) : {};
     } catch { return {}; }
   });
 
   const persistComments = useCallback((next) => {
     setAllComments(next);
-    try { localStorage.setItem('xenbet_comments', JSON.stringify(next)); } catch {}
+    try { localStorage.setItem('betxentra_comments', JSON.stringify(next)); } catch {}
   }, []);
 
   const slipDlg     = useRef(null);
@@ -525,14 +525,14 @@ export default function Home({ initialChip }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Listen for xenbet:load-code events (from BookingCodeOverlay, GlobalFAB, etc.)
+  // Listen for betxentra:load-code events (from BookingCodeOverlay, GlobalFAB, etc.)
   useEffect(() => {
     const handler = (e) => {
       const code = e.detail?.code;
       if (code) loadFromCode(code);
     };
-    window.addEventListener('xenbet:load-code', handler);
-    return () => window.removeEventListener('xenbet:load-code', handler);
+    window.addEventListener('betxentra:load-code', handler);
+    return () => window.removeEventListener('betxentra:load-code', handler);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -563,10 +563,10 @@ export default function Home({ initialChip }) {
     setCodeLoading(false);
     if (ok) {
       try {
-        const stored = localStorage.getItem('xenbet_recent_codes');
+        const stored = localStorage.getItem('betxentra_recent_codes');
         let list = stored ? JSON.parse(stored) : [];
         list = [trimmed, ...list.filter((c) => c !== trimmed)].slice(0, 8);
-        localStorage.setItem('xenbet_recent_codes', JSON.stringify(list));
+        localStorage.setItem('betxentra_recent_codes', JSON.stringify(list));
       } catch { /* ignore */ }
       closeCodeModal();
     } else {
@@ -660,10 +660,10 @@ export default function Home({ initialChip }) {
       if (res.account) setAccount(res.account);
       toast(`Bet placed — booking code ${res.bet.bookingCode}.`);
       try {
-        const stored = localStorage.getItem('xenbet_recent_codes');
+        const stored = localStorage.getItem('betxentra_recent_codes');
         let list = stored ? JSON.parse(stored) : [];
         list = [res.bet.bookingCode, ...list.filter((c) => c !== res.bet.bookingCode)].slice(0, 8);
-        localStorage.setItem('xenbet_recent_codes', JSON.stringify(list));
+        localStorage.setItem('betxentra_recent_codes', JSON.stringify(list));
       } catch { /* ignore */ }
       setSelections([]);
       setSlipOpen(false);
@@ -900,7 +900,7 @@ export default function Home({ initialChip }) {
           {[0, 1].map((dup) => (
             <div className="xb-promo-set" key={dup}>
               <div className="xb-promo-card xb-promo-card-hero">
-                <img src="/images/hero-banner.png" alt="Xenbet — Official Betting Partner in Africa" className="xb-hero-img"
+                <img src="/images/hero-banner.png" alt="BetXentra — Official Betting Partner in Africa" className="xb-hero-img"
                   onError={(e) => { e.target.style.display = 'none'; }} />
               </div>
               <div className="xb-promo-card">
@@ -1559,9 +1559,9 @@ export default function Home({ initialChip }) {
         onClose={() => { setSuccessBet(null); setSuccessType('placed'); }}
         onShare={() => {
           const code = successBet?.bookingCode || 'XX00000';
-          const text = `Check out my bet on Xenbet!\nBooking Code: ${code}`;
+          const text = `Check out my bet on BetXentra!\nBooking Code: ${code}`;
           if (navigator.share) {
-            navigator.share({ title: 'Xenbet Booking Code', text, url: `https://xenbet.vercel.app/ticket/${code}` }).catch(() => {});
+            navigator.share({ title: 'BetXentra Booking Code', text, url: `https://betxentra.vercel.app/ticket/${code}` }).catch(() => {});
           } else {
             navigator.clipboard.writeText(code).then(() => toast('Booking code copied!', 'success')).catch(() => {});
           }
@@ -1675,7 +1675,7 @@ function RecentCodes({ onSelect }) {
   const [codes, setCodes] = useState([]);
   useEffect(() => {
     try {
-      const stored = localStorage.getItem('xenbet_recent_codes');
+      const stored = localStorage.getItem('betxentra_recent_codes');
       if (stored) setCodes(JSON.parse(stored).slice(0, 5));
     } catch { /* ignore */ }
   }, []);
@@ -1787,7 +1787,7 @@ function DraggableBetFAB({ count, totalOdds, onClick }) {
   const dragState = useRef({ dragging: false, startX: 0, startY: 0, offsetX: 0, offsetY: 0 });
   const [pos, setPos] = useState(() => {
     try {
-      const saved = localStorage.getItem('xenbet_fab_pos');
+      const saved = localStorage.getItem('betxentra_fab_pos');
       if (saved) return JSON.parse(saved);
     } catch { /* ignore */ }
     return null;
@@ -1838,7 +1838,7 @@ function DraggableBetFAB({ count, totalOdds, onClick }) {
     dragState.current.dragging = false;
     setPos((p) => {
       if (p) {
-        try { localStorage.setItem('xenbet_fab_pos', JSON.stringify(p)); } catch { /* ignore */ }
+        try { localStorage.setItem('betxentra_fab_pos', JSON.stringify(p)); } catch { /* ignore */ }
       }
       return p;
     });

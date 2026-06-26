@@ -2874,7 +2874,7 @@ nav a:active { transform: scale(.96); }
   box-shadow: none;
 }
 
-/* ===== Xenbet Hero Banner ===== */
+/* ===== BetXentra Hero Banner ===== */
 .xb-hero-img {
   width: 100%;
   height: auto;
@@ -3141,7 +3141,7 @@ nav a:active { transform: scale(.96); }
   letter-spacing: .03em;
 }
 
-/* ===== New Xenbet Bet Slip (xb-*) ===== */
+/* ===== BetXentra Bet Slip (xb-*) ===== */
 .xb-sheet-header {
   display: flex;
   align-items: center;

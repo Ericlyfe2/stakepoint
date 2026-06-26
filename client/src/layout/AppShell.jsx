@@ -280,7 +280,7 @@ export default function AppShell() {
   // openCount is best-effort — derived from a global window flag set by Home
   // when My Bets history loads. Avoids a second fetch here.
   const openCount = typeof window !== 'undefined'
-    ? (window.__xenbetOpenCount || 0)
+    ? (window.__betxentraOpenCount || 0)
     : 0;
 
   // --- Search functionality ---
@@ -341,11 +341,11 @@ export default function AppShell() {
           <span><b>LIVE</b> Arsenal 2-1 Chelsea · 73&apos;</span>
           <span><b>BOOSTED</b> Real Madrid to win &amp; BTTS · <em>3.45</em></span>
           <span><b>LIVE</b> Aduana 0-0 Medeama · 22&apos;</span>
-          <span><b>Xenbet</b> sharper odds, instant payouts</span>
+          <span><b>BetXentra</b> sharper odds, instant payouts</span>
           <span><b>LIVE</b> Arsenal 2-1 Chelsea · 73&apos;</span>
           <span><b>BOOSTED</b> Real Madrid to win &amp; BTTS · <em>3.45</em></span>
           <span><b>LIVE</b> Aduana 0-0 Medeama · 22&apos;</span>
-          <span><b>Xenbet</b> sharper odds, instant payouts</span>
+          <span><b>BetXentra</b> sharper odds, instant payouts</span>
         </div>
       </div>
 
@@ -438,7 +438,7 @@ export default function AppShell() {
       <dialog ref={walletMenuDlg} className="bv-dialog wallet-menu-dialog" style={{ maxWidth: 360, width: '90%' }}>
         <div className="wallet-menu-inner" style={{ padding: '4px 2px' }}>
           <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-            <h3 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: 'var(--text)' }}>Xenbet Wallet</h3>
+            <h3 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: 'var(--text)' }}>BetXentra Wallet</h3>
             <button type="button" className="btn btn-ghost" onClick={() => walletMenuDlg.current?.close()} style={{ padding: '6px 10px', fontSize: 16 }}>✕</button>
           </header>
           

@@ -681,7 +681,7 @@ In the `signOut` callback (`client/src/providers/AccountProvider.jsx:138-144`), 
 
 - [ ] **Step 3: Manual smoke test**
 
-Run dev: `npm run dev`. In a browser, log in as a real user (seeded `demo@xenbet.app` works). Open DevTools → Network tab. You should see `GET /api/profile/messages?limit=50` fire after login.
+Run dev: `npm run dev`. In a browser, log in as a real user (seeded `demo@betxentra.app` works). Open DevTools → Network tab. You should see `GET /api/profile/messages?limit=50` fire after login.
 
 In a second tab, log in as an admin and POST to `/api/admin/users/<user-id>/messages` (use the Network tab to copy the admin token, or temporarily call `adminSendUserMessage` from the browser console with the user's email lowercased as `id`). The first tab should receive a `message:new` socket event — check `useAccount().messages` in React DevTools to confirm the record landed.
 

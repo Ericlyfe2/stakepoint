@@ -199,7 +199,7 @@ export function StubSettingsPage() {
 
         <Card title="Branding">
           <dl className="adm-kv">
-            <dt>Site name</dt><dd>Xenbet Gaming</dd>
+            <dt>Site name</dt><dd>BetXentra Gaming</dd>
             <dt>Default currency</dt><dd>GHS</dd>
             <dt>Locale</dt><dd>en-GH</dd>
             <dt>Theme</dt><dd>Dark + Light (auto)</dd>

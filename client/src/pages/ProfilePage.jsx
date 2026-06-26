@@ -52,7 +52,7 @@ export default function ProfilePage() {
         <div className="acct-empty-card">
           <p className="acct-empty-eyebrow">ACCOUNT · LOCKED</p>
           <h1>Sign in to use your account.</h1>
-          <Link className="acct-empty-cta" to="/login">Sign in to Xenbet →</Link>
+          <Link className="acct-empty-cta" to="/login">Sign in to BetXentra →</Link>
         </div>
         <style>{ACCT_CSS}</style>
       </main>
@@ -63,7 +63,7 @@ export default function ProfilePage() {
   const identity = account.phone || shortId(account.email) || 'Account';
 
   const handleSignOut = async () => {
-    if (typeof window !== 'undefined' && !window.confirm('Sign out of Xenbet?')) return;
+    if (typeof window !== 'undefined' && !window.confirm('Sign out of BetXentra?')) return;
     try { await signOut(); } catch (e) { toast(e?.message || 'Sign-out failed.'); }
   };
 

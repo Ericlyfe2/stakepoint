@@ -5,7 +5,7 @@
 
 ## Goal
 
-Rename the project from `xenbet` to `oddsify` across the entire codebase
+Rename the project from `xenbet` to `oddsify` across the entire codebase (Note: later rebranded to `BetXentra`)
 (UI, package metadata, env keys, storage keys, internal references) and
 replace the electric-lime accent palette with a green + yellow + pink-red
 scheme inspired by reference images of competitor betting UIs (Oddywin,
@@ -78,12 +78,13 @@ Internal:
 - `JWT.issuer` env config: `xenbet` → `oddsify`
 - API health `service` field: `xenbet-api` → `oddsify-api`
 - `.env.example` defaults referencing xenbet domain
+- Later rebranded to BetXentra: all occurrences of `xenbet`/`oddsify` branding now use `betxentra`
 - `<meta name="theme-color">`: updated to new `--bg` (`#08090B`)
 
 ## Migration shim
 
 A small `client/src/lib/migrateStorage.js` invoked once from `main.jsx`
-copies any `xenbet_*` localStorage key to its `oddsify_*` counterpart
+copies any `xenbet_*` localStorage key to its `oddsify_*` counterpart (now migrated to `betxentra_*`)
 then deletes the old key. Idempotent (no-op on subsequent loads).
 Preserves existing users' theme preference and session.
 

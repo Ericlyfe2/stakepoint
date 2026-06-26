@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Replace the bottom region of the Home page (`client/src/pages/Home.jsx` lines 1130 + 1137–1163) with a five-block SportyBet-style footer (sponsor card, payslip, payment methods, legal, back-to-top) plus a relocated GrandPrizeWinners block at its top — keeping "Xenbet GH" brand and the booking-code lookup.
+**Goal:** Replace the bottom region of the Home page (`client/src/pages/Home.jsx` lines 1130 + 1137–1163) with a five-block SportyBet-style footer (sponsor card, payslip, payment methods, legal, back-to-top) plus a relocated GrandPrizeWinners block at its top — keeping "BetXentra GH" brand and the booking-code lookup.
 
 **Architecture:** Pure presentation change. One JSX block in Home.jsx swapped for a richer one; one CSS rule block in app.css swapped for a layered ruleset. No new files, no new dependencies, no behavior changes beyond moving where `<GrandPrizeWinners />` renders. CSS reuses existing design tokens (`--surface`, `--surface-2`, `--bg`, `--line`, `--accent`, `--accent-hot`, `--accent-cool`, `--text`, `--text-soft`, `--text-dim`).
 
@@ -351,7 +351,7 @@ Replace those 27 lines with this exact block:
         <div className="sb-age-chip" aria-label="Age 18 and above only">18+</div>
 
         <div className="sb-sponsor-card">
-          <div className="sb-sponsor-brand">Xenbet GH</div>
+          <div className="sb-sponsor-brand">BetXentra GH</div>
           <div className="sb-sponsor-sub">Official Sponsor · Betting Partner</div>
           <div className="sb-sponsor-logos" aria-hidden="true">
             <span className="sb-logo-rm">R·M</span>
@@ -388,9 +388,9 @@ Replace those 27 lines with this exact block:
         </div>
 
         <div className="sb-legal">
-          <div className="sb-legal-brand">Xenbet GH</div>
+          <div className="sb-legal-brand">BetXentra GH</div>
           <p className="sb-legal-text">
-            Age 18 and above only. Play Responsibly. Betting is addictive and can be psychologically harmful. Xenbet GH is licensed by the Gaming Commission of Ghana under Licence No 0006027.
+            Age 18 and above only. Play Responsibly. Betting is addictive and can be psychologically harmful. BetXentra GH is licensed by the Gaming Commission of Ghana under Licence No 0006027.
           </p>
           <div className="sb-legal-links">
             <a href="/terms">Terms &amp; Conditions</a>
@@ -464,7 +464,7 @@ Expected: no React warnings, no unresolved CSS variable errors, no missing-route
 - [ ] **Step 5: Take a screenshot of the footer region**
 
 Use `mcp__Claude_Preview__preview_screenshot` after scrolling to the footer.
-Expected: image shows GrandPrizeWinners → 18+ chip → white sponsor card with "Xenbet GH" + RM/LaLiga chips → dark payslip card with red `*711*222#` → payment chips row (MTN yellow, telecel red, VISA navy, GTBank orange) → legal text → Back to Top white pill.
+Expected: image shows GrandPrizeWinners → 18+ chip → white sponsor card with "BetXentra GH" + RM/LaLiga chips → dark payslip card with red `*711*222#` → payment chips row (MTN yellow, telecel red, VISA navy, GTBank orange) → legal text → Back to Top white pill.
 
 - [ ] **Step 6: Verify 320px viewport has no horizontal overflow**
 
@@ -526,7 +526,7 @@ If no fixes were needed, skip this step.
 - Block 4 (Payment methods row): Task 1 `.sb-payment` + 4 chip color rules; Task 2 JSX. ✓
 - Block 5 (Legal block + links): Task 1 `.sb-legal*` rules; Task 2 JSX with routes `/terms`, `/info`, `/help`. ✓
 - Block 6 (Back to Top): Task 1 `.sb-totop` rule; Task 2 button with `window.scrollTo`. ✓
-- Brand text "Xenbet GH" throughout: Task 2 JSX uses it in both sponsor card and legal block. ✓
+- Brand text "BetXentra GH" throughout: Task 2 JSX uses it in both sponsor card and legal block. ✓
 - No new files / no new deps: confirmed. ✓
 - Success criteria (Back to Top works, booking-code lookup works, no overflow, no console errors): Task 3 steps 4, 6, 7, 8. ✓
 

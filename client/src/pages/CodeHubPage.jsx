@@ -153,7 +153,7 @@ export default function CodeHubPage() {
   const shareCode = async (code) => {
     try {
       if (navigator.share) {
-        await navigator.share({ title: 'Xenbet Code', text: `Check out this bet on Xenbet — code ${code}` });
+        await navigator.share({ title: 'BetXentra Code', text: `Check out this bet on BetXentra — code ${code}` });
       } else {
         await navigator.clipboard?.writeText(code);
         toast(`Code ${code} copied.`);

@@ -52,8 +52,8 @@ export default function BetPlacementSuccessModal({
 
   const handleShareTo = useCallback((platform) => {
     const code = bookingCode;
-    const text = `Check out my bet on Xenbet! Booking Code: ${code}`;
-    const url = `https://xenbet.vercel.app/ticket/${code}`;
+    const text = `Check out my bet on BetXentra! Booking Code: ${code}`;
+    const url = `https://betxentra.vercel.app/ticket/${code}`;
     if (platform === 'copy') {
       handleCopy();
     } else if (platform === 'x') {
@@ -196,7 +196,7 @@ export default function BetPlacementSuccessModal({
             <div className="bpsm-bk-footer">
               <div className="bpsm-bk-footer-bar">
                 <span className="bpsm-footer-x">X</span>
-                <span className="bpsm-footer-name">xenbet.com</span>
+                <span className="bpsm-footer-name">betxentra.com</span>
               </div>
             </div>
           </motion.div>
@@ -357,7 +357,7 @@ export default function BetPlacementSuccessModal({
             <motion.div className="bpsm-footer" variants={fadeUp}>
               <div className="bpsm-footer-brand">
                 <span className="bpsm-footer-x">X</span>
-                <span className="bpsm-footer-name">xenbet.com</span>
+                <span className="bpsm-footer-name">betxentra.com</span>
               </div>
             </motion.div>
           </motion.div>

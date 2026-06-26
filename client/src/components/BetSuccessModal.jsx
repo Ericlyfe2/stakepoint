@@ -55,12 +55,12 @@ export default function BetSuccessModal({ bet, onClose, onRebet, onConfirm }) {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const shareText = `Check out my bet on Xenbet!\nBooking Code: ${code}`;
-  const shareUrl = `https://xenbet.vercel.app/ticket/${code}`;
+  const shareText = `Check out my bet on BetXentra!\nBooking Code: ${code}`;
+  const shareUrl = `https://betxentra.vercel.app/ticket/${code}`;
 
   const shareNative = () => {
     if (navigator.share) {
-      navigator.share({ title: 'Xenbet Booking Code', text: shareText, url: shareUrl }).catch(() => {});
+      navigator.share({ title: 'BetXentra Booking Code', text: shareText, url: shareUrl }).catch(() => {});
     }
   };
 
@@ -139,7 +139,7 @@ export default function BetSuccessModal({ bet, onClose, onRebet, onConfirm }) {
         <div className="bsm-footer">
           <div className="bsm-footer-brand">
             <span className="bsm-footer-x">X</span>
-            <span className="bsm-footer-name">xenbet.com</span>
+            <span className="bsm-footer-name">betxentra.com</span>
           </div>
           <button type="button" className="bsm-footer-ok" onClick={() => { dlg.current?.close(); onConfirm?.(); }}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>

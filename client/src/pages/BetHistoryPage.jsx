@@ -201,7 +201,7 @@ function TicketDetails({ bet, onClose, onRemix, onShare }) {
             </div>
 
             <div className="td-info-return">
-              <span className="td-info-return-label">Total Xenbet Return</span>
+              <span className="td-info-return-label">Total BetXentra Return</span>
               <span className={`td-info-return-value td-info-return-${head.cls}`}>
                 {status === 'won' || status === 'cashed_out' ? fmt(totalReturn) : status === 'lost' ? '0.00' : fmt(bet.potentialWin)}
               </span>
@@ -359,7 +359,7 @@ function BetCardView({ bet, expanded, onToggle, onCashout, onRemix, onDetails, t
             {copiedCode === code ? '✓ Copied' : code}
           </button>
           {navigator.share && (
-            <button type="button" className="xh-chip" onClick={(e) => { e.stopPropagation(); navigator.share({ title: 'My Xenbet Slip', text: `Check out my bet slip on Xenbet! Booking Code: ${code}` }).catch(() => {}); }}>
+            <button type="button" className="xh-chip" onClick={(e) => { e.stopPropagation(); navigator.share({ title: 'My BetXentra Slip', text: `Check out my bet slip on BetXentra! Booking Code: ${code}` }).catch(() => {}); }}>
               Share
             </button>
           )}
@@ -886,7 +886,7 @@ export default function BetHistoryPage() {
           onShare={(bet) => {
             const code = bet.bookingCode || toBookingCode(bet.id);
             if (navigator.share) {
-              navigator.share({ title: 'My Xenbet Ticket', text: `Check out my bet ticket on Xenbet!\n\nBooking Code: ${code}\nStake: GHS ${fmt(bet.stake)}\nPotential Win: GHS ${fmt(bet.potentialWin)}\nStatus: ${(bet.status || '').toUpperCase()}` }).catch(() => {});
+              navigator.share({ title: 'My BetXentra Ticket', text: `Check out my bet ticket on BetXentra!\n\nBooking Code: ${code}\nStake: GHS ${fmt(bet.stake)}\nPotential Win: GHS ${fmt(bet.potentialWin)}\nStatus: ${(bet.status || '').toUpperCase()}` }).catch(() => {});
             } else {
               navigator.clipboard?.writeText(code).then(() => toast('Booking code copied! Share it with friends.', 'success')).catch(() => toast('Share your booking code: ' + code, 'info'));
             }

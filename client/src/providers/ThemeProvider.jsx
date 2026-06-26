@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 
 const ThemeCtx = createContext(null);
-const STORAGE_KEY = 'xenbet_theme';
+const STORAGE_KEY = 'betxentra_theme';
 
 function readInitial() {
   if (typeof window === 'undefined') return 'dark';

@@ -121,7 +121,7 @@ export default function LoginPage() {
           country,
           ...(referralCode.trim() ? { referralCode: referralCode.trim() } : {}),
         });
-        toast(`Welcome to Xenbet, ${data.account?.displayName || data.account?.email}!`);
+        toast(`Welcome to BetXentra, ${data.account?.displayName || data.account?.email}!`);
         routeAfterLogin(data);
       } else {
         const data = await login({

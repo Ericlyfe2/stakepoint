@@ -1,7 +1,7 @@
-# Xenbet Production Readiness Audit Report
+# BetXentra Production Readiness Audit Report
 
 **Date:** 2026-06-21  
-**Platform:** Xenbet (Ghana sportsbook)  
+**Platform:** BetXentra (Ghana sportsbook)  
 **Auditor:** Automated platform audit  
 **Status:** ⚠️ **NOT PRODUCTION READY** — 37 findings (12 Critical, 15 High, 7 Medium, 3 Low)
 

@@ -130,7 +130,7 @@ export default function AdminSignup() {
           </div>
         </div>
         <div style={{ fontSize: 12, color: 'rgba(255,255,255,.5)' }}>
-          © {new Date().getFullYear()} Xenbet Gaming · Licensed by the Gaming Commission of Ghana
+          © {new Date().getFullYear()} BetXentra Gaming · Licensed by the Gaming Commission of Ghana
         </div>
       </aside>
 

@@ -66,7 +66,7 @@ export default function AdminShell() {
         <div className="adm-brand">
           <div className="mark">X</div>
           <div className="text">
-            <div className="name">Xenbet</div>
+            <div className="name">BetXentra</div>
             <div className="sub">Admin OS</div>
           </div>
         </div>

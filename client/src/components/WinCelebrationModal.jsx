@@ -169,7 +169,7 @@ function TrophyGraphic() {
               {/* Rim */}
               <ellipse cx="40" cy="20" rx="30" ry="6" fill="#fff7cc" />
               <ellipse cx="40" cy="20" rx="28" ry="4.5" fill="#ffe066" />
-              {/* XENBET "X" logo on cup */}
+              {/* BETXENTRA "X" logo on cup */}
               <g transform="translate(40,44) scale(1.3)">
                 <line x1="-6" y1="-6" x2="6" y2="6" stroke="#1a0e00" strokeWidth="3.5" strokeLinecap="round" />
                 <line x1="6" y1="-6" x2="-6" y2="6" stroke="#1a0e00" strokeWidth="3.5" strokeLinecap="round" />

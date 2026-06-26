@@ -13,7 +13,7 @@ process.env.PATHS = JSON.stringify({ data: DATA_DIR });
 process.env.JWT_SECRET = 'test-secret-key-for-jwt';
 process.env.JWT_ACCESS_TTL = '1h';
 process.env.JWT_REFRESH_TTL = '30d';
-process.env.JWT_ISSUER = 'xenbet-test';
+process.env.JWT_ISSUER = 'betxentra-test';
 process.env.GOOGLE_ENABLED = 'false';
 
 function cleanData() {

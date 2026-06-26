@@ -1,5 +1,5 @@
 /**
- * Xenbet API client.
+ * BetXentra API client.
  * - Reads/writes JWT tokens from localStorage (access + refresh).
  * - Auto-refreshes a single in-flight access token on 401.
  * - Throws an Error with .status/.body on non-2xx.
@@ -87,7 +87,7 @@ async function rawFetch(path, opts = {}, retry = true) {
       clearTokens();
       // Notify AccountProvider so it can clear the in-memory account too.
       if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('xenbet:force-logout'));
+        window.dispatchEvent(new CustomEvent('betxentra:force-logout'));
       }
     }
     return res;
