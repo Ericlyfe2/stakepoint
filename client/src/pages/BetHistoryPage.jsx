@@ -33,11 +33,25 @@ function placedAtLabel(iso) {
 
 function computeOffer(b) {
   if (b.status !== 'open') return 0;
-  if (b.lastCashOutOffer?.amount > 0) return b.lastCashOutOffer.amount;
-  if (b.cashoutOffer > 0) return b.cashoutOffer;
+  const stake = Number(b.stake || 0);
+
+  // Fair value of an open ticket whose legs are all still pending: a touch under
+  // the stake, scaled down a little more as the combined odds (and so the risk)
+  // climb. e.g. stake 300 @ 12.32 odds → ~274.13.
   const logOdds = Math.log2(Math.max(1.01, b.totalOdds || 1));
   const factor = Math.min(0.98, Math.max(0.90, 0.95 - 0.01 * logOdds));
-  return Number((b.stake * factor).toFixed(2));
+  const fair = Number((stake * factor).toFixed(2));
+
+  // Honour a server-provided offer only when it is plausible. Before any leg has
+  // resolved a cash-out can never be worth more than the stake, so reject bogus
+  // values (e.g. a percentage of the potential win) and fall back to fair value.
+  const serverOffer = b.lastCashOutOffer?.amount > 0
+    ? Number(b.lastCashOutOffer.amount)
+    : b.cashoutOffer > 0 ? Number(b.cashoutOffer) : 0;
+  if (serverOffer > 0 && serverOffer <= stake * 1.01) {
+    return Number(serverOffer.toFixed(2));
+  }
+  return fair;
 }
 
 function stableHash(key) {
@@ -637,7 +651,9 @@ export default function BetHistoryPage() {
     if (amount <= 0) { toast('Cash-out is not available for this bet.', 'warn'); return; }
     try {
       const res = await fetchCashoutOffer(b.id);
-      if (res.offer > 0) amount = res.offer;
+      // Only accept the server offer when it is plausible for a pending ticket
+      // (never worth more than the stake); otherwise keep the fair-value offer.
+      if (res.offer > 0 && res.offer <= Number(b.stake || 0) * 1.01) amount = res.offer;
     } catch {
       // use client-side fallback if server is unreachable
     }
