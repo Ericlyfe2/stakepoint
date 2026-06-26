@@ -1,5 +1,15 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180">
+  <!-- Background -->
   <rect width="180" height="180" rx="40" fill="#0a0d0c"/>
-  <path d="M44 38 L90 84 L136 38 L152 54 L106 100 L152 146 L136 162 L90 116 L44 162 L28 146 L74 100 L28 54 Z"
-        fill="#c5ff3d"/>
+  <!-- Shield body -->
+  <path d="M90 18 L152 46 L152 102 C152 140 90 166 90 166 C90 166 28 140 28 102 L28 46 Z"
+        fill="#22c55e"/>
+  <!-- Inner shield highlight -->
+  <path d="M90 30 L142 56 L142 102 C142 134 90 158 90 158 C90 158 38 134 38 102 L38 56 Z"
+        fill="none" stroke="rgba(255,255,255,0.15)" stroke-width="2"/>
+  <!-- B letterform -->
+  <path d="M62 62 L62 120 L93 120 C108 120 118 112 118 100 C118 93 114 88 108 85 C113 82 117 77 117 70 C117 65 112 62 104 62 Z
+           M74 72 L100 72 C106 72 110 75 110 80 C110 86 106 89 100 89 L74 89 Z
+           M74 99 L102 99 C108 99 111 102 111 107 C111 113 107 110 102 110 L74 110 Z"
+        fill="white"/>
 </svg>
