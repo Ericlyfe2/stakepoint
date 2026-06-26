@@ -36,31 +36,26 @@ function ThemeToggle() {
   );
 }
 
-/* Live-activity + trust strip that fills the desktop header's center space */
+/* World Cup promo banner that fills the desktop header's center space */
 function HeaderTrust() {
-  const [online, setOnline] = useState(() => 2400 + Math.floor(Math.random() * 220));
-
-  useEffect(() => {
-    const id = setInterval(() => {
-      setOnline((n) => {
-        const next = n + Math.floor(Math.random() * 21) - 10; // gentle random walk
-        return Math.min(3200, Math.max(1800, next));
-      });
-    }, 3200);
-    return () => clearInterval(id);
-  }, []);
-
+  const navigate = useNavigate();
   return (
-    <div className="header-trust" aria-hidden="true">
-      <span className="ht-live">
-        <span className="ht-dot" />
-        <strong>{online.toLocaleString('en-GH')}</strong>
-        <span className="ht-live-label">online</span>
-      </span>
-      <span className="ht-sep" />
-      <span className="ht-badge"><span className="ht-ico">⚡</span> Instant Payouts</span>
-      <span className="ht-badge"><span className="ht-ico">🔒</span> Licensed in Ghana</span>
-      <span className="ht-badge ht-badge--accent"><span className="ht-ico">🎯</span> Sharper Odds</span>
+    <div className="header-trust">
+      <button
+        type="button"
+        className="ht-wc"
+        onClick={() => navigate('/')}
+        aria-label="Bet on the FIFA World Cup"
+      >
+        <img src="/images/worldcup.png" alt="" className="ht-wc-img" />
+        <span className="ht-wc-overlay">
+          <span className="ht-wc-text">
+            <span className="ht-wc-kicker">FIFA</span>
+            <span className="ht-wc-title">World Cup</span>
+          </span>
+          <span className="ht-wc-cta">Bet Now</span>
+        </span>
+      </button>
     </div>
   );
 }
