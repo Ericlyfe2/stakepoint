@@ -2892,12 +2892,12 @@ nav a:active { transform: scale(.96); }
   gap: 14px;
   padding-right: 14px;
 }
-/* Three identical copies are rendered; shifting by exactly one copy (-100%/3)
+/* Four identical copies are rendered; shifting by exactly one copy (-100%/4)
    lands copy 2 where copy 1 was, so the loop is seamless and never reveals
    empty space even when the viewport is wider than a single copy. */
 @keyframes xb-promo-scroll {
   0%   { transform: translate3d(0, 0, 0); }
-  100% { transform: translate3d(calc(-100% / 3), 0, 0); }
+  100% { transform: translate3d(calc(-100% / 4), 0, 0); }
 }
 @media (prefers-reduced-motion: reduce) {
   .xb-promo-track { animation: none; }

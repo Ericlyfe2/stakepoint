@@ -897,12 +897,8 @@ export default function Home({ initialChip }) {
       {/* ─── Hero + Promo Carousel ─── */}
       <div className="xb-promo-track-wrap">
         <div className="xb-promo-track">
-          {[0, 1, 2].map((dup) => (
+          {[0, 1, 2, 3].map((dup) => (
             <div className="xb-promo-set" key={dup} aria-hidden={dup > 0 ? 'true' : undefined}>
-              <div className="xb-promo-card xb-promo-card-hero">
-                <img src="/images/hero-banner.png" alt="BetXentra — Official Betting Partner in Africa" className="xb-hero-img"
-                  onError={(e) => { e.target.style.display = 'none'; }} />
-              </div>
               <div className="xb-promo-card">
                 <div className="xb-promo-card-inner xb-promo-worldcup">
                   <span className="xb-promo-tag xb-promo-tag-gold">FIFA WORLD CUP</span>
