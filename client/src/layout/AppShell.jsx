@@ -36,30 +36,6 @@ function ThemeToggle() {
   );
 }
 
-/* World Cup promo banner that fills the desktop header's center space */
-function HeaderTrust() {
-  const navigate = useNavigate();
-  return (
-    <div className="header-trust">
-      <button
-        type="button"
-        className="ht-wc"
-        onClick={() => navigate('/')}
-        aria-label="Bet on the FIFA World Cup"
-      >
-        <img src="/images/worldcup.png" alt="" className="ht-wc-img" />
-        <span className="ht-wc-overlay">
-          <span className="ht-wc-text">
-            <span className="ht-wc-kicker">FIFA</span>
-            <span className="ht-wc-title">World Cup</span>
-          </span>
-          <span className="ht-wc-cta">Bet Now</span>
-        </span>
-      </button>
-    </div>
-  );
-}
-
 function MobileHeader({ account, onSignIn, onSignUp, onAvatar, onSearch, onBalanceClick }) {
   const authed = !!account;
   const { theme, toggleTheme } = useTheme();
@@ -398,7 +374,6 @@ export default function AppShell() {
             <NavLink to="/my-bets"  className={navCls}>My Bets</NavLink>
             <NavLink to="/wallet"   className={navCls}>Wallet</NavLink>
           </nav>
-          <HeaderTrust />
           <div className="header-right">
             <button type="button" className="btn btn-ghost" onClick={openSearch} title="Search Matches">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ marginBottom: -2 }}>

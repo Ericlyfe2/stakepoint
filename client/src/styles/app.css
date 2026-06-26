@@ -197,9 +197,9 @@ html[data-theme="light"] .skl {
   margin: 0 auto;
   padding: 18px 32px;
   display: grid;
-  grid-template-columns: auto auto 1fr auto;
+  grid-template-columns: auto 1fr auto;
   align-items: center;
-  gap: 32px;
+  gap: 48px;
 }
 .logo {
   display: flex;
@@ -254,85 +254,6 @@ nav a .live-dot {
   50% { opacity: 0.4; transform: scale(1.4); }
 }
 .header-right { display: flex; gap: 12px; align-items: center; }
-
-/* ===== Header center: World Cup promo banner =====
-   The strip is the flexible 1fr grid column and acts as a size container, so the
-   banner only appears when the *actual* free space (which depends on nav width,
-   the control cluster, and auth state) is wide enough — never overflowing. */
-.header-trust {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 0;
-  overflow: hidden;
-  container-type: inline-size;
-}
-.ht-wc {
-  display: none; /* revealed by the container query below when there is room */
-  position: relative;
-  width: 100%;
-  max-width: 300px;
-  height: 40px;
-  padding: 0;
-  border: 1px solid var(--line);
-  border-radius: 11px;
-  overflow: hidden;
-  cursor: pointer;
-  background: #0a0d0c;
-  font: inherit;
-  transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
-}
-.ht-wc:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.28);
-  border-color: rgba(34, 197, 94, 0.55);
-}
-.ht-wc-img {
-  position: absolute;
-  inset: 0;
-  width: 100%; height: 100%;
-  object-fit: cover;
-  object-position: center 38%;
-}
-.ht-wc-overlay {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 0 11px;
-  background: linear-gradient(90deg, rgba(0,0,0,0.78) 0%, rgba(0,0,0,0.42) 42%, rgba(0,0,0,0.05) 70%, rgba(0,0,0,0.4) 100%);
-}
-.ht-wc-text { display: flex; flex-direction: column; line-height: 1.05; text-align: left; min-width: 0; }
-.ht-wc-kicker {
-  font-size: 8px; font-weight: 800; letter-spacing: 1.6px;
-  color: #ffd24a; text-transform: uppercase;
-}
-.ht-wc-title {
-  font-size: 13px; font-weight: 800; color: #fff;
-  letter-spacing: -0.01em; white-space: nowrap;
-}
-.ht-wc-cta {
-  flex-shrink: 0;
-  font-size: 10px; font-weight: 800;
-  color: #062014;
-  background: #22c55e;
-  padding: 4px 9px;
-  border-radius: 999px;
-  white-space: nowrap;
-}
-
-/* Reveal the banner only when the gap is wide enough to look good; drop the
-   "Bet Now" pill first when space gets tight so the image + label still fit. */
-@container (min-width: 124px) { .ht-wc { display: block; } }
-@container (max-width: 219px) { .ht-wc-cta { display: none; } }
-
-/* Tablet ≤980px reverts the header to a 3-column grid + scrollable nav,
-   so remove the strip entirely to keep child/column counts aligned. */
-@media (max-width: 980px) {
-  .header-trust { display: none; }
-}
 .balance {
   display: flex;
   align-items: center;
