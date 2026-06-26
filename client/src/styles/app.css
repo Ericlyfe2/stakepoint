@@ -2884,18 +2884,24 @@ nav a:active { transform: scale(.96); }
 .xb-promo-track {
   display: flex;
   width: max-content;
-  animation: xb-promo-scroll 20s linear infinite;
+  animation: xb-promo-scroll 30s linear infinite;
+  will-change: transform;
 }
 .xb-promo-set {
   display: flex;
   gap: 14px;
   padding-right: 14px;
 }
+/* Three identical copies are rendered; shifting by exactly one copy (-100%/3)
+   lands copy 2 where copy 1 was, so the loop is seamless and never reveals
+   empty space even when the viewport is wider than a single copy. */
 @keyframes xb-promo-scroll {
-  0% { transform: translateX(0); }
-  100% { transform: translateX(-50%); }
+  0%   { transform: translate3d(0, 0, 0); }
+  100% { transform: translate3d(calc(-100% / 3), 0, 0); }
 }
-.xb-promo-track:hover { animation-play-state: paused; }
+@media (prefers-reduced-motion: reduce) {
+  .xb-promo-track { animation: none; }
+}
 
 .xb-promo-card {
   width: 280px;
