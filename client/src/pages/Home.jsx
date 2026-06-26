@@ -904,6 +904,17 @@ export default function Home({ initialChip }) {
                   onError={(e) => { e.target.style.display = 'none'; }} />
               </div>
               <div className="xb-promo-card">
+                <div className="xb-promo-card-inner xb-promo-worldcup">
+                  <span className="xb-promo-tag xb-promo-tag-gold">FIFA WORLD CUP</span>
+                  <h3>Bet the Tournament</h3>
+                  <p>Back your nation through every match — sharper odds on the world&apos;s biggest stage.</p>
+                  <div className="xb-promo-btns">
+                    <button type="button" className="xb-promo-btn-primary" onClick={() => navigate('/')}>Bet Now</button>
+                    <button type="button" className="xb-promo-btn-outline" onClick={() => setSubTab('highlights')}>View All</button>
+                  </div>
+                </div>
+              </div>
+              <div className="xb-promo-card">
                 <div className="xb-promo-card-inner xb-promo-payout">
                   <span className="xb-promo-tag">FAST PAYOUTS</span>
                   <h3>Instant MoMo Withdrawals</h3>
