@@ -135,9 +135,9 @@
   border-radius: 11px;
   background: var(--grad-brand);
   display: grid; place-items: center;
-  color: #fff; font-weight: 800; font-size: 18px;
   box-shadow: var(--shadow-glow);
   flex-shrink: 0;
+  overflow: hidden;
 }
 .adm-brand .name { font-weight: 800; letter-spacing: -.01em; font-size: 18px; }
 .adm-brand .sub  { color: var(--text-dim); font-size: 11px; text-transform: uppercase; letter-spacing: .14em; }

@@ -64,7 +64,13 @@ export default function AdminShell() {
       {/* Sidebar */}
       <aside className={`adm-side ${mobileOpen ? 'open' : ''}`}>
         <div className="adm-brand">
-          <div className="mark">X</div>
+          <div className="mark">
+            <svg width="26" height="26" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <path d="M32 4L56 15L56 37C56 52 32 64 32 64C32 64 8 52 8 37L8 15Z" fill="rgba(255,255,255,0.2)"/>
+              <path d="M32 8L52 18L52 37C52 50 32 61 32 61C32 61 12 50 12 37L12 18Z" fill="none" stroke="rgba(255,255,255,0.3)" strokeWidth="1"/>
+              <path d="M22 22L22 43L33 43C38 43 42 40 42 35.5C42 33 40.5 31 38.5 30C40 29 41 27.5 41 25.5C41 23 38 22 34 22ZM26.5 26L33 26C35.5 26 37 27 37 29C37 31 35.5 32 33 32L26.5 32ZM26.5 35.5L33.5 35.5C36.5 35.5 37.5 37 37.5 39C37.5 41 35.5 39.5 33.5 39.5L26.5 39.5Z" fill="white"/>
+            </svg>
+          </div>
           <div className="text">
             <div className="name">BetXentra</div>
             <div className="sub">Admin OS</div>

@@ -169,10 +169,10 @@ function TrophyGraphic() {
               {/* Rim */}
               <ellipse cx="40" cy="20" rx="30" ry="6" fill="#fff7cc" />
               <ellipse cx="40" cy="20" rx="28" ry="4.5" fill="#ffe066" />
-              {/* BETXENTRA "X" logo on cup */}
-              <g transform="translate(40,44) scale(1.3)">
-                <line x1="-6" y1="-6" x2="6" y2="6" stroke="#1a0e00" strokeWidth="3.5" strokeLinecap="round" />
-                <line x1="6" y1="-6" x2="-6" y2="6" stroke="#1a0e00" strokeWidth="3.5" strokeLinecap="round" />
+              {/* BetXentra shield mark on cup */}
+              <g transform="translate(28,28) scale(0.36)">
+                <path d="M32 6L54 16L54 36C54 50 32 60 32 60C32 60 10 50 10 36L10 16Z" fill="#1a0e00" fillOpacity="0.35"/>
+                <path d="M22 22L22 43L33 43C38 43 42 40 42 35.5C42 33 40.5 31 38.5 30C40 29 41 27.5 41 25.5C41 23 38 22 34 22ZM26.5 26L33 26C35.5 26 37 27 37 29C37 31 35.5 32 33 32L26.5 32ZM26.5 35.5L33.5 35.5C36.5 35.5 37.5 37 37.5 39C37.5 41 35.5 39.5 33.5 39.5L26.5 39.5Z" fill="#1a0e00" fillOpacity="0.55"/>
               </g>
               {/* Highlight */}
               <ellipse cx="34" cy="32" rx="10" ry="16" fill="white" opacity="0.12" />

@@ -138,7 +138,11 @@ export default function BetSuccessModal({ bet, onClose, onRebet, onConfirm }) {
         {/* Branded footer */}
         <div className="bsm-footer">
           <div className="bsm-footer-brand">
-            <span className="bsm-footer-x">X</span>
+            <svg width="22" height="22" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" style={{borderRadius:6,overflow:'hidden',flexShrink:0}}>
+              <rect width="64" height="64" rx="14" fill="#0a0d0c"/>
+              <path d="M32 6L54 16L54 36C54 50 32 60 32 60C32 60 10 50 10 36L10 16Z" fill="#22c55e"/>
+              <path d="M22 22L22 43L33 43C38 43 42 40 42 35.5C42 33 40.5 31 38.5 30C40 29 41 27.5 41 25.5C41 23 38 22 34 22ZM26.5 26L33 26C35.5 26 37 27 37 29C37 31 35.5 32 33 32L26.5 32ZM26.5 35.5L33.5 35.5C36.5 35.5 37.5 37 37.5 39C37.5 41 35.5 39.5 33.5 39.5L26.5 39.5Z" fill="white"/>
+            </svg>
             <span className="bsm-footer-name">betxentra.com</span>
           </div>
           <button type="button" className="bsm-footer-ok" onClick={() => { dlg.current?.close(); onConfirm?.(); }}>
@@ -185,7 +189,7 @@ const BSM_CSS = `
 /* Footer */
 .bsm-footer { display: flex; align-items: center; justify-content: space-between; padding: 10px 16px; background: linear-gradient(135deg, #0a4a2e, #116f43); border-radius: 0 0 16px 16px; }
 .bsm-footer-brand { display: flex; align-items: center; gap: 6px; }
-.bsm-footer-x { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 6px; background: var(--accent); color: #000; font-size: 13px; font-weight: 900; }
+.bsm-footer-x { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 6px; overflow: hidden; flex-shrink: 0; }
 .bsm-footer-name { color: #fff; font-size: 14px; font-weight: 700; letter-spacing: .02em; }
 .bsm-footer-ok { background: none; border: none; color: rgba(255,255,255,.7); cursor: pointer; padding: 6px; display: grid; place-items: center; }
 .bsm-footer-ok:hover { color: #fff; }
