@@ -197,9 +197,9 @@ html[data-theme="light"] .skl {
   margin: 0 auto;
   padding: 18px 32px;
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: auto auto 1fr auto;
   align-items: center;
-  gap: 48px;
+  gap: 32px;
 }
 .logo {
   display: flex;
@@ -254,6 +254,84 @@ nav a .live-dot {
   50% { opacity: 0.4; transform: scale(1.4); }
 }
 .header-right { display: flex; gap: 12px; align-items: center; }
+
+/* ===== Header center: live-activity + trust strip =====
+   The strip is the flexible 1fr grid column. It acts as a size container so its
+   contents only appear when the *actual* free space (which depends on nav width,
+   the control cluster, and auth state) is wide enough — never overflowing. */
+.header-trust {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  min-width: 0;
+  overflow: hidden;
+  container-type: inline-size;
+}
+/* Contents are hidden by default and revealed by the container queries below */
+.ht-live, .ht-sep, .ht-badge { display: none; }
+
+.ht-live {
+  align-items: center;
+  gap: 6px;
+  padding: 6px 11px;
+  border-radius: 999px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  font-size: 12.5px;
+  color: var(--text-soft);
+  white-space: nowrap;
+}
+.ht-live strong { color: var(--text); font-weight: 700; font-variant-numeric: tabular-nums; }
+.ht-live-label { color: var(--text-dim); }
+.ht-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: #22c55e;
+  box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.55);
+  animation: htPulse 1.8s ease-out infinite;
+  flex-shrink: 0;
+}
+@keyframes htPulse {
+  0%   { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.5); }
+  70%  { box-shadow: 0 0 0 7px rgba(34, 197, 94, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
+}
+.ht-sep {
+  width: 1px; height: 18px;
+  background: var(--line);
+  flex-shrink: 0;
+}
+.ht-badge {
+  align-items: center;
+  gap: 5px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-soft);
+  white-space: nowrap;
+}
+.ht-badge--accent { color: var(--accent); }
+.ht-ico { font-size: 13px; line-height: 1; }
+
+/* Reveal progressively based on the strip's own width (the real free space).
+   The compact live pill is ~120px, so it appears as soon as ~130px is free;
+   trust badges only join in when there is genuine room, and never overflow. */
+@container (min-width: 128px) {
+  .ht-live { display: inline-flex; }
+}
+@container (min-width: 440px) {
+  .ht-sep { display: block; }
+  .ht-badge:not(.ht-badge--accent) { display: inline-flex; }
+}
+@container (min-width: 560px) {
+  .ht-badge--accent { display: inline-flex; }
+}
+
+/* Tablet ≤980px reverts the header to a 3-column grid + scrollable nav,
+   so remove the strip entirely to keep child/column counts aligned. */
+@media (max-width: 980px) {
+  .header-trust { display: none; }
+}
 .balance {
   display: flex;
   align-items: center;

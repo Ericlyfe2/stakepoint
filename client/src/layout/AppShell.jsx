@@ -36,6 +36,35 @@ function ThemeToggle() {
   );
 }
 
+/* Live-activity + trust strip that fills the desktop header's center space */
+function HeaderTrust() {
+  const [online, setOnline] = useState(() => 2400 + Math.floor(Math.random() * 220));
+
+  useEffect(() => {
+    const id = setInterval(() => {
+      setOnline((n) => {
+        const next = n + Math.floor(Math.random() * 21) - 10; // gentle random walk
+        return Math.min(3200, Math.max(1800, next));
+      });
+    }, 3200);
+    return () => clearInterval(id);
+  }, []);
+
+  return (
+    <div className="header-trust" aria-hidden="true">
+      <span className="ht-live">
+        <span className="ht-dot" />
+        <strong>{online.toLocaleString('en-GH')}</strong>
+        <span className="ht-live-label">online</span>
+      </span>
+      <span className="ht-sep" />
+      <span className="ht-badge"><span className="ht-ico">⚡</span> Instant Payouts</span>
+      <span className="ht-badge"><span className="ht-ico">🔒</span> Licensed in Ghana</span>
+      <span className="ht-badge ht-badge--accent"><span className="ht-ico">🎯</span> Sharper Odds</span>
+    </div>
+  );
+}
+
 function MobileHeader({ account, onSignIn, onSignUp, onAvatar, onSearch, onBalanceClick }) {
   const authed = !!account;
   const { theme, toggleTheme } = useTheme();
@@ -374,6 +403,7 @@ export default function AppShell() {
             <NavLink to="/my-bets"  className={navCls}>My Bets</NavLink>
             <NavLink to="/wallet"   className={navCls}>Wallet</NavLink>
           </nav>
+          <HeaderTrust />
           <div className="header-right">
             <button type="button" className="btn btn-ghost" onClick={openSearch} title="Search Matches">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ marginBottom: -2 }}>
