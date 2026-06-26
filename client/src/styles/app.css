@@ -2884,7 +2884,7 @@ nav a:active { transform: scale(.96); }
 .xb-promo-track {
   display: flex;
   width: max-content;
-  animation: xb-promo-scroll 30s linear infinite;
+  animation: xb-promo-scroll 22s linear infinite;
   will-change: transform;
 }
 .xb-promo-set {
