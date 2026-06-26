@@ -43,7 +43,7 @@ function MobileHeader({ account, onSignIn, onSignUp, onAvatar, onSearch, onBalan
   return (
     <div className="sb-mobile-header">
       <NavLink to="/" className="sb-logo" end>
-        Xen<em>bet</em>
+        Bet<em>Xentra</em>
       </NavLink>
 
       <button type="button" className="sb-search-btn" aria-label="Search" onClick={onSearch}>
@@ -353,7 +353,7 @@ export default function AppShell() {
         <div className="header-inner">
           <NavLink to="/" className="logo" end>
             <div className="logo-mark"><span>X</span></div>
-            <div className="logo-text">Xen<em>bet</em></div>
+            <div className="logo-text">Bet<em>Xentra</em></div>
           </NavLink>
           <nav id="main-nav">
             <NavLink to="/" end className={navCls}>Sports</NavLink>

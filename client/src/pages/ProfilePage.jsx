@@ -92,7 +92,7 @@ export default function ProfilePage() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4, delay: 0.1, ease: 'easeOut' }}
       >
-        <div className="acct-brand">Xen<em>bet</em></div>
+        <div className="acct-brand">Bet<em>Xentra</em></div>
         <button type="button" className="acct-balance-pill" onClick={() => navigate('/wallet')}>
           <span className="acct-balance-icon" aria-hidden><I.user width="14" height="14" /></span>
           <span className="acct-balance-amt">₵&nbsp;{fmtMoney(account.balance)}</span>
