@@ -348,12 +348,12 @@ function BetCardView({ bet, onCashout, onRemix, onDetails, copiedCode, onCopy, a
         <div className="xh-card-row">
           <span className="xh-card-row-label">Total Return</span>
           <span className="xh-card-row-value" style={{ color: returnColor, fontWeight: 800 }}>
-            ₦{bet.status === 'won' || bet.status === 'cashed_out' ? fmt(totalReturn) : bet.status === 'lost' ? '0.00' : fmt(bet.potentialWin)}
+            GHS{bet.status === 'won' || bet.status === 'cashed_out' ? fmt(totalReturn) : bet.status === 'lost' ? '0.00' : fmt(bet.potentialWin)}
           </span>
         </div>
         <div className="xh-card-row">
           <span className="xh-card-row-label">Total Stake</span>
-          <span className="xh-card-row-value xh-val-stake">₦{fmt(bet.stake)}</span>
+          <span className="xh-card-row-value xh-val-stake">GHS{fmt(bet.stake)}</span>
         </div>
         <div className="xh-card-row xh-card-row-bottom">
           <span className="xh-card-row-dim">{selectionLabel}</span>
