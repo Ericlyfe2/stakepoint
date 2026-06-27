@@ -1,4 +1,5 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import {
   fetchMatches,
@@ -19,73 +20,16 @@ import {
   defaultSystemType,
   maxSystemReturn,
 } from '../lib/systemBets.js';
-
-const BONUS = 0.08;
-
-function formatAmt(n) {
-  return Number(n || 0).toLocaleString('en-GH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
-
-function pickLabel(market, key, match) {
-  const team = (k) => (k === '1' ? match.home : k === '2' ? match.away : 'Draw');
-
-  if (market === '1X2' || market === '1H1X2') {
-    const prefix = market === '1H1X2' ? '1H · ' : '';
-    if (key === '1') return `${prefix}${match.home} to win`;
-    if (key === '2') return `${prefix}${match.away} to win`;
-    return `${prefix}Draw`;
-  }
-  if (market === 'ML') return `${key === '1' ? match.home : match.away} to win`;
-  if (market === 'OU25') return `${key} 2.5 goals`;
-  if (market === 'OU15') return `${key} 1.5 goals`;
-  if (market === 'OU35') return `${key} 3.5 goals`;
-  if (market === '1HOU05') return `1H · ${key} 0.5 goals`;
-  if (market === 'BTTS') return `Both Teams To Score · ${key}`;
-  if (market === '1HBTTS') return `1H · Both Teams To Score · ${key}`;
-  if (market === 'DC') {
-    if (key === '1X') return `${match.home} or Draw`;
-    if (key === 'X2') return `Draw or ${match.away}`;
-    return `${match.home} or ${match.away}`;
-  }
-  if (market === 'DNB') return `Draw No Bet · ${team(key)}`;
-  if (market === 'AH1') {
-    if (key === 'H-1') return `${match.home} -1`;
-    if (key === 'A+1') return `${match.away} +1`;
-    return `Handicap ${key}`;
-  }
-  if (market === 'WINBTTS') {
-    const result = key[0] === '1' ? match.home : key[0] === '2' ? match.away : 'Draw';
-    return `${result} & BTTS ${key[1] === 'Y' ? 'Yes' : 'No'}`;
-  }
-  if (market === 'WINOU25') {
-    const result = key[0] === '1' ? match.home : key[0] === '2' ? match.away : 'Draw';
-    return `${result} & ${key[1] === 'O' ? 'Over' : 'Under'} 2.5`;
-  }
-  if (market === 'BTTSOU25') {
-    return `BTTS ${key[0] === 'Y' ? 'Yes' : 'No'} & ${key[1] === 'O' ? 'Over' : 'Under'} 2.5`;
-  }
-  if (market === 'HTFT') {
-    const half = (k) => (k === '1' ? match.home : k === '2' ? match.away : 'Draw');
-    const [a, b] = key.split('/');
-    return `HT/FT · ${half(a)} / ${half(b)}`;
-  }
-  if (market === 'CS') return `Correct Score ${key === 'OTHER' ? 'Any Other' : key}`;
-  if (market === 'TP')   return `${key} ${match.line || ''} pts`;
-  if (market === 'SETS') return `${key} 2.5 sets`;
-  if (market === 'HCAP') return `Handicap ${key}`;
-  return `${market} · ${key}`;
-}
-
-function matchMeta(match) {
-  const h = match.home, a = match.away;
-  if (match.isLive) return `${h} vs ${a} · LIVE ${match.minute || ''}`;
-  return `${h} vs ${a} · ${[match.kickoff, match.day].filter(Boolean).join(' ')}`;
-}
-
-function parseStake(raw) {
-  const n = parseFloat(String(raw || '').replace(/,/g, ''));
-  return Number.isFinite(n) ? Math.max(0, n) : 0;
-}
+import useBetslip from '../hooks/useBetslip.js';
+import {
+  formatAmt,
+  parseStake,
+  pickLabel,
+  matchMeta,
+  buildSelection,
+  marketName,
+  validateBetSlip,
+} from '../lib/betslipEngine.js';
 
 function systemTypeHint(count) {
   if (count < 3) return `${3 - count} more selection${count === 2 ? '' : 's'}`;
@@ -94,28 +38,90 @@ function systemTypeHint(count) {
 }
 
 // Returns the column keys for the current market chip, with fallbacks.
+const MARKET_CHIP_DEFS = [
+  ['1X2', '1X2'],
+  ['DC', 'DC'],
+  ['DNB', 'DNB'],
+  ['OU25', 'O/U 2.5'],
+  ['OU35', 'O/U 3.5'],
+  ['OU15', 'O/U 1.5'],
+  ['BTTS', 'BTTS'],
+  ['WINBTTS', 'R+BTTS'],
+  ['WINOU25', 'R+O/U'],
+  ['BTTSOU25', 'BTTS+O/U'],
+  ['HTFT', 'HT/FT'],
+  ['CS', 'CS'],
+  ['AH1', 'AH ±1'],
+  ['1H1X2', '1H 1X2'],
+  ['1HOU05', '1H O/U 0.5'],
+  ['1HBTTS', '1H BTTS'],
+];
+
 function columnsFor(marketChip, match) {
-  // Aliases — fall back to 1X2 / ML if the chip's market isn't priced.
   if (marketChip === '1X2') {
     const m = match.markets?.['1X2'] || match.markets?.['ML'];
     if (!m) return null;
     return { market: match.markets?.['1X2'] ? '1X2' : 'ML', selections: m.selections };
   }
   if (marketChip === 'OU25') {
-    const m = match.markets?.['OU25'];
-    if (!m) return null;
+    const m = match.markets?.['OU25']; if (!m) return null;
     return { market: 'OU25', selections: m.selections };
   }
+  if (marketChip === 'OU35') {
+    const m = match.markets?.['OU35']; if (!m) return null;
+    return { market: 'OU35', selections: m.selections };
+  }
+  if (marketChip === 'OU15') {
+    const m = match.markets?.['OU15']; if (!m) return null;
+    return { market: 'OU15', selections: m.selections };
+  }
   if (marketChip === 'DC') {
-    const m = match.markets?.['DC'];
-    if (!m) return null;
+    const m = match.markets?.['DC']; if (!m) return null;
     return { market: 'DC', selections: m.selections };
   }
-  if (marketChip === 'HT') {
-    // first-half O/U; if not provided, no row
-    const m = match.markets?.['HT_OU15'] || match.markets?.['HT_OU05'] || match.markets?.['BTTS'];
-    if (!m) return null;
-    return { market: m.id || 'HT', selections: m.selections };
+  if (marketChip === 'DNB') {
+    const m = match.markets?.['DNB']; if (!m) return null;
+    return { market: 'DNB', selections: m.selections };
+  }
+  if (marketChip === 'BTTS') {
+    const m = match.markets?.['BTTS']; if (!m) return null;
+    return { market: 'BTTS', selections: m.selections };
+  }
+  if (marketChip === 'WINBTTS') {
+    const m = match.markets?.['WINBTTS']; if (!m) return null;
+    return { market: 'WINBTTS', selections: m.selections };
+  }
+  if (marketChip === 'WINOU25') {
+    const m = match.markets?.['WINOU25']; if (!m) return null;
+    return { market: 'WINOU25', selections: m.selections };
+  }
+  if (marketChip === 'BTTSOU25') {
+    const m = match.markets?.['BTTSOU25']; if (!m) return null;
+    return { market: 'BTTSOU25', selections: m.selections };
+  }
+  if (marketChip === 'HTFT') {
+    const m = match.markets?.['HTFT']; if (!m) return null;
+    return { market: 'HTFT', selections: m.selections };
+  }
+  if (marketChip === 'CS') {
+    const m = match.markets?.['CS']; if (!m) return null;
+    return { market: 'CS', selections: m.selections };
+  }
+  if (marketChip === 'AH1') {
+    const m = match.markets?.['AH1']; if (!m) return null;
+    return { market: 'AH1', selections: m.selections };
+  }
+  if (marketChip === '1H1X2') {
+    const m = match.markets?.['1H1X2']; if (!m) return null;
+    return { market: '1H1X2', selections: m.selections };
+  }
+  if (marketChip === '1HOU05') {
+    const m = match.markets?.['1HOU05']; if (!m) return null;
+    return { market: '1HOU05', selections: m.selections };
+  }
+  if (marketChip === '1HBTTS') {
+    const m = match.markets?.['1HBTTS']; if (!m) return null;
+    return { market: '1HBTTS', selections: m.selections };
   }
   return null;
 }
@@ -132,10 +138,6 @@ export default function Home({ initialChip }) {
   const [sportId, setSportId]         = useState(sportParam);
   const [snapshot, setSnapshot]       = useState(null);
   const [loadErr, setLoadErr]         = useState(null);
-  const [selections, setSelections]   = useState([]);
-  const [betMode, setBetMode]         = useState('multiple');
-  const [systemType, setSystemType]   = useState(null);
-  const [stake, setStake]   = useState('400.00');
   const [activeLeague, setActiveLeague] = useState(null);
 
   // new mobile-first UI state
@@ -154,6 +156,33 @@ export default function Home({ initialChip }) {
   const [isPlacing, setIsPlacing] = useState(false);
   const [showKeypad, setShowKeypad] = useState(false);
   const [betRealMode, setBetRealMode] = useState('REAL');
+
+  const {
+    selections,
+    betMode,
+    setBetMode,
+    stakes,
+    oddsChanges,
+    toggleSelection,
+    removeSelection,
+    clearSlip,
+    syncOdds,
+    refreshOdds,
+    acceptOddsChanges,
+    rejectOddsChanges,
+    setMultipleStake,
+    setSelectionStake,
+    bulkSetSelectionStakes,
+    totalOdds,
+    totalStake,
+    payout,
+    selectionPayouts,
+    selectionCount,
+    hasOddsChanges,
+    buildPlaceBetPayload,
+    loadSelections,
+  } = useBetslip('multiple');
+  const [systemType, setSystemType]   = useState(null);
 
   const [codeModalOpen, setCodeModalOpen] = useState(false);
   const [codeInput, setCodeInput]         = useState('');
@@ -192,8 +221,10 @@ export default function Home({ initialChip }) {
         const data = await fetchMatches(sportId);
         if (cancelled) return;
         setSnapshot(data);
-        if (sportId === 'football' && selections.length === 0) {
-          setSelections((data.seedSlip || []).map((s) => ({ ...s })));
+        if (sportId === 'football' && selectionCount === 0) {
+          if (data.seedSlip?.length) {
+            loadSelections(data.seedSlip.map((s) => ({ ...s })));
+          }
         }
       } catch (e) {
         if (!cancelled) setLoadErr(e.message || 'Could not load fixtures.');
@@ -285,144 +316,33 @@ export default function Home({ initialChip }) {
     if (slipOpen) setSlipErr(''); // clear error when reopening
   }, [slipOpen]);
 
-  const upsertSelection = useCallback((row) => {
-    setSelections((prev) => {
-      // Dedupe by (matchId, market, outcome) so the same odd can't appear
-      // twice on the slip, but different outcomes in the same market — and
-      // different markets on the same match — can coexist.
-      const i = prev.findIndex((s) => s.matchId === row.matchId && s.market === row.market && s.outcome === row.outcome);
-      if (i === -1) return [...prev, row];
-      const next = [...prev];
-      next[i] = { ...row, id: prev[i].id };
-      return next;
-    });
-  }, []);
-
-  const removeByOutcome = useCallback((matchId, market, outcome) => {
-    setSelections((prev) => prev.filter((s) => !(s.matchId === matchId && s.market === market && s.outcome === outcome)));
-  }, []);
-
-  const removeById = useCallback((id) => {
-    setSelections((prev) => prev.filter((s) => s.id !== id));
-  }, []);
-
-  const toggleSelection = useCallback((league, match, market, key, odds) => {
-    setSelections((prev) => {
-      // Toggle by exact (matchId, market, outcome): same odd clicked twice => deselect.
-      // Deselect path must work even when odds are null / market suspended, so the
-      // user can always remove a stale pick.
-      const existingIdx = prev.findIndex(
-        (s) => s.matchId === match.id && s.market === market && s.outcome === key,
-      );
-      if (existingIdx >= 0) {
-        const next = prev.slice();
-        next.splice(existingIdx, 1);
-        return next;
-      }
-
-      // Adding a new pick requires a valid price.
-      if (odds == null || !Number.isFinite(Number(odds))) return prev;
-
-      const newPick = {
-        id: `sel-${crypto.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`}`,
-        matchId: match.id,
-        market,
-        outcome: key,
-        odds: Number(odds),
-        pickLabel: pickLabel(market, key, match),
-        marketLabel: market === '1X2' || market === 'ML' ? `Match · ${key}` : `${market} · ${key}`,
-        meta: matchMeta(match),
-        trend: null,
-      };
-
-      if (betMode === 'single') return [newPick];
-
-      if (prev.length >= 12) {
-        toast('Slip is full — 12 selections max.');
-        return prev;
-      }
-
-      return [...prev, newPick];
-    });
-  }, [betMode, toast]);
-
-  const clearSlip = useCallback(() => {
-    setSelections([]);
-    toast('Slip cleared.');
-  }, [toast]);
+  const toggleSelectionWrapper = useCallback((league, match, market, key, odds) => {
+    toggleSelection(match, market, key, odds);
+  }, [toggleSelection]);
 
   // Side-effects when bet mode changes
   useEffect(() => {
-    if (betMode === 'single' && selections.length > 1) {
-      setSelections((prev) => prev.slice(-1));
-    }
     if (betMode === 'system') {
-      const next = defaultSystemType(selections.length);
+      const next = defaultSystemType(selectionCount);
       setSystemType(next);
     } else {
       setSystemType(null);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [betMode, selections.length]);
+  }, [betMode, selectionCount]);
 
   // Keep slip odds in sync with the live snapshot
   useEffect(() => {
-    if (!snapshot) return;
-    setSelections((prev) => {
-      let changed = false;
-      const next = prev.map((s) => {
-        const match = snapshot.leagues
-          .flatMap((lg) => lg.matches)
-          .find((m) => m.id === s.matchId);
-        // Don't nullify selections on temporary snapshot gaps — keep stale
-        // odds so the slip doesn't vanish during polling transitions.
-        if (!match) return { ...s, stale: true };
-        const mkt = match.markets?.[s.market];
-        if (!mkt || mkt.suspended) return { ...s, stale: true };
-        const sel = mkt.selections?.find((x) => x.key === s.outcome);
-        if (!sel || sel.suspended) return { ...s, stale: true };
-        if (sel.odds === s.odds) return { ...s, stale: false };
-        changed = true;
-        return { ...s, odds: sel.odds, trend: sel.odds > s.odds ? '↑' : '↓', stale: false };
-      });
-      return changed ? next : prev;
-    });
-  }, [snapshot]);
+    syncOdds(snapshot);
+  }, [snapshot, syncOdds]);
 
   const eligibleSystems = useMemo(
-    () => eligibleSystemTypes(selections.length),
-    [selections.length],
+    () => eligibleSystemTypes(selectionCount),
+    [selectionCount],
   );
 
   const systemDef    = systemType ? SYSTEM_TYPES[systemType] : null;
   const linesCount   = systemDef?.totalLines || 0;
-  const stakePerLine = parseStake(stake);
-
-  const totalOdds = useMemo(() => {
-    if (!selections.length) return 0;
-    if (betMode === 'single')   return selections[0].odds;
-    if (betMode === 'multiple') return selections.reduce((p, s) => p * s.odds, 1);
-    if (betMode === 'system' && systemDef && stakePerLine > 0) {
-      const ret = maxSystemReturn(selections.map((s) => s.odds), systemType, stakePerLine);
-      const totalStake = stakePerLine * linesCount;
-      return totalStake > 0 ? ret / totalStake : 0;
-    }
-    return 0;
-  }, [selections, betMode, systemDef, systemType, stakePerLine, linesCount]);
-
-  const totalStake = betMode === 'system'
-    ? Number((stakePerLine * linesCount).toFixed(2))
-    : stakePerLine;
-
-  const payout = useMemo(() => {
-    if (!selections.length || stakePerLine <= 0) return 0;
-    if (betMode === 'system') {
-      if (!systemDef) return 0;
-      return maxSystemReturn(selections.map((s) => s.odds), systemType, stakePerLine);
-    }
-    if (!totalOdds) return 0;
-    return stakePerLine * totalOdds * (1 + BONUS);
-  }, [selections, stakePerLine, totalOdds, betMode, systemDef, systemType]);
+  const stakePerLine = parseStake(stakes.multiple || 0);
 
   // Hydrate a booking code into the live slip — looks up the legs and replaces
   // the current selection list, then opens the slip.
@@ -448,8 +368,7 @@ export default function Home({ initialChip }) {
         away: l.away,
         trend: null,
       }));
-      setSelections(hydrated);
-      setBetMode(hydrated.length === 1 ? 'single' : 'multiple');
+      loadSelections(hydrated, hydrated.length === 1 ? 'single' : 'multiple');
       setSlipOpen(true);
       setSlipErr('');
       toast(`Loaded ${hydrated.length} selection${hydrated.length === 1 ? '' : 's'} from ${code}.`);
@@ -476,21 +395,13 @@ export default function Home({ initialChip }) {
     if (rec?.legs?.length) {
       try { sessionStorage.removeItem('sp_recommended_legs'); } catch { /* ignore */ }
       const hydrated = rec.legs.map((l, i) => ({
+        ...l,
         id: `sel-${Date.now()}-${i}`,
-        matchId: l.matchId,
-        market: l.market,
-        outcome: l.outcome,
-        odds: l.odds,
-        pickLabel: l.pick || '',
-        marketLabel: l.type || l.market,
         meta: l.matchLabel || `${l.home || ''} vs ${l.away || ''}`,
-        home: l.home || '',
-        away: l.away || '',
         trend: null,
       }));
       if (hydrated.length) {
-        setSelections(hydrated);
-        setBetMode(hydrated.length === 1 ? 'single' : 'multiple');
+        loadSelections(hydrated, hydrated.length === 1 ? 'single' : 'multiple');
         setSlipOpen(true);
         setSlipErr('');
       }
@@ -503,21 +414,15 @@ export default function Home({ initialChip }) {
     if (remix?.length) {
       try { localStorage.removeItem('bv_remix_selections'); } catch { /* ignore */ }
       const hydrated = remix.map((l, i) => ({
+        ...l,
         id: `sel-${Date.now()}-${i}`,
-        matchId: l.matchId,
-        market: l.market,
-        outcome: l.outcome,
-        odds: l.odds,
         pickLabel: pickLabel(l.market, l.outcome, { home: l.home || '', away: l.away || '' }),
         marketLabel: l.marketName || l.market,
         meta: `${l.home || ''} vs ${l.away || ''}`,
-        home: l.home || '',
-        away: l.away || '',
         trend: null,
       }));
       if (hydrated.length) {
-        setSelections(hydrated);
-        setBetMode(hydrated.length === 1 ? 'single' : 'multiple');
+        loadSelections(hydrated, hydrated.length === 1 ? 'single' : 'multiple');
         setSlipOpen(true);
         setSlipErr('');
       }
@@ -578,15 +483,13 @@ export default function Home({ initialChip }) {
 
   const onBookBet = useCallback(async () => {
     setSlipErr('');
-    if (!selections.length) { setSlipErr('Add at least one selection to your bet slip.'); return; }
-    if (betMode === 'multiple' && selections.length < 2) {
-      setSlipErr('Multiple bets need at least 2 selections.'); return;
-    }
-    if (betMode === 'system' && !systemDef) {
-      setSlipErr('Pick a valid number of selections for a system bet (3–8).'); return;
-    }
-    const linePrice = parseStake(stake);
-    if (linePrice <= 0) { setSlipErr('Enter a stake amount.'); return; }
+
+    const errors = validateBetSlip({
+      selections, betMode, stakes,
+      account, minStake: 400,
+    });
+    if (errors.length) { setSlipErr(errors[0]); return; }
+
     if (!account) {
       setSlipOpen(false);
       navigate('/login?next=/');
@@ -594,25 +497,30 @@ export default function Home({ initialChip }) {
       return;
     }
 
+    const linePrice = betMode === 'multiple'
+      ? parseStake(stakes.multiple || 0)
+      : totalStake;
+
     setIsBooking(true);
     try {
-      const res = await bookBet({
+      const payload = {
         mode: betMode,
         stake: linePrice,
         ...(betMode === 'system' ? { systemType } : {}),
         selections: selections.map((s) => ({
           matchId: s.matchId, market: s.market, outcome: s.outcome, odds: s.odds,
         })),
-      });
-      setSelections([]);
+      };
+      const res = await bookBet(payload);
+      clearSlip();
       setSlipOpen(false);
       setSuccessType('booked');
       setSuccessBet(res.bet);
-      toast(`Bet booked — code ${res.bet.bookingCode}.`);
+      toast(`Bet booked - code ${res.bet.bookingCode}.`);
     } catch (e) {
       if (e.status === 409) {
-        setSlipErr(e.message || 'Odds changed or market closed — refreshing.');
-        setSelections([]);
+        setSlipErr(e.message || 'Odds changed or market closed - refreshing.');
+        clearSlip();
         try { setSnapshot(await fetchMatches(sportId)); } catch {/* ignore */}
       } else {
         setSlipErr(e.message || 'Could not book bet.');
@@ -620,60 +528,62 @@ export default function Home({ initialChip }) {
     } finally {
       setIsBooking(false);
     }
-  }, [selections, betMode, systemDef, stake, linesCount, totalOdds, payout, toast, sportId, account, navigate]);
+  }, [selections, betMode, stakes, totalStake, systemDef, systemType, toast, sportId, account, navigate, clearSlip]);
 
   const onPlaceBet = useCallback(async () => {
     setSlipErr('');
-    if (!selections.length) { setSlipErr('Add at least one selection to your bet slip.'); return; }
-    if (betMode === 'multiple' && selections.length < 2) {
-      setSlipErr('Multiple bets need at least 2 selections.'); return;
-    }
-    if (betMode === 'system' && !systemDef) {
-      setSlipErr('Pick a valid number of selections for a system bet (3–8).'); return;
-    }
-    const linePrice = parseStake(stake);
-    if (linePrice <= 0) { setSlipErr('Enter a stake amount.'); return; }
-    const cost = betMode === 'system' ? linePrice * linesCount : linePrice;
-    if (cost < 400) { setSlipErr(`Minimum stake is GHS 400 (this ticket costs GHS ${formatAmt(cost)}).`); return; }
+
+    const errors = validateBetSlip({
+      selections, betMode, stakes,
+      account, minStake: 400,
+    });
+    if (errors.length) { setSlipErr(errors[0]); return; }
+
     if (!account) {
       setSlipOpen(false);
       navigate('/login?next=/');
       toast('Sign in to place a bet.');
       return;
     }
-    if (cost > account.balance) {
-      setSlipErr(`Insufficient balance — this ticket costs GHS ${formatAmt(cost)}.`);
+
+    if (totalStake > account.balance) {
+      setSlipErr(`Insufficient balance - this ticket costs GHS ${formatAmt(totalStake)}.`);
       return;
     }
 
+    const linePrice = betMode === 'multiple'
+      ? parseStake(stakes.multiple || 0)
+      : totalStake;
+
     setIsPlacing(true);
-    adjustBalance(-cost);
+    adjustBalance(-totalStake);
     try {
-      const res = await placeBet({
+      const payload = {
         mode: betMode,
         stake: linePrice,
         ...(betMode === 'system' ? { systemType } : {}),
         selections: selections.map((s) => ({
           matchId: s.matchId, market: s.market, outcome: s.outcome, odds: s.odds,
         })),
-      });
+      };
+      const res = await placeBet(payload);
       if (res.account) setAccount(res.account);
-      toast(`Bet placed — booking code ${res.bet.bookingCode}.`);
+      toast(`Bet placed - booking code ${res.bet.bookingCode}.`);
       try {
         const stored = localStorage.getItem('betxentra_recent_codes');
         let list = stored ? JSON.parse(stored) : [];
         list = [res.bet.bookingCode, ...list.filter((c) => c !== res.bet.bookingCode)].slice(0, 8);
         localStorage.setItem('betxentra_recent_codes', JSON.stringify(list));
       } catch { /* ignore */ }
-      setSelections([]);
+      clearSlip();
       setSlipOpen(false);
       setSuccessType('placed');
       setSuccessBet(res.bet);
     } catch (e) {
-      adjustBalance(cost);
+      adjustBalance(totalStake);
       if (e.status === 409) {
-        setSlipErr(e.message || 'Odds changed or market closed — refreshing.');
-        setSelections([]);
+        setSlipErr(e.message || 'Odds changed or market closed - refreshing.');
+        clearSlip();
         try { setSnapshot(await fetchMatches(sportId)); } catch {/* ignore */}
       } else {
         setSlipErr(e.message || 'Could not place bet.');
@@ -681,7 +591,7 @@ export default function Home({ initialChip }) {
     } finally {
       setIsPlacing(false);
     }
-  }, [selections, betMode, systemDef, stake, linesCount, totalOdds, payout, toast, account, navigate, sportId]);
+  }, [selections, betMode, stakes, totalStake, systemDef, systemType, linesCount, toast, account, navigate, sportId, adjustBalance, setAccount, clearSlip]);
 
   const openMarkets = (league, match) => {
     setMarketsForMatch({ league, match });
@@ -809,12 +719,11 @@ export default function Home({ initialChip }) {
       away: l.away,
       trend: null,
     }));
-    setSelections(hydrated);
-    setBetMode(hydrated.length === 1 ? 'single' : 'multiple');
+    loadSelections(hydrated, hydrated.length === 1 ? 'single' : 'multiple');
     setSlipOpen(true);
     setSlipErr('');
     toast(`Loaded ${hydrated.length} legs onto your slip.`);
-  }, [toast]);
+  }, [toast, loadSelections]);
 
   const onFeaturedCodeLoad = async (e) => {
     e.preventDefault();
@@ -885,12 +794,7 @@ export default function Home({ initialChip }) {
 
   // Grand Prize Winners state (replaced by animated GrandPrizeWinners component)
 
-  const marketChips = [
-    ['1X2',  '1X2'],
-    ['OU25', 'O/U'],
-    ['DC',   'DC'],
-    ['HT',   '1st Half O/U'],
-  ];
+  const marketChips = MARKET_CHIP_DEFS;
 
   return (
     <>
@@ -1031,6 +935,7 @@ export default function Home({ initialChip }) {
 
       {/* ─── Market chips ─── */}
       <div className="sb-market-chips">
+        <div className="sb-market-chips-scroll">
         {marketChips.map(([key, label]) => (
           <button
             key={key}
@@ -1041,6 +946,7 @@ export default function Home({ initialChip }) {
             {label}
           </button>
         ))}
+        </div>
         <button type="button" className="sb-chip sb-chip-icon" aria-label="Region">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <circle cx="12" cy="12" r="9" />
@@ -1272,7 +1178,7 @@ export default function Home({ initialChip }) {
 
       {/* ─── Draggable floating betslip button ─── */}
       <DraggableBetFAB
-        count={selections.length}
+        count={selectionCount}
         totalOdds={totalOdds}
         onClick={() => setSlipOpen(true)}
       />
@@ -1281,7 +1187,7 @@ export default function Home({ initialChip }) {
       <dialog ref={slipDlg} className="sb-sheet sporty-betslip-sheet" onClose={() => setSlipOpen(false)}>
         <div className="xb-sheet-header">
           <div className="xb-header-left">
-            <span className="xb-count-badge">{selections.length}</span>
+            <span className="xb-count-badge">{selectionCount}</span>
             <span className="xb-header-title">Bet Slip</span>
           </div>
           <div className="xb-header-right">
@@ -1297,7 +1203,7 @@ export default function Home({ initialChip }) {
         <div className="sb-sheet-body" style={{ padding: '0 0 max(80px, env(safe-area-inset-bottom))' }}>
           {/* Clear slip button */}
           <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '4px 12px 0' }}>
-            {selections.length > 0 && (
+            {selectionCount > 0 && (
               <button type="button" onClick={clearSlip} style={{ background: 'none', border: 0, color: '#d32f2f', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
                 Clear All
               </button>
@@ -1314,23 +1220,54 @@ export default function Home({ initialChip }) {
               </button>
             </div>
 
+            {/* Odds change notification */}
+            {hasOddsChanges && (
+              <div className="xb-odds-changed">
+                <span>Odds changed for {oddsChanges.length} selection(s)</span>
+                <div className="xb-odds-actions">
+                  <button type="button" onClick={acceptOddsChanges} className="xb-odds-accept">Accept</button>
+                  <button type="button" onClick={rejectOddsChanges} className="xb-odds-reject">Reject</button>
+                </div>
+              </div>
+            )}
+
             {/* Selections list */}
-            {selections.length === 0 ? (
-              <p style={{ fontSize: 13, color: '#888', padding: '24px 0', textAlign: 'center' }}>
+            {selectionCount === 0 ? (
+              <motion.p
+                initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+                style={{ fontSize: 13, color: '#888', padding: '24px 0', textAlign: 'center' }}
+              >
                 Tap any odds to add a selection.
-              </p>
+              </motion.p>
             ) : (
-              <div className="xb-selections" style={{ maxHeight: '220px', overflowY: 'auto' }}>
+              <div className="xb-selections">
+                <AnimatePresence mode="popLayout">
                 {selections.map((s) => (
-                  <div key={s.id} className="xb-sel-card">
+                  <motion.div
+                    key={s.id}
+                    layout
+                    initial={{ opacity: 0, x: 80, height: 0 }}
+                    animate={{ opacity: 1, x: 0, height: 'auto' }}
+                    exit={{ opacity: 0, x: -80, height: 0 }}
+                    transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+                    className={`xb-sel-card${s.trend ? ` xb-trend-${s.trend}` : ''}`}
+                  >
                     <div className="xb-sel-top">
                       <div className="xb-sel-info">
                         <div className="xb-sel-teams">{s.meta}</div>
-                        <div className="xb-sel-pick">{s.pickLabel} @ {s.odds.toFixed(2)}</div>
+                        <div className="xb-sel-pick">{s.pickLabel}</div>
+                        <div className="xb-sel-market">{marketName(s.market)}</div>
+                        <div className="xb-sel-odds-row">
+                          <span className={`xb-sel-odds${s.stale ? ' stale' : ''}`}>
+                            @ {s.odds.toFixed(2)}
+                          </span>
+                          {s.trend === 'up' && <span className="xb-trend-up">Odds Increased</span>}
+                          {s.trend === 'down' && <span className="xb-trend-down">Odds Decreased</span>}
+                          {s.stale && <span className="xb-stale-badge">Stale</span>}
+                        </div>
                       </div>
                       <div className="xb-sel-actions">
-                        <button type="button" className="xb-view-match" onClick={() => {/* navigate to match */}}>View Match</button>
-                        <button type="button" className="xb-sel-remove" aria-label="Remove" onClick={() => removeById(s.id)}>
+                        <button type="button" className="xb-sel-remove" aria-label="Remove" onClick={() => removeSelection(s.id)}>
                           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                         </button>
                       </div>
@@ -1339,87 +1276,109 @@ export default function Home({ initialChip }) {
                     {betMode === 'single' && (
                       <div className="xb-sel-stake-row">
                         <div className="xb-sel-stake-input">
+                          <span className="xb-stake-currency">GHS</span>
                           <input
                             type="text"
-                            value={stake}
-                            onChange={(e) => setStake(e.target.value)}
+                            value={stakes[s.id] > 0 ? stakes[s.id].toFixed(2) : ''}
+                            onChange={(e) => setSelectionStake(s.id, e.target.value)}
                             inputMode="decimal"
-                            placeholder="Enter stake (USD)"
+                            placeholder="Stake"
                           />
                         </div>
                         <div className="xb-sel-win">
-                          <span className="xb-sel-win-label">Single Win</span>
-                          <span className="xb-sel-win-val">${payout > 0 ? formatAmt(s.odds * parseStake(stake)) : '0.00'}</span>
+                          <span className="xb-sel-win-label">Potential Win</span>
+                          <span className="xb-sel-win-val">GHS {(selectionPayouts[s.id] || 0) > 0 ? formatAmt(selectionPayouts[s.id]) : '0.00'}</span>
                         </div>
                       </div>
                     )}
-                  </div>
+                  </motion.div>
                 ))}
+                </AnimatePresence>
               </div>
             )}
 
             {/* Summary section */}
-            <div className="xb-summary">
-              {betMode === 'single' && (
+            {selectionCount > 0 && (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="xb-summary"
+              >
+                {betMode === 'multiple' && (
+                  <div className="xb-summary-row">
+                    <span>Total Odds</span>
+                    <span>{totalOdds.toFixed(2)}</span>
+                  </div>
+                )}
+                {betMode === 'multiple' && (
+                  <div className="xb-summary-row">
+                    <span>Selections</span>
+                    <span>{selectionCount}</span>
+                  </div>
+                )}
                 <div className="xb-summary-row">
-                  <span>Selections</span>
-                  <span>{selections.length}</span>
+                  <span>Total Stake</span>
+                  <span>GHS {formatAmt(totalStake)}</span>
                 </div>
-              )}
-              {betMode === 'multiple' && (
-                <div className="xb-summary-row">
-                  <span>Total Odds</span>
-                  <span>{selections.length ? totalOdds.toFixed(2) : '—'}</span>
+                <div className="xb-summary-row xb-summary-payout">
+                  <span>Potential Win</span>
+                  <span>GHS {payout > 0 ? formatAmt(payout) : '0.00'}</span>
                 </div>
-              )}
-              <div className="xb-summary-row">
-                <span>Total Stake</span>
-                <span>${formatAmt(totalStake)}</span>
-              </div>
-              <div className="xb-summary-row">
-                <span>Potential Win</span>
-                <span>${payout > 0 ? formatAmt(payout) : '0.00'}</span>
-              </div>
-            </div>
+              </motion.div>
+            )}
 
-            {/* Multiple mode: single stake input + quick buttons */}
-            {betMode === 'multiple' && (
-              <div className="xb-stake-section">
+            {/* Multiple mode: single stake input */}
+            {betMode === 'multiple' && selectionCount > 0 && (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="xb-stake-section"
+              >
                 <div className="xb-stake-row">
-                  <span className="xb-stake-label">Stake</span>
+                  <span className="xb-stake-label">Stake (GHS)</span>
                   <div className="xb-stake-input-wrap">
                     <input
                       type="text"
-                      value={stake}
-                      onChange={(e) => setStake(e.target.value)}
+                      value={stakes.multiple > 0 ? stakes.multiple.toFixed(2) : ''}
+                      onChange={(e) => setMultipleStake(e.target.value)}
                       inputMode="decimal"
-                      placeholder="Enter stake (USD)"
+                      placeholder="Enter stake"
                       autoComplete="off"
                     />
                   </div>
                 </div>
-              </div>
+              </motion.div>
             )}
 
             {/* Quick stake add buttons */}
-            <div className="xb-quick-stakes">
-              {[100, 200, 300, 400, 500, 600, 700, 800, 900, 1000].map((amt) => (
-                <button key={amt} type="button" className="xb-quick-btn" onClick={() => setStake(formatAmt(parseStake(stake) + amt))}>+{amt}</button>
-              ))}
-            </div>
-
-            {/* Minimum stake warning */}
-            {parseStake(stake) > 0 && parseStake(stake) < 400 && (
-              <div className="xb-warn">Enter stake on each selection above.</div>
+            {selectionCount > 0 && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.1 }}
+                className="xb-quick-stakes"
+              >
+                {[100, 200, 300, 500, 1000, 2000, 5000, 10000].map((amt) => (
+                  <button key={amt} type="button" className="xb-quick-btn" onClick={() => {
+                    if (betMode === 'single') {
+                      selections.forEach((s) => setSelectionStake(s.id, (stakes[s.id] || 0) + amt));
+                    } else {
+                      setMultipleStake((stakes.multiple || 0) + amt);
+                    }
+                  }}>+{amt}</button>
+                ))}
+              </motion.div>
             )}
 
-            {/* Insufficient balance */}
-            {parseStake(stake) > (account?.balance || 0) && betRealMode === 'REAL' && (
+            {/* Warnings */}
+            {totalStake < 400 && totalStake > 0 && (
+              <div className="xb-warn">Minimum total stake is GHS 400.00.</div>
+            )}
+            {totalStake > (account?.balance || 0) && betRealMode === 'REAL' && (
               <div className="xb-warn" style={{ color: '#d32f2f' }}>
                 Insufficient balance. <a href="#deposit" className="xb-deposit-link" onClick={(e) => { e.preventDefault(); setSlipOpen(false); openDeposit(); }}>Deposit</a>
               </div>
             )}
-
             {slipErr && <div className="xb-warn" style={{ color: '#d32f2f' }}>{slipErr}</div>}
 
             {/* Booking code section */}
@@ -1443,24 +1402,26 @@ export default function Home({ initialChip }) {
             </div>
 
             {/* Action buttons */}
-            <div className="xb-actions">
-              <button
-                type="button"
-                className="xb-book-btn"
-                onClick={onBookBet}
-                disabled={isBooking}
-              >
-                {isBooking ? 'Booking...' : 'Book Bet'}
-              </button>
-              <button
-                type="button"
-                className="xb-place-btn"
-                onClick={onPlaceBet}
-                disabled={isPlacing || !selections.length || parseStake(stake) <= 0 || (parseStake(stake) > (account?.balance || 0) && betRealMode === 'REAL')}
-              >
-                {isPlacing ? 'Placing...' : 'Place Bet'}
-              </button>
-            </div>
+            {selectionCount > 0 && (
+              <div className="xb-actions">
+                <button
+                  type="button"
+                  className="xb-book-btn"
+                  onClick={onBookBet}
+                  disabled={isBooking}
+                >
+                  {isBooking ? 'Booking...' : 'Book Bet'}
+                </button>
+                <button
+                  type="button"
+                  className="xb-place-btn"
+                  onClick={onPlaceBet}
+                  disabled={isPlacing || totalStake <= 0 || totalStake > (account?.balance || 0)}
+                >
+                  {isPlacing ? 'Placing...' : `Place Bet${totalStake > 0 ? ` - GHS ${formatAmt(totalStake)}` : ''}`}
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </dialog>
@@ -1480,79 +1441,65 @@ export default function Home({ initialChip }) {
           };
           const hasPrev = curIdx > 0;
           const hasNext = curIdx >= 0 && curIdx < matchesInLeague.length - 1;
+          const match_ = marketsForMatch.match;
+          const league_ = marketsForMatch.league;
+          const marketEntries = Object.entries(match_.markets || {});
+          const isLargeMarket = (mkey) => {
+            const count = match_.markets?.[mkey]?.selections?.length || 0;
+            return count >= 9;
+          };
           return (
           <>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, position: 'sticky', top: 0, background: 'var(--surface)', padding: '4px 0', zIndex: 5 }}>
-              <button
-                type="button"
-                onClick={() => marketsDlg.current?.close()}
-                aria-label="Close"
-                style={{ background: 'var(--surface-2)', border: '1px solid var(--line)', borderRadius: 8, padding: '8px 10px', color: 'var(--text)', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4, fontWeight: 700 }}
-              >
+            <div className="md-header">
+              <button type="button" className="md-header-btn" onClick={() => marketsDlg.current?.close()} aria-label="Close">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
                 Back
               </button>
-              <button
-                type="button"
-                onClick={goPrev}
-                disabled={!hasPrev}
-                aria-label="Previous match"
-                title="Previous match in league"
-                style={{ background: 'var(--surface-2)', border: '1px solid var(--line)', borderRadius: 8, padding: '8px 10px', color: hasPrev ? 'var(--text)' : 'var(--text-dim)', cursor: hasPrev ? 'pointer' : 'not-allowed', opacity: hasPrev ? 1 : 0.5 }}
-              >
+              <button type="button" className="md-header-btn" onClick={goPrev} disabled={!hasPrev} aria-label="Previous match" title="Previous match in league">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
               </button>
-              <span style={{ fontSize: 12, color: 'var(--text-dim)', flex: 1, textAlign: 'center' }}>
-                {curIdx >= 0 ? `${curIdx + 1} / ${matchesInLeague.length}` : ''}
-              </span>
-              <button
-                type="button"
-                onClick={goNext}
-                disabled={!hasNext}
-                aria-label="Next match"
-                title="Next match in league"
-                style={{ background: 'var(--surface-2)', border: '1px solid var(--line)', borderRadius: 8, padding: '8px 10px', color: hasNext ? 'var(--text)' : 'var(--text-dim)', cursor: hasNext ? 'pointer' : 'not-allowed', opacity: hasNext ? 1 : 0.5 }}
-              >
+              <span className="md-header-count">{curIdx >= 0 ? `${curIdx + 1} / ${matchesInLeague.length}` : ''}</span>
+              <button type="button" className="md-header-btn" onClick={goNext} disabled={!hasNext} aria-label="Next match" title="Next match in league">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
               </button>
             </div>
-            <h3 style={{
-              fontSize: 'clamp(22px, 6.5vw, 34px)',
-              lineHeight: 1.1,
-              fontWeight: 800,
-              letterSpacing: '-0.02em',
-              margin: '8px 0 6px',
-              wordBreak: 'break-word',
-            }}>{marketsForMatch.match.home} vs {marketsForMatch.match.away}</h3>
-            <p style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 16 }}>
-              {marketsForMatch.league.name} · {matchMeta(marketsForMatch.match)}
-            </p>
-            {Object.entries(marketsForMatch.match.markets || {}).map(([mkey, mkt]) => (
-              <div key={mkey} style={{ marginBottom: 16 }}>
-                <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-soft)', marginBottom: 8 }}>{mkt.name}</div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 8 }}>
+            <h3 className="md-match-title">{match_.home} vs {match_.away}</h3>
+            <div className="md-match-meta">
+              <span>{league_.name} · {matchMeta(match_)}</span>
+              {match_.isLive && <span className="md-live-badge">LIVE {match_.minute || ''}</span>}
+            </div>
+            {marketEntries.map(([mkey, mkt]) => {
+              const selCount = mkt.selections?.length || 0;
+              let gridClass = '';
+              if (selCount >= 9) gridClass = 'compact-cols';
+              else if (selCount >= 6) gridClass = 'wide-cols';
+              return (
+              <div key={mkey} className="md-market-section">
+                <div className="md-market-name">{marketName(mkey)}</div>
+                <div className={`md-market-grid ${gridClass}`}>
                   {mkt.selections.map((s) => {
-                    const sel = selections.find((x) => x.matchId === marketsForMatch.match.id && x.market === mkey && x.outcome === s.key);
+                    const sel = selections.find((x) => x.matchId === match_.id && x.market === mkey && x.outcome === s.key);
+                    const trendClass = sel?.trend === 'up' ? ' up' : sel?.trend === 'down' ? ' down' : '';
                     return (
                       <button
                         key={s.key}
                         type="button"
-                        className={`odd-btn${sel ? ' selected' : ''}`}
-                        onClick={() => toggleSelection(marketsForMatch.league, marketsForMatch.match, mkey, s.key, s.odds)}
-                        style={{ padding: '10px 12px' }}
+                        className={`odd-btn${sel ? ' selected' : ''}${trendClass}${s.suspended ? ' suspended' : ''}`}
+                        onClick={() => toggleSelection(league_, match_, mkey, s.key, s.odds)}
+                        disabled={s.suspended}
                       >
-                        <span className="ol" style={{ fontSize: 11 }}>{s.label}</span>
+                        <span className="ol">{s.label}</span>
                         <span className="ov">{s.odds.toFixed(2)}</span>
                       </button>
                     );
                   })}
                 </div>
               </div>
-            ))}
+            )})}
             <div className="bv-dialog-actions">
               <button type="button" className="btn btn-ghost" onClick={() => marketsDlg.current?.close()}>Close</button>
               <button type="button" className="btn btn-primary" onClick={() => { marketsDlg.current?.close(); setSlipOpen(true); }}>
-                Done · {selections.length} on slip
+                Done · {selectionCount} on slip
               </button>
             </div>
           </>

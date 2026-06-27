@@ -19,4 +19,10 @@ export default defineConfig({
       },
     },
   },
+  test: {
+    environment: 'jsdom',
+    globals: true,
+    setupFiles: './src/test/setup.js',
+    exclude: ['src/lib/*.test.js', 'node_modules'],
+  },
 });
