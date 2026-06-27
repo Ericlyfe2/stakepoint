@@ -1132,7 +1132,7 @@ export default function Home({ initialChip }) {
                                       key={s.key}
                                       type="button"
                                       className={`sb-odd${isSel ? ' selected' : ''}`}
-                                      onClick={() => toggleSelection(lg, match, market, s.key, s.odds)}
+                                      onClick={() => toggleSelection(match, market, s.key, s.odds)}
                                     >
                                       {s.odds?.toFixed(2)}
                                     </button>
@@ -1485,7 +1485,7 @@ export default function Home({ initialChip }) {
                         key={s.key}
                         type="button"
                         className={`odd-btn${sel ? ' selected' : ''}${trendClass}${s.suspended ? ' suspended' : ''}`}
-                        onClick={() => toggleSelection(league_, match_, mkey, s.key, s.odds)}
+                        onClick={() => toggleSelection(match_, mkey, s.key, s.odds)}
                         disabled={s.suspended}
                       >
                         <span className="ol">{s.label}</span>
