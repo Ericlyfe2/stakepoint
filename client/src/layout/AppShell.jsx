@@ -88,10 +88,10 @@ function MobileHeader({ account, onSignIn, onSignUp, onAvatar, onSearch, onBalan
             style={{ cursor: 'pointer', background: 'var(--surface)', border: '1px solid var(--surface-2)', font: 'inherit' }}
           >
             <span style={{ color: 'var(--text-dim)' }}>GHS</span>
-            <b>{formatAmt(account.balance)}</b>
+            <b>{formatAmt(account?.balance)}</b>
           </button>
           <button type="button" className="sb-avatar" onClick={onAvatar} aria-label="Account">
-            {(account.displayName || account.email || '?').charAt(0).toUpperCase()}
+            {(account?.displayName || account?.email || '?').charAt(0).toUpperCase()}
           </button>
         </>
       ) : (
@@ -384,7 +384,7 @@ export default function AppShell() {
             <button
               type="button"
               className="balance"
-              title={authed ? `${account.displayName} — open wallet manager` : 'Not signed in'}
+              title={authed ? `${account?.displayName || 'Account'} — open wallet manager` : 'Not signed in'}
               onClick={() => authed ? walletMenuDlg.current?.showModal() : navigate('/login?next=/')}
               style={{ cursor: 'pointer', background: 'transparent', border: 'none', font: 'inherit' }}
             >
@@ -396,7 +396,7 @@ export default function AppShell() {
             <button type="button" className="btn btn-ghost" onClick={openDeposit}>Deposit</button>
             {authed && <button type="button" className="btn btn-ghost" onClick={openWithdraw}>Withdraw</button>}
             {authed && <button type="button" className="btn btn-ghost" onClick={() => navigate('/profile')} title="Account">
-              {(account.displayName || account.email).charAt(0).toUpperCase()}
+              {(account?.displayName || account?.email || '?').charAt(0).toUpperCase()}
             </button>}
             {!authed
               ? <button type="button" className="btn btn-primary" onClick={() => navigate('/login')}>Sign in</button>
