@@ -208,9 +208,9 @@ function BottomNav({ openCount }) {
       ),
     },
     {
-      to: '/info',
+      to: '/az-menu',
       label: 'A-Z Menu',
-      active: is('/info'),
+      active: is('/az-menu'),
       icon: (
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
           <line x1="3" y1="12" x2="21" y2="12" />

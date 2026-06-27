@@ -18,6 +18,7 @@ import VirtualsPage from './pages/VirtualsPage.jsx';
 import JackpotPage from './pages/JackpotPage.jsx';
 import PromosPage from './pages/PromosPage.jsx';
 import InfoPage from './pages/InfoPage.jsx';
+import AZMenuPage from './pages/AZMenuPage.jsx';
 import HelpPage from './pages/HelpPage.jsx';
 import CodeHubPage from './pages/CodeHubPage.jsx';
 import TicketPage from './pages/TicketPage.jsx';
@@ -101,6 +102,7 @@ export default function App() {
                 <Route path="/profile"   element={<ProfilePage />} />
                 <Route path="/wallet"    element={<WalletPage />} />
                 <Route path="/withdraw"  element={<WithdrawPage />} />
+                <Route path="/az-menu"   element={<AZMenuPage />} />
                 <Route path="/info"      element={<InfoPage />} />
                 <Route path="/terms"     element={<Navigate to="/info#terms" replace />} />
                 <Route path="/privacy"   element={<Navigate to="/info#privacy" replace />} />
