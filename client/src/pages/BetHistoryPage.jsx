@@ -225,7 +225,7 @@ function TicketDetails({ bet, onClose, onRemix, onShare }) {
             </div>
             <div className="td-info-row">
               <span className="td-info-label">Total BetXentra Return</span>
-              <span className="td-info-val td-info-return" style={{ color: isWon || isCashed ? '#22c66e' : '#fff' }}>{returnVal}</span>
+              <span className="td-info-val td-info-return" style={{ color: isWon || isCashed ? '#22c66e' : 'var(--text)' }}>{returnVal}</span>
             </div>
             <div className="td-info-row">
               <span className="td-info-label">Total Stake</span>
@@ -321,7 +321,7 @@ function TicketDetails({ bet, onClose, onRemix, onShare }) {
                     <div className="td-leg-details">
                       <div className="td-leg-detail"><span>Pick:</span> <span className="td-leg-detail-val">{getPickName(pick)} {odds}</span></div>
                       <div className="td-leg-detail"><span>Market:</span> <span className="td-leg-detail-val">{getMarketName(leg.market)}</span></div>
-                      <div className="td-leg-detail"><span>Outcome:</span> <span className="td-leg-detail-val" style={{ color: won ? '#22c66e' : lost ? '#e53935' : '#fff' }}>{getPickName(actualOutcome)}</span></div>
+                      <div className="td-leg-detail"><span>Outcome:</span> <span className="td-leg-detail-val" style={{ color: won ? '#22c66e' : lost ? '#e53935' : 'var(--text)' }}>{getPickName(actualOutcome)}</span></div>
                     </div>
                   </div>
                 </div>
@@ -1005,7 +1005,7 @@ const XH_CSS = `
 /* ── Top tabs ── */
 .xh-top-tabs { display: flex; background: var(--bg-soft); border-bottom: 1px solid var(--line); }
 .xh-top-tab { flex: 1; padding: 14px 0; border: none; background: transparent; color: var(--text-dim); font-size: 13px; font-weight: 700; cursor: pointer; font-family: inherit; text-align: center; position: relative; }
-.xh-top-tab.active { color: #fff; font-weight: 800; }
+.xh-top-tab.active { color: var(--text); font-weight: 800; }
 .xh-top-tab.active::after { content: ''; position: absolute; bottom: -1px; left: 0; right: 0; height: 3px; background: var(--accent); }
 
 /* ── Filter chips ── */
@@ -1016,7 +1016,7 @@ const XH_CSS = `
 /* ── Date group with rail ── */
 .xh-date-group { display: flex; align-items: stretch; gap: 0; }
 .xh-date-rail { width: 50px; flex-shrink: 0; display: flex; flex-direction: column; align-items: center; padding-top: 16px; background: var(--bg); }
-.xh-date-day { color: #fff; font-size: 18px; font-weight: 800; line-height: 1; }
+.xh-date-day { color: var(--text); font-size: 18px; font-weight: 800; line-height: 1; }
 .xh-date-mon { color: var(--text-dim); font-size: 10px; font-weight: 700; letter-spacing: 1px; margin-top: 2px; }
 .xh-date-cards { flex: 1; padding: 10px 12px 4px; display: flex; flex-direction: column; gap: 10px; }
 .xh-date-group-flat { display: flex; flex-direction: column; }
@@ -1027,11 +1027,11 @@ const XH_CSS = `
 
 /* ── Card header bar ── */
 .xh-card-header { display: flex; justify-content: space-between; align-items: center; padding: 9px 13px; }
-.xh-card-header-mode { font-size: 13px; font-weight: 800; color: #fff; }
+.xh-card-header-mode { font-size: 13px; font-weight: 800; color: var(--text-inv); }
 .xh-card-header-status { display: flex; align-items: center; gap: 7px; }
 .xh-card-header-icon { font-size: 12px; }
-.xh-card-header-label { color: #fff; font-size: 12.5px; font-weight: 800; }
-.xh-card-header-chevron { color: #fff; font-size: 14px; opacity: .85; }
+.xh-card-header-label { color: var(--text-inv); font-size: 12.5px; font-weight: 800; }
+.xh-card-header-chevron { color: var(--text-inv); font-size: 14px; opacity: .85; }
 
 /* ── Card body ── */
 .xh-card-body { padding: 0 13px 11px; display: flex; flex-direction: column; gap: 5px; }
@@ -1049,12 +1049,12 @@ const XH_CSS = `
 /* Auto cashout banner */
 .xh-auto-banner { display: flex; align-items: center; gap: 6px; padding: 9px 13px; background: var(--surface-2); border-bottom: 1px solid var(--line); }
 .xh-auto-banner-text { color: var(--text-soft); font-size: 11.5px; }
-.xh-auto-banner-text strong { color: #fff; }
+.xh-auto-banner-text strong { color: var(--text); }
 .xh-auto-banner-info { color: var(--text-dim); display: flex; cursor: pointer; }
 
 /* Mode header row */
 .xh-open-mode-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 13px 6px; cursor: pointer; }
-.xh-open-mode { color: #fff; font-size: 14px; font-weight: 800; }
+.xh-open-mode { color: var(--text); font-size: 14px; font-weight: 800; }
 .xh-open-actions { display: flex; align-items: center; gap: 10px; }
 .xh-open-action { display: inline-flex; align-items: center; gap: 4px; background: none; border: none; color: var(--text-dim); font-size: 11px; font-weight: 600; cursor: pointer; font-family: inherit; padding: 0; }
 .xh-open-action:hover { color: var(--text-soft); }
@@ -1063,7 +1063,7 @@ const XH_CSS = `
 /* Compact view */
 .xh-open-compact { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 13px 12px; cursor: pointer; }
 .xh-open-compact-info { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 0; }
-.xh-open-match { color: #fff; font-size: 13.5px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.xh-open-match { color: var(--text); font-size: 13.5px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .xh-open-stake { color: var(--text-soft); font-size: 12px; font-weight: 600; }
 .xh-open-cashout-btn { flex-shrink: 0; padding: 10px 16px; border: none; border-radius: 8px; background: var(--accent); color: #fff; font-weight: 800; font-size: 12px; font-family: inherit; cursor: pointer; transition: opacity .15s; line-height: 1.35; text-align: center; }
 .xh-open-cashout-btn:hover { opacity: .9; }
@@ -1076,9 +1076,9 @@ const XH_CSS = `
 .xh-open-leg { padding: 10px 0; border-bottom: 1px solid var(--line); }
 .xh-open-leg:last-of-type { border-bottom: none; }
 .xh-open-leg-pick { display: flex; align-items: center; gap: 7px; color: var(--text-soft); font-size: 12.5px; margin-bottom: 4px; }
-.xh-open-leg-pick strong { color: #fff; font-weight: 700; }
+.xh-open-leg-pick strong { color: var(--text); font-weight: 700; }
 .xh-open-leg-mkt { color: var(--text-dim); font-size: 11px; font-weight: 500; }
-.xh-open-leg-match { color: #fff; font-size: 13.5px; font-weight: 700; margin-bottom: 3px; }
+.xh-open-leg-match { color: var(--text); font-size: 13.5px; font-weight: 700; margin-bottom: 3px; }
 .xh-open-leg-date { color: var(--text-dim); font-size: 11px; margin-bottom: 6px; }
 .xh-open-leg-league-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .xh-open-hide-details { background: none; border: none; color: var(--text-dim); font-size: 11px; font-weight: 600; cursor: pointer; font-family: inherit; padding: 0; }
@@ -1087,7 +1087,7 @@ const XH_CSS = `
 /* Stake / Pot Win summary */
 .xh-open-summary { display: flex; flex-direction: column; gap: 5px; padding: 10px 0 8px; border-top: 1px solid var(--line); }
 .xh-open-summary-row { display: flex; justify-content: space-between; color: var(--text-soft); font-size: 12px; }
-.xh-open-summary-val { color: #fff; font-weight: 700; font-variant-numeric: tabular-nums; }
+.xh-open-summary-val { color: var(--text); font-weight: 700; font-variant-numeric: tabular-nums; }
 
 /* Full-width cashout button */
 .xh-open-cashout-wrap { padding: 4px 0 2px; }
@@ -1146,7 +1146,7 @@ const XH_CSS = `
 .td-info-row { display: flex; justify-content: space-between; align-items: center; padding: 11px 14px; border-bottom: 1px solid var(--line); }
 .td-info-row:last-child { border-bottom: none; }
 .td-info-label { color: var(--text-soft); font-size: 12.5px; font-weight: 500; }
-.td-info-val { color: #fff; font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.td-info-val { color: var(--text); font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .td-info-return { font-size: 18px; font-weight: 800; }
 .td-info-status { font-size: 12.5px; font-weight: 800; }
 
@@ -1154,7 +1154,7 @@ const XH_CSS = `
 .td-booking { background: var(--surface); border-bottom: 1px solid var(--line); padding: 12px 14px; }
 .td-booking-label { display: block; color: var(--text-dim); font-size: 11px; font-weight: 600; margin-bottom: 8px; }
 .td-booking-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-.td-booking-code { color: #fff; font-size: 18px; font-weight: 800; letter-spacing: 1px; }
+.td-booking-code { color: var(--text); font-size: 18px; font-weight: 800; letter-spacing: 1px; }
 .td-booking-actions { display: flex; align-items: center; gap: 8px; }
 .td-booking-icon-btn { width: 34px; height: 34px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface-2); color: var(--text-soft); display: grid; place-items: center; cursor: pointer; }
 .td-booking-rebet { padding: 9px 22px; border-radius: 8px; border: none; background: var(--accent); color: #fff; font-size: 13px; font-weight: 800; cursor: pointer; font-family: inherit; }
@@ -1170,15 +1170,15 @@ const XH_CSS = `
 .td-leg { background: var(--surface); border-radius: 8px; overflow: hidden; border-left: 3px solid #22c66e; }
 .td-leg-header { background: var(--surface-2); padding: 8px 12px; color: var(--text-dim); font-size: 11px; font-weight: 600; }
 .td-leg-body { padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; }
-.td-leg-teams { color: #fff; font-size: 13.5px; font-weight: 700; }
+.td-leg-teams { color: var(--text); font-size: 13.5px; font-weight: 700; }
 .td-leg-score-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .td-leg-ft { color: var(--text-soft); font-size: 12px; }
-.td-leg-ft strong { color: #fff; font-weight: 800; }
+.td-leg-ft strong { color: var(--text); font-weight: 800; }
 .td-leg-divider { color: var(--text-dim); font-size: 12px; }
 .td-leg-tracker { display: inline-flex; align-items: center; gap: 4px; color: var(--accent); font-size: 11px; font-weight: 700; cursor: pointer; }
 .td-leg-details { display: flex; flex-direction: column; gap: 2px; margin-top: 4px; }
 .td-leg-detail { color: var(--text-soft); font-size: 12px; display: flex; gap: 5px; }
-.td-leg-detail-val { color: #fff; font-weight: 600; }
+.td-leg-detail-val { color: var(--text); font-weight: 600; }
 
 /* ── Cashout confirm ── */
 .xh-confirm-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.6); display: grid; place-items: center; z-index: 9999; padding: 16px; animation: xhFade .18s ease-out both; }

@@ -280,7 +280,7 @@ const STYLES = `
 }
 .bc-tab.active {
   background: var(--surface);
-  color: #fff;
+  color: var(--text);
 }
 .bc-tab-count {
   display: inline-block;
@@ -302,7 +302,7 @@ const STYLES = `
   padding: 6px 14px;
   border-radius: 999px;
   border: 1px solid var(--line);
-  background: rgba(255,255,255,0.04);
+  background: var(--surface);
   color: var(--text-dim);
   font-size: 12px;
   font-weight: 600;
@@ -311,12 +311,12 @@ const STYLES = `
   font-family: inherit;
 }
 .bc-pill:hover {
-  background: rgba(255,255,255,0.08);
-  color: #fff;
+  background: var(--surface-2);
+  color: var(--text);
 }
 .bc-pill.active {
   background: var(--surface-2);
-  color: #fff;
+  color: var(--text);
   border-color: var(--surface-2);
 }
 .bc-grid-btn {
@@ -326,7 +326,7 @@ const STYLES = `
   height: 32px;
   border-radius: 8px;
   border: 1px solid var(--line);
-  background: rgba(255,255,255,0.04);
+  background: var(--surface);
   color: var(--text-dim);
   cursor: pointer;
   display: grid;
@@ -334,8 +334,8 @@ const STYLES = `
   transition: background 0.15s, color 0.15s;
 }
 .bc-grid-btn:hover {
-  background: rgba(255,255,255,0.08);
-  color: #fff;
+  background: var(--surface-2);
+  color: var(--text);
 }
 
 /* ── Card ── */
