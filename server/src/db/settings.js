@@ -7,7 +7,7 @@ const DEFAULTS = {
   maintenanceMessage: 'Platform is undergoing scheduled maintenance. Please check back shortly.',
   signupsOpen: true,
   defaultOddsSource: 'auto',
-  minDeposit: 300,
+  minDeposit: 1,
   minWithdraw: 550,
   maxSingleStake: 1000000,
   maxMultipleStake: 500000,

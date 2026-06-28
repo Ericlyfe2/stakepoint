@@ -443,7 +443,7 @@ export function FinancePage() {
         </Card>
         <Card title="Min thresholds">
           <dl className="adm-kv" style={{ margin: 0 }}>
-            <dt>Min deposit</dt><dd>GHS 300</dd>
+            <dt>Min deposit</dt><dd>GHS 1</dd>
             <dt>Min withdraw</dt><dd>GHS 10,000</dd>
             <dt>Deposit gate</dt><dd>10% of withdraw</dd>
           </dl>
