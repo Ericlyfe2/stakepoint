@@ -308,10 +308,8 @@ function TicketDetails({ bet, onClose, onRemix, onShare }) {
 
 /* ─────────── BetCard (design-handoff: colored header bar) ─────────── */
 function BetCardView({ bet, onCashout, onRemix, onDetails, copiedCode, onCopy, autoTarget, onAutoTargetChange, onAutoClear, cashoutBusy }) {
-  const code = bet.bookingCode || toBookingCode(bet.id);
   const isOpen = bet.status === 'open';
   const cashOutAmount = isOpen ? computeOffer(bet) : 0;
-  const head = STATUS_CONFIG[bet.status] || STATUS_CONFIG.lost;
   const modeLabel = bet.mode === 'single' ? 'Single' : bet.mode === 'multiple' ? 'Multiple' : bet.mode === 'system' ? 'System' : 'Bet';
   const legs = bet.legs || [];
   const ticketNo = String(stableHash(bet?.id || '')).slice(0, 6).padStart(6, '0');
@@ -321,15 +319,12 @@ function BetCardView({ bet, onCashout, onRemix, onDetails, copiedCode, onCopy, a
   const green = '#22c66e';
   const gray = '#8a98a3';
   const isWon = bet.status === 'won';
-  const barBg = isWon ? '#1aa64f' : bet.status === 'cashed_out' ? '#14b8a6' : bet.status === 'void' ? '#f5a623' : bet.status === 'open' ? '#3b82f6' : '#9aa6af';
+  const barBg = isWon ? '#1aa64f' : bet.status === 'cashed_out' ? '#14b8a6' : bet.status === 'void' ? '#f5a623' : '#9aa6af';
   const returnColor = isWon ? green : bet.status === 'cashed_out' ? '#14b8a6' : gray;
-  const pillIcon = isWon ? '🏆' : bet.status === 'cashed_out' ? '⟳' : bet.status === 'void' ? '⚪' : bet.status === 'open' ? '⏳' : '✕';
-  const statusLabel = isWon ? 'Won' : bet.status === 'cashed_out' ? 'Cashed Out' : bet.status === 'void' ? 'Void' : bet.status === 'open' ? 'Pending' : 'Lost';
+  const pillIcon = isWon ? '🏆' : bet.status === 'cashed_out' ? '⟳' : bet.status === 'void' ? '⚪' : '✕';
+  const statusLabel = isWon ? 'Won' : bet.status === 'cashed_out' ? 'Cashed Out' : bet.status === 'void' ? 'Void' : 'Lost';
 
-  const firstLeg = legs[0] || {};
-  const matchName = firstLeg.match || firstLeg.event || (legs.length > 1 ? `${legs.length} selections` : 'Bet');
-  const league = firstLeg.league || firstLeg.competition || '';
-
+  /* ── Open Bets card (SportyBet style) ── */
   if (isOpen) {
     return (
       <motion.div
@@ -341,9 +336,35 @@ function BetCardView({ bet, onCashout, onRemix, onDetails, copiedCode, onCopy, a
         className="xh-card xh-card-open"
         onClick={() => onDetails?.(bet)}
       >
-        <div className="xh-open-body">
-          <div className="xh-open-info">
-            <span className="xh-open-match">{matchName}</span>
+        {/* Selections list */}
+        <div className="xh-open-legs">
+          {legs.map((leg, i) => {
+            const matchName = leg.home && leg.away ? `${leg.home} vs ${leg.away}` : leg.match || leg.event || 'Match';
+            const pick = getPickName(leg.outcome);
+            const market = getMarketName(leg.market);
+            return (
+              <div key={i} className="xh-open-leg">
+                <div className="xh-open-leg-top">
+                  <span className="xh-open-match">{matchName}</span>
+                  <span className="xh-open-odds">@ {Number(leg.odds || 1).toFixed(2)}</span>
+                </div>
+                <div className="xh-open-leg-bottom">
+                  <span className="xh-open-pick">{pick}</span>
+                  <span className="xh-open-market">{market}</span>
+                </div>
+              </div>
+            );
+          })}
+          {legs.length === 0 && (
+            <div className="xh-open-leg">
+              <span className="xh-open-match">Bet</span>
+            </div>
+          )}
+        </div>
+
+        {/* Stake row + cashout */}
+        <div className="xh-open-footer">
+          <div className="xh-open-stake-info">
             <span className="xh-open-stake">Stake {fmt(bet.stake)}</span>
           </div>
           {cashOutAmount > 0 && (
@@ -356,7 +377,11 @@ function BetCardView({ bet, onCashout, onRemix, onDetails, copiedCode, onCopy, a
             </button>
           )}
         </div>
-        {league && <div className="xh-open-league">{league}</div>}
+
+        {/* League badge */}
+        {legs[0] && (legs[0].league || legs[0].competition) && (
+          <div className="xh-open-league">{legs[0].league || legs[0].competition}</div>
+        )}
 
         {cashOutAmount > 0 && (
           <div onClick={e => e.stopPropagation()}>
@@ -374,6 +399,7 @@ function BetCardView({ bet, onCashout, onRemix, onDetails, copiedCode, onCopy, a
     );
   }
 
+  /* ── Bet History card (no cashout) ── */
   return (
     <motion.div
       layout
@@ -384,7 +410,6 @@ function BetCardView({ bet, onCashout, onRemix, onDetails, copiedCode, onCopy, a
       className="xh-card"
       onClick={() => onDetails?.(bet)}
     >
-      {/* ── Solid colored header bar ── */}
       <div className="xh-card-header" style={{ background: barBg }}>
         <span className="xh-card-header-mode">{modeLabel}</span>
         <div className="xh-card-header-status">
@@ -394,7 +419,6 @@ function BetCardView({ bet, onCashout, onRemix, onDetails, copiedCode, onCopy, a
         </div>
       </div>
 
-      {/* ── Card body ── */}
       <div className="xh-card-body">
         <div className="xh-card-row">
           <span className="xh-card-row-label">Total Return</span>
@@ -928,15 +952,23 @@ const XH_CSS = `
 .xh-card-row-dim { font-size: 11px; color: #56636d; font-weight: 600; }
 .xh-card-row-dim:last-child { font-size: 10.5px; font-weight: 400; }
 
-/* ── Open bet card ── */
-.xh-card-open { padding: 12px 13px 10px; }
-.xh-open-body { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.xh-open-info { display: flex; flex-direction: column; gap: 3px; flex: 1; min-width: 0; }
-.xh-open-match { color: #e8eef3; font-size: 13.5px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* ── Open bet card (SportyBet style) ── */
+.xh-card-open { padding: 0; }
+.xh-open-legs { display: flex; flex-direction: column; gap: 0; }
+.xh-open-leg { padding: 10px 13px; border-bottom: 1px solid #222e38; }
+.xh-open-leg:last-child { border-bottom: none; }
+.xh-open-leg-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 3px; }
+.xh-open-match { color: #e8eef3; font-size: 13px; font-weight: 700; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.xh-open-odds { color: #7d8b97; font-size: 11.5px; font-weight: 700; flex-shrink: 0; }
+.xh-open-leg-bottom { display: flex; align-items: center; gap: 8px; }
+.xh-open-pick { color: #1aa64f; font-size: 11.5px; font-weight: 700; }
+.xh-open-market { color: #56636d; font-size: 11px; }
+.xh-open-footer { display: flex; align-items: center; justify-content: space-between; padding: 10px 13px; border-top: 1px solid #222e38; }
+.xh-open-stake-info { display: flex; flex-direction: column; }
 .xh-open-stake { color: #7d8b97; font-size: 12px; font-weight: 600; }
 .xh-open-cashout-btn { flex-shrink: 0; padding: 8px 14px; border: none; border-radius: 8px; background: #1aa64f; color: #fff; font-weight: 800; font-size: 11.5px; font-family: inherit; cursor: pointer; transition: opacity .15s; line-height: 1.35; text-align: center; }
 .xh-open-cashout-btn:hover { opacity: .9; }
-.xh-open-league { display: inline-block; margin-top: 8px; padding: 4px 10px; border-radius: 5px; border: 1px solid #1aa64f; color: #1aa64f; font-size: 10.5px; font-weight: 700; }
+.xh-open-league { display: inline-block; margin: 0 13px 10px; padding: 4px 10px; border-radius: 5px; border: 1px solid #1aa64f; color: #1aa64f; font-size: 10.5px; font-weight: 700; }
 
 /* ── Skeleton ── */
 .xh-skeleton-wrap { display: flex; flex-direction: column; gap: 8px; padding: 8px 14px; }
