@@ -2910,7 +2910,7 @@ nav a:active { transform: scale(.96); }
 .sb-nav-item .active-indicator {
   width: 30px;
   height: 3px;
-  background: #e91b1b;
+  background: var(--accent);
   border-radius: 99px;
   margin-top: 2px;
 }

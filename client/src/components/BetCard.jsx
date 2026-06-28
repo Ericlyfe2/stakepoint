@@ -251,7 +251,7 @@ const STYLES = `
   font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
   max-width: 480px;
   margin: 0 auto;
-  color: #ffffff;
+  color: var(--text);
 }
 
 /* ── Tab bar ── */
@@ -269,8 +269,8 @@ const STYLES = `
   cursor: pointer;
   transition: background 0.15s, color 0.15s;
   font-family: inherit;
-  background: #3b82f6;
-  color: rgba(255,255,255,0.85);
+  background: var(--surface-2);
+  color: var(--text-soft);
 }
 .bc-tab:first-child {
   border-radius: 10px 0 0 0;
@@ -279,8 +279,8 @@ const STYLES = `
   border-radius: 0 10px 0 0;
 }
 .bc-tab.active {
-  background: #374151;
-  color: #ffffff;
+  background: var(--surface);
+  color: #fff;
 }
 .bc-tab-count {
   display: inline-block;
@@ -301,9 +301,9 @@ const STYLES = `
   flex-shrink: 0;
   padding: 6px 14px;
   border-radius: 999px;
-  border: 1px solid rgba(255,255,255,0.08);
+  border: 1px solid var(--line);
   background: rgba(255,255,255,0.04);
-  color: rgba(255,255,255,0.55);
+  color: var(--text-dim);
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
@@ -312,12 +312,12 @@ const STYLES = `
 }
 .bc-pill:hover {
   background: rgba(255,255,255,0.08);
-  color: #ffffff;
+  color: #fff;
 }
 .bc-pill.active {
-  background: #374151;
-  color: #ffffff;
-  border-color: #374151;
+  background: var(--surface-2);
+  color: #fff;
+  border-color: var(--surface-2);
 }
 .bc-grid-btn {
   margin-left: auto;
@@ -325,9 +325,9 @@ const STYLES = `
   width: 32px;
   height: 32px;
   border-radius: 8px;
-  border: 1px solid rgba(255,255,255,0.08);
+  border: 1px solid var(--line);
   background: rgba(255,255,255,0.04);
-  color: rgba(255,255,255,0.55);
+  color: var(--text-dim);
   cursor: pointer;
   display: grid;
   place-items: center;
@@ -335,16 +335,16 @@ const STYLES = `
 }
 .bc-grid-btn:hover {
   background: rgba(255,255,255,0.08);
-  color: #ffffff;
+  color: #fff;
 }
 
 /* ── Card ── */
 .bc-card {
-  background: #ffffff;
+  background: var(--surface);
   border-radius: 14px;
   padding: 16px 18px;
-  box-shadow: 0 4px 20px rgba(0,0,0,0.08);
-  color: #111827;
+  border: 1px solid var(--line);
+  color: var(--text);
 }
 
 /* ── Card head ── */
@@ -369,8 +369,8 @@ const STYLES = `
   gap: 4px;
   padding: 5px 10px;
   border: none;
-  background: rgba(0,122,69,0.08);
-  color: #0E8A4A;
+  background: rgba(0,122,69,0.15);
+  color: var(--accent);
   font-size: 11px;
   font-weight: 700;
   border-radius: 6px;
@@ -379,7 +379,7 @@ const STYLES = `
   font-family: inherit;
 }
 .bc-action-btn:hover {
-  background: rgba(0,122,69,0.15);
+  background: rgba(0,122,69,0.25);
 }
 .bc-action-btn span {
   display: none;
@@ -406,10 +406,10 @@ const STYLES = `
   width: 28px;
   height: 28px;
   border-radius: 50%;
-  background: #f3f4f6;
+  background: var(--surface-2);
   display: grid;
   place-items: center;
-  color: #9ca3af;
+  color: var(--text-dim);
   margin-top: 1px;
 }
 .bc-leg-body {
@@ -419,7 +419,7 @@ const STYLES = `
 .bc-leg-selection {
   font-size: 14px;
   font-weight: 600;
-  color: #111827;
+  color: var(--text);
   display: flex;
   gap: 6px;
   align-items: baseline;
@@ -428,23 +428,23 @@ const STYLES = `
 .bc-leg-market {
   font-size: 11px;
   font-weight: 500;
-  color: #6b7280;
+  color: var(--text-dim);
 }
 .bc-leg-teams {
   font-size: 13px;
-  color: #4b5563;
+  color: var(--text-soft);
   margin-top: 1px;
 }
 .bc-leg-time {
   font-size: 11.5px;
-  color: #9ca3af;
+  color: var(--text-dim);
   margin-top: 1px;
 }
 
 /* ── Divider ── */
 .bc-divider {
   height: 1px;
-  background: #e5e7eb;
+  background: var(--line);
   margin: 12px 0;
 }
 
@@ -456,7 +456,7 @@ const STYLES = `
   padding: 0;
   border: none;
   background: transparent;
-  color: #9ca3af;
+  color: var(--text-dim);
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
@@ -464,7 +464,7 @@ const STYLES = `
   transition: color 0.15s;
 }
 .bc-toggle-details:hover {
-  color: #6b7280;
+  color: var(--text-soft);
 }
 
 /* ── Expandable details ── */
@@ -482,13 +482,13 @@ const STYLES = `
   gap: 10px;
   align-items: flex-start;
   padding: 8px 10px;
-  background: #f9fafb;
+  background: var(--bg-soft);
   border-radius: 8px;
 }
 .bc-detail-idx {
   font-size: 11px;
   font-weight: 700;
-  color: #9ca3af;
+  color: var(--text-dim);
   font-variant-numeric: tabular-nums;
   min-width: 20px;
 }
@@ -500,16 +500,16 @@ const STYLES = `
 .bc-detail-teams {
   font-size: 13px;
   font-weight: 600;
-  color: #111827;
+  color: var(--text);
 }
 .bc-detail-pick {
   font-size: 12px;
-  color: #0E8A4A;
+  color: var(--accent);
   font-weight: 600;
 }
 .bc-detail-mkt {
   font-size: 11px;
-  color: #6b7280;
+  color: var(--text-dim);
 }
 
 /* ── Summary ── */
@@ -528,13 +528,13 @@ const STYLES = `
 }
 .bc-summary-lbl {
   font-size: 12px;
-  color: #9ca3af;
+  color: var(--text-dim);
   font-weight: 500;
 }
 .bc-summary-val {
   font-size: 14px;
   font-weight: 700;
-  color: #111827;
+  color: var(--text);
   font-variant-numeric: tabular-nums;
 }
 
@@ -546,8 +546,8 @@ const STYLES = `
   padding: 14px 16px;
   border: none;
   border-radius: 10px;
-  background: #00D26A;
-  color: #ffffff;
+  background: var(--accent);
+  color: #fff;
   font-size: 15px;
   font-weight: 800;
   letter-spacing: 0.01em;
@@ -556,9 +556,9 @@ const STYLES = `
   font-family: inherit;
 }
 .bc-cashout-btn:hover {
-  background: #00b85c;
+  filter: brightness(1.15);
   transform: translateY(-1px);
-  box-shadow: 0 8px 20px rgba(0,210,106,0.35);
+  box-shadow: 0 8px 20px rgba(0,122,69,0.35);
 }
 .bc-cashout-btn:active {
   transform: translateY(0);
