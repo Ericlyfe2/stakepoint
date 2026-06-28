@@ -297,7 +297,7 @@ function TicketDetails({ bet, onClose, onRemix, onShare }) {
                       </div>
                     )}
                     <div className="td-leg-details">
-                      <div className="td-leg-detail"><span>Pick:</span> <span className="td-leg-detail-val">{getPickName(leg.pick || leg.selection)} {odds}</span></div>
+                      <div className="td-leg-detail"><span>Pick:</span> <span className="td-leg-detail-val">{getPickName(leg.outcome || leg.pick || leg.selection)} {odds}</span></div>
                       <div className="td-leg-detail"><span>Market:</span> <span className="td-leg-detail-val">{getMarketName(leg.market)}</span></div>
                       <div className="td-leg-detail"><span>Outcome:</span> <span className="td-leg-detail-val" style={{ color: won ? '#22c66e' : lost ? '#e53935' : '#fff' }}>{getPickName(outcomeLabel)}</span></div>
                     </div>
