@@ -320,7 +320,7 @@ const BSM_CSS = `
   gap: 5px;
   background: none;
   border: none;
-  color: #4ade80;
+  color: #0E8A4A;
   font-size: 12px;
   font-weight: 700;
   cursor: pointer;

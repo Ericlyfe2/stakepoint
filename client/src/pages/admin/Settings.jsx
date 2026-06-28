@@ -212,7 +212,7 @@ const STYLES = `
   border: none; font-size: 11px; font-weight: 800; letter-spacing: .08em;
   cursor: pointer; transition: all .15s ease; text-transform: uppercase;
 }
-.adm-toggle.on { background: rgba(34, 197, 94, .15); color: #22c55e; }
+.adm-toggle.on { background: rgba(0, 122, 69, .15); color: #0E8A4A; }
 .adm-toggle.off { background: rgba(239, 68, 68, .12); color: #ef4444; }
 .adm-toggle:hover { opacity: .75; }
 .adm-kv-row {

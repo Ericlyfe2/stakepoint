@@ -14,7 +14,7 @@ function ago(iso) {
 
 const SEVERITY_COLORS = {
   info: '#3b82f6',
-  success: '#22c55e',
+  success: '#0E8A4A',
   warning: '#f59e0b',
   critical: '#ef4444',
 };

@@ -258,8 +258,8 @@ function AdminInvitesCard() {
         {lastIssued && (
           <div style={{
             padding: 12, marginBottom: 14,
-            background: 'linear-gradient(135deg, rgba(24,240,161,.08), rgba(124,92,255,.08))',
-            border: '1px solid rgba(24,240,161,.25)',
+            background: 'linear-gradient(135deg, rgba(14,138,74,.08), rgba(124,92,255,.08))',
+            border: '1px solid rgba(14,138,74,.25)',
             borderRadius: 12,
           }}>
             <div style={{ fontSize: 12, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '.12em', fontWeight: 700 }}>
@@ -436,7 +436,7 @@ export function FinancePage() {
           <div style={{ color: 'var(--text-dim)', fontSize: 12 }}>Lifetime {s ? moneyFmt(s.withdrawTotal) : '—'} · {s ? numFmt(s.withdrawCount) : '—'} txns</div>
         </Card>
         <Card title="Net cash">
-          <div style={{ fontSize: 28, fontWeight: 800, color: s && s.net >= 0 ? 'var(--success, #1aa46a)' : 'var(--danger, #d63a2c)' }}>
+          <div style={{ fontSize: 28, fontWeight: 800, color: s && s.net >= 0 ? 'var(--success, #0E8A4A)' : 'var(--danger, #d63a2c)' }}>
             {s ? moneyFmt(s.net) : '—'}
           </div>
           <div style={{ color: 'var(--text-dim)', fontSize: 12 }}>Deposits minus withdrawals</div>
@@ -689,7 +689,7 @@ export function SupportPage() {
                 <p style={{ marginTop: 8, whiteSpace: 'pre-wrap', fontSize: 14, lineHeight: 1.6 }}>{active.body}</p>
               </div>
               {(active.replies || []).map((r, i) => (
-                <div key={i} style={{ background: 'var(--grad-brand, linear-gradient(135deg, rgba(124,92,255,.08), rgba(24,240,161,.08)))', borderRadius: 10, padding: 14 }}>
+                <div key={i} style={{ background: 'var(--grad-brand, linear-gradient(135deg, rgba(124,92,255,.08), rgba(14,138,74,.08)))', borderRadius: 10, padding: 14 }}>
                   <div style={{ fontSize: 12, color: 'var(--text-dim)' }}><strong>{r.by}</strong> · {dateShort(r.at)}</div>
                   <p style={{ marginTop: 8, whiteSpace: 'pre-wrap', fontSize: 14, lineHeight: 1.6 }}>{r.body}</p>
                 </div>

@@ -50,8 +50,8 @@ const STAGES = [
     title: 'Stage 3',
     name: 'Approved',
     description: 'Approved but auto-locked. The withdrawal popup keeps appearing until you unblock them or promote to Stage 4.',
-    accent: '#1aa46a',
-    gradient: 'linear-gradient(135deg, #18f0a1 0%, #1aa46a 100%)',
+    accent: '#0E8A4A',
+    gradient: 'linear-gradient(135deg, #007A45 0%, #005A32 100%)',
   },
   {
     id: 4,

@@ -198,7 +198,7 @@ export function BarChart({ data = [], height = 220, color = '#22d3ee', yFormat =
   );
 }
 
-export function PieChart({ data = [], size = 200, donut = 0.62, palette = ['#7c5cff', '#22d3ee', '#18f0a1', '#ffb547', '#ff5d6c', '#ff5fb1', '#4f8bff'] }) {
+export function PieChart({ data = [], size = 200, donut = 0.62, palette = ['#7c5cff', '#22d3ee', '#0E8A4A', '#ffb547', '#ff5d6c', '#ff5fb1', '#4f8bff'] }) {
   const total = data.reduce((s, d) => s + (Number(d.value) || 0), 0) || 1;
   let a = -Math.PI / 2;
   const r = size / 2;

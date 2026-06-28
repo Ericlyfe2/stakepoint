@@ -173,8 +173,8 @@ const AC_CSS = `
   margin-bottom: 8px;
 }
 .ac-panel.active {
-  border-color: rgba(197,255,61,0.2);
-  background: rgba(197,255,61,0.03);
+  border-color: rgba(0,122,69,0.2);
+  background: rgba(0,122,69,0.03);
 }
 .ac-toggle {
   display: flex;
@@ -258,8 +258,8 @@ const AC_CSS = `
   margin-top: 6px;
   padding: 4px 10px;
   border-radius: 999px;
-  background: rgba(26,164,106,0.15);
-  color: #1aa46a;
+  background: rgba(14,138,74,0.15);
+  color: #0E8A4A;
   font-size: 11px;
   font-weight: 700;
   animation: acPulse 2s ease-in-out infinite;

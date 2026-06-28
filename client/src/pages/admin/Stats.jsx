@@ -66,7 +66,7 @@ export default function StatsAdmin() {
 
       <div className="adm-stat-grid">
         <Stat label="GGR" value={moneyFmt(summary?.ggr)} icon={<IconCash size={16} />} accent="linear-gradient(135deg,#7c5cff,#22d3ee)" delta={summary?.ggr >= 0 ? { direction: 'up', label: `${summary?.hold || 0}% hold` } : { direction: 'down', label: 'negative' }} />
-        <Stat label="Stake" value={moneyFmt(summary?.stake)} icon={<IconActivity size={16} />} accent="linear-gradient(135deg,#22d3ee,#18f0a1)" />
+        <Stat label="Stake" value={moneyFmt(summary?.stake)} icon={<IconActivity size={16} />} accent="linear-gradient(135deg,#22d3ee,#0E8A4A)" />
         <Stat label="ARPU" value={moneyFmt(summary?.arpu)} icon={<IconArrowUp size={16} />} />
         <Stat label="Active players" value={numFmt(summary?.playerCount)} icon={<IconUsers size={16} />} />
         <Stat label="New signups" value={numFmt(summary?.newSignups)} icon={<IconSparkles size={16} />} />
@@ -79,14 +79,14 @@ export default function StatsAdmin() {
         <Card title={`DAU vs new signups · last ${windowDays} days`} subtitle="Daily active bettors against new registrations">
           <div className="adm-legend" style={{ marginBottom: 8 }}>
             <span className="lg" style={{ '--c': '#7c5cff' }}>DAU</span>
-            <span className="lg" style={{ '--c': '#18f0a1' }}>New signups</span>
+            <span className="lg" style={{ '--c': '#0E8A4A' }}>New signups</span>
           </div>
           <LineChart
             height={260}
             yFormat={(v) => v}
             series={[
               { key: 'dau', label: 'DAU', color: '#7c5cff', data: daily.map((d) => ({ date: d.date, y: d.dau })) },
-              { key: 'sgn', label: 'Signups', color: '#18f0a1', data: daily.map((d) => ({ date: d.date, y: d.newSignups })) },
+              { key: 'sgn', label: 'Signups', color: '#0E8A4A', data: daily.map((d) => ({ date: d.date, y: d.newSignups })) },
             ]}
           />
         </Card>

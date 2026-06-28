@@ -157,7 +157,7 @@ function CasinoBanner() {
       <rect width="400" height="140" fill="url(#cb1)"/>
       {/* Slot machine */}
       <rect x="170" y="15" width="60" height="50" rx="6" fill="rgba(0,0,0,.3)" stroke="#fbbf24" strokeWidth="1.5"/>
-      <rect x="178" y="23" width="14" height="18" rx="2" fill="#1a1a1a"/><text x="185" y="37" textAnchor="middle" fill="#22c55e" fontSize="12" fontWeight="900">7</text>
+      <rect x="178" y="23" width="14" height="18" rx="2" fill="#1a1a1a"/><text x="185" y="37" textAnchor="middle" fill="#007A45" fontSize="12" fontWeight="900">7</text>
       <rect x="194" y="23" width="14" height="18" rx="2" fill="#1a1a1a"/><text x="201" y="37" textAnchor="middle" fill="#ef4444" fontSize="12" fontWeight="900">7</text>
       <rect x="210" y="23" width="14" height="18" rx="2" fill="#1a1a1a"/><text x="217" y="37" textAnchor="middle" fill="#fbbf24" fontSize="12" fontWeight="900">7</text>
       <rect x="175" y="48" width="50" height="8" rx="3" fill="#fbbf24"/>
@@ -165,7 +165,7 @@ function CasinoBanner() {
       {/* Chips */}
       <circle cx="80" cy="70" r="14" fill="#e11d48" stroke="#fb7185" strokeWidth="2"/><circle cx="80" cy="70" r="8" fill="none" stroke="#fb7185" strokeWidth="1"/>
       <circle cx="320" cy="60" r="12" fill="#2563eb" stroke="#60a5fa" strokeWidth="2"/><circle cx="320" cy="60" r="7" fill="none" stroke="#60a5fa" strokeWidth="1"/>
-      <circle cx="100" cy="100" r="10" fill="#16a34a" stroke="#4ade80" strokeWidth="1.5"/>
+      <circle cx="100" cy="100" r="10" fill="#005A32" stroke="#0E8A4A" strokeWidth="1.5"/>
       <text x="200" y="85" textAnchor="middle" fill="#fff" fontSize="16" fontWeight="900" fontFamily="sans-serif">CASINO WELCOME BONUS</text>
       <text x="200" y="103" textAnchor="middle" fill="rgba(255,255,255,.6)" fontSize="10" fontWeight="700" fontFamily="sans-serif">100% BONUS ON FIRST DEPOSIT</text>
       <text x="200" y="120" textAnchor="middle" fill="rgba(255,255,255,.35)" fontSize="8" fontFamily="sans-serif">Play slots, table games and more</text>
@@ -240,10 +240,10 @@ function LiveBoostBanner() {
       <rect x="155" y="15" width="35" height="16" rx="4" fill="#ef4444"/>
       <text x="172" y="27" textAnchor="middle" fill="#fff" fontSize="9" fontWeight="800" fontFamily="sans-serif">LIVE</text>
       {/* Boost arrows */}
-      <path d="M100 90 L120 60 L140 75 L160 45" fill="none" stroke="#22c55e" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
-      <polygon points="160,45 155,52 162,50" fill="#22c55e"/>
-      <path d="M240 85 L260 55 L280 68 L300 40" fill="none" stroke="#4ade80" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" opacity=".5"/>
-      <polygon points="300,40 295,47 302,45" fill="#4ade80" opacity=".5"/>
+      <path d="M100 90 L120 60 L140 75 L160 45" fill="none" stroke="#007A45" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+      <polygon points="160,45 155,52 162,50" fill="#007A45"/>
+      <path d="M240 85 L260 55 L280 68 L300 40" fill="none" stroke="#0E8A4A" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" opacity=".5"/>
+      <polygon points="300,40 295,47 302,45" fill="#0E8A4A" opacity=".5"/>
       <text x="200" y="105" textAnchor="middle" fill="#fff" fontSize="16" fontWeight="900" fontFamily="sans-serif">LIVE ODDS BOOST</text>
       <text x="200" y="123" textAnchor="middle" fill="rgba(255,255,255,.55)" fontSize="9.5" fontWeight="600" fontFamily="sans-serif">BOOST YOUR WINNINGS ON LIVE MATCHES</text>
     </svg>
@@ -260,7 +260,7 @@ function CashOutBanner() {
       {/* Money/coins */}
       <circle cx="200" cy="40" r="22" fill="#fbbf24" stroke="#daa520" strokeWidth="2"/>
       <text x="200" y="47" textAnchor="middle" fill="#92400e" fontSize="18" fontWeight="900">$</text>
-      <circle cx="160" cy="55" r="12" fill="#22c55e" opacity=".4"/><circle cx="240" cy="50" r="10" fill="#22c55e" opacity=".3"/>
+      <circle cx="160" cy="55" r="12" fill="#007A45" opacity=".4"/><circle cx="240" cy="50" r="10" fill="#007A45" opacity=".3"/>
       {/* Arrow out */}
       <path d="M200 62 L200 80" stroke="#fbbf24" strokeWidth="2.5" strokeLinecap="round"/>
       <polygon points="194,76 200,86 206,76" fill="#fbbf24"/>
@@ -325,14 +325,14 @@ function MultiBetBanner() {
       <rect x="172" y="12" width="56" height="35" rx="4" fill="rgba(255,255,255,.08)" transform="rotate(-5 200 30)"/>
       <rect x="172" y="16" width="56" height="35" rx="4" fill="rgba(255,255,255,.12)" transform="rotate(0 200 33)"/>
       <rect x="172" y="20" width="56" height="35" rx="4" fill="rgba(255,255,255,.18)" transform="rotate(5 200 37)"/>
-      <text x="200" y="42" textAnchor="middle" fill="#22c55e" fontSize="12" fontWeight="900">×250%</text>
+      <text x="200" y="42" textAnchor="middle" fill="#007A45" fontSize="12" fontWeight="900">×250%</text>
       {/* Sparkles */}
       <text x="140" y="40" fontSize="10" fill="rgba(255,215,0,.4)">✦</text>
       <text x="260" y="35" fontSize="8" fill="rgba(255,215,0,.35)">✦</text>
       <text x="200" y="80" textAnchor="middle" fill="#fff" fontSize="17" fontWeight="900" fontFamily="sans-serif">MULTI BET BONUS</text>
       <text x="200" y="98" textAnchor="middle" fill="rgba(255,255,255,.55)" fontSize="9.5" fontWeight="600" fontFamily="sans-serif">Up to 250% bonus on 30+ selections</text>
-      <rect x="155" y="106" width="90" height="18" rx="9" fill="rgba(34,197,94,.2)" stroke="#22c55e" strokeWidth="1"/>
-      <text x="200" y="119" textAnchor="middle" fill="#4ade80" fontSize="8" fontWeight="700" fontFamily="sans-serif">ACCUMULATOR BOOST</text>
+      <rect x="155" y="106" width="90" height="18" rx="9" fill="rgba(0,122,69,.2)" stroke="#007A45" strokeWidth="1"/>
+      <text x="200" y="119" textAnchor="middle" fill="#0E8A4A" fontSize="8" fontWeight="700" fontFamily="sans-serif">ACCUMULATOR BOOST</text>
     </svg>
   );
 }
@@ -393,7 +393,7 @@ function StatsBanner() {
       <rect x="214" y="40" width="14" height="30" rx="2" fill="#3b82f6" opacity=".75"/>
       <rect x="232" y="30" width="14" height="40" rx="2" fill="#3b82f6" opacity=".85"/>
       {/* Trend line */}
-      <polyline points="167,42 185,30 203,18 221,36 239,26" fill="none" stroke="#22c55e" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+      <polyline points="167,42 185,30 203,18 221,36 239,26" fill="none" stroke="#007A45" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
       <text x="200" y="90" textAnchor="middle" fill="#fff" fontSize="16" fontWeight="900" fontFamily="sans-serif">MATCH STATS & ANALYSIS</text>
       <text x="200" y="108" textAnchor="middle" fill="rgba(255,255,255,.55)" fontSize="9.5" fontWeight="600" fontFamily="sans-serif">Head-to-head, form guide, lineups</text>
     </svg>
@@ -434,19 +434,19 @@ function EarlyPayoutBanner() {
       <rect width="400" height="140" fill="url(#ep1)"/>
       {/* Scoreboard */}
       <rect x="155" y="15" width="90" height="48" rx="6" fill="rgba(0,0,0,.3)" stroke="rgba(255,255,255,.15)" strokeWidth="1.5"/>
-      <text x="185" y="46" textAnchor="middle" fill="#22c55e" fontSize="22" fontWeight="900" fontFamily="sans-serif">2</text>
+      <text x="185" y="46" textAnchor="middle" fill="#007A45" fontSize="22" fontWeight="900" fontFamily="sans-serif">2</text>
       <text x="200" y="44" textAnchor="middle" fill="rgba(255,255,255,.4)" fontSize="14" fontWeight="700" fontFamily="sans-serif">-</text>
       <text x="215" y="46" textAnchor="middle" fill="rgba(255,255,255,.5)" fontSize="22" fontWeight="900" fontFamily="sans-serif">0</text>
       {/* Check mark */}
-      <circle cx="200" cy="32" r="6" fill="#22c55e"/>
+      <circle cx="200" cy="32" r="6" fill="#007A45"/>
       <polyline points="196,32 199,35 204,29" fill="none" stroke="#fff" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
       {/* Money flying */}
       <text x="130" y="45" fontSize="14" fill="rgba(255,215,0,.35)">💸</text>
       <text x="260" y="40" fontSize="12" fill="rgba(255,215,0,.3)">💸</text>
       <text x="200" y="85" textAnchor="middle" fill="#fff" fontSize="17" fontWeight="900" fontFamily="sans-serif">EARLY PAYOUT</text>
       <text x="200" y="103" textAnchor="middle" fill="rgba(255,255,255,.55)" fontSize="9.5" fontWeight="600" fontFamily="sans-serif">Win paid out if your team leads by 2</text>
-      <rect x="160" y="110" width="80" height="16" rx="8" fill="rgba(34,197,94,.2)"/>
-      <text x="200" y="122" textAnchor="middle" fill="#4ade80" fontSize="8" fontWeight="700" fontFamily="sans-serif">FOOTBALL ONLY</text>
+      <rect x="160" y="110" width="80" height="16" rx="8" fill="rgba(0,122,69,.2)"/>
+      <text x="200" y="122" textAnchor="middle" fill="#0E8A4A" fontSize="8" fontWeight="700" fontFamily="sans-serif">FOOTBALL ONLY</text>
     </svg>
   );
 }

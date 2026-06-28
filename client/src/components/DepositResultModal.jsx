@@ -55,8 +55,8 @@ export default function DepositResultModal({ result, onClose }) {
             style={{
               width: 72, height: 72, borderRadius: '50%', margin: '0 auto 18px',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              background: approved ? 'rgba(34,197,94,0.15)' : 'rgba(239,68,68,0.15)',
-              color: approved ? '#22c55e' : '#ef4444',
+              background: approved ? 'rgba(0,122,69,0.15)' : 'rgba(239,68,68,0.15)',
+              color: approved ? '#0E8A4A' : '#ef4444',
               fontSize: 38, fontWeight: 900, lineHeight: 1,
             }}
           >
@@ -90,7 +90,7 @@ export default function DepositResultModal({ result, onClose }) {
             style={{
               width: '100%', marginTop: 22, padding: '12px 0', borderRadius: 10, border: 'none',
               background: approved
-                ? 'linear-gradient(135deg, #22c55e, #16a34a)'
+                ? 'linear-gradient(135deg, #007A45, #005A32)'
                 : 'var(--surface-2, #1a221d)',
               color: approved ? 'var(--text-inv)' : 'var(--text, #e7efea)',
               fontWeight: 800, fontSize: 15, cursor: 'pointer',

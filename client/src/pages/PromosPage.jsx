@@ -142,12 +142,12 @@ const PROMOS_CSS = `
   position: relative; overflow: hidden;
   padding: 32px 28px; border-radius: 22px;
   background: linear-gradient(135deg, var(--surface) 0%, var(--surface-2) 100%);
-  border: 1px solid rgba(197, 255, 61, .18);
+  border: 1px solid rgba(0, 122, 69, .18);
 }
 .promos-hero-bg {
   position: absolute; inset: -10%;
   background:
-    radial-gradient(500px 280px at 88% -10%, rgba(197, 255, 61, .18), transparent 60%),
+    radial-gradient(500px 280px at 88% -10%, rgba(0, 122, 69, .18), transparent 60%),
     radial-gradient(420px 280px at -5% 110%, rgba(106, 208, 255, .14), transparent 60%);
   pointer-events: none;
 }

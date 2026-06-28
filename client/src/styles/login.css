@@ -1,13 +1,13 @@
 /* BetXentra sign-in / sign-up page — clean mobile-first */
 
 .login-page-v2 {
-  --green: #1a6b3c;
-  --green-dark: #145530;
-  --green-light: #e8f5e9;
-  --border: #d0d5d1;
+  --green: #005A32;
+  --green-dark: #004A2A;
+  --green-light: #EAF8F0;
+  --border: #c8d5cc;
   --text: #1a1a1a;
   --text-soft: #555;
-  --bg: #f0f4f0;
+  --bg: #f0f5f2;
   --card-bg: #fff;
 
   min-height: 100dvh;

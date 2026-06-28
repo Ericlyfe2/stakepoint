@@ -203,7 +203,7 @@ export default function DepositsPage() {
                         onClick={() => handleApprove(tx.id)}
                         disabled={busyId === tx.id}
                         className="adm-btn adm-btn-sm"
-                        style={{ background: '#22c55e', color: '#fff', border: 'none' }}
+                        style={{ background: '#005A32', color: '#fff', border: 'none' }}
                         title="Approve"
                       >
                         <IconCheck />

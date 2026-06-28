@@ -250,9 +250,9 @@ function PasswordHints({ password, ok }) {
         <span key={t.label} style={{
           display: 'inline-flex', alignItems: 'center', gap: 4,
           fontSize: 11, padding: '3px 8px', borderRadius: 999,
-          background: t.pass ? 'rgba(24,240,161,.12)' : 'var(--surface-soft)',
+          background: t.pass ? 'rgba(14,138,74,.12)' : 'var(--surface-soft)',
           color: t.pass ? 'var(--accent)' : 'var(--text-dim)',
-          border: `1px solid ${t.pass ? 'rgba(24,240,161,.24)' : 'var(--border)'}`,
+          border: `1px solid ${t.pass ? 'rgba(14,138,74,.24)' : 'var(--border)'}`,
         }}>
           {t.pass ? <IconCheck size={11} /> : <IconAlert size={11} />} {t.label}
         </span>

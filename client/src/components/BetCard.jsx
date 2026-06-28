@@ -369,8 +369,8 @@ const STYLES = `
   gap: 4px;
   padding: 5px 10px;
   border: none;
-  background: rgba(34,197,94,0.08);
-  color: #22c55e;
+  background: rgba(0,122,69,0.08);
+  color: #0E8A4A;
   font-size: 11px;
   font-weight: 700;
   border-radius: 6px;
@@ -379,7 +379,7 @@ const STYLES = `
   font-family: inherit;
 }
 .bc-action-btn:hover {
-  background: rgba(34,197,94,0.15);
+  background: rgba(0,122,69,0.15);
 }
 .bc-action-btn span {
   display: none;
@@ -504,7 +504,7 @@ const STYLES = `
 }
 .bc-detail-pick {
   font-size: 12px;
-  color: #22c55e;
+  color: #0E8A4A;
   font-weight: 600;
 }
 .bc-detail-mkt {

@@ -24,7 +24,7 @@
   --brand: #7c5cff;
   --brand-2: #4f8bff;
   --brand-3: #22d3ee;
-  --accent: #18f0a1;
+  --accent: #0E8A4A;
   --warn: #ffb547;
   --danger: #ff5d6c;
   --info: #4f8bff;
@@ -32,9 +32,9 @@
 
   --grad-aurora: radial-gradient(1200px 600px at 5% -10%, rgba(124,92,255,.32), transparent 60%),
                  radial-gradient(900px 700px at 100% 0%, rgba(34,211,238,.18), transparent 55%),
-                 radial-gradient(700px 700px at 50% 100%, rgba(24,240,161,.12), transparent 60%);
+                 radial-gradient(700px 700px at 50% 100%, rgba(0,90,50,.15), transparent 60%);
   --grad-brand:   linear-gradient(135deg, #7c5cff 0%, #4f8bff 60%, #22d3ee 100%);
-  --grad-success: linear-gradient(135deg, #18f0a1 0%, #22d3ee 100%);
+  --grad-success: linear-gradient(135deg, #0E8A4A 0%, #007A45 100%);
   --grad-warn:    linear-gradient(135deg, #ffb547 0%, #ff7e6b 100%);
   --grad-danger:  linear-gradient(135deg, #ff5d6c 0%, #ff5fb1 100%);
 
@@ -399,9 +399,9 @@
   font-size: 12px; font-weight: 600;
   padding: 3px 9px;
   border-radius: 999px;
-  background: rgba(24,240,161,.12);
+  background: rgba(14,138,74,.12);
   color: var(--accent);
-  border: 1px solid rgba(24,240,161,.22);
+  border: 1px solid rgba(14,138,74,.22);
 }
 .adm-stat .delta.down { background: rgba(255,93,108,.12); color: var(--danger); border-color: rgba(255,93,108,.22); }
 .adm-stat .icn {
@@ -471,7 +471,7 @@
   border: 1px solid var(--border);
   text-transform: uppercase; letter-spacing: .08em;
 }
-.adm-badge.success { background: rgba(24,240,161,.12); color: var(--accent); border-color: rgba(24,240,161,.22); }
+.adm-badge.success { background: rgba(14,138,74,.12); color: var(--accent); border-color: rgba(14,138,74,.22); }
 .adm-badge.warn    { background: rgba(255,181,71,.12); color: var(--warn);   border-color: rgba(255,181,71,.22); }
 .adm-badge.danger  { background: rgba(255,93,108,.14); color: var(--danger); border-color: rgba(255,93,108,.24); }
 .adm-badge.info    { background: rgba(79,139,255,.12); color: var(--info);   border-color: rgba(79,139,255,.22); }
@@ -668,7 +668,7 @@
 }
 .adm-list-feed .row .dot.warn { background: var(--warn); box-shadow: 0 0 0 4px rgba(255,181,71,.18); }
 .adm-list-feed .row .dot.danger { background: var(--danger); box-shadow: 0 0 0 4px rgba(255,93,108,.18); }
-.adm-list-feed .row .dot.success { background: var(--accent); box-shadow: 0 0 0 4px rgba(24,240,161,.18); }
+.adm-list-feed .row .dot.success { background: var(--accent); box-shadow: 0 0 0 4px rgba(14,138,74,.18); }
 .adm-list-feed .row .meta { color: var(--text-dim); font-size: 12px; }
 
 .adm-loading { display: inline-flex; align-items: center; gap: 8px; color: var(--text-dim); }
@@ -716,7 +716,7 @@
 .adm-auth-art .glow {
   position: absolute;
   width: 600px; height: 600px;
-  background: radial-gradient(circle, rgba(24,240,161,.45), transparent 60%);
+  background: radial-gradient(circle, rgba(14,138,74,.45), transparent 60%);
   filter: blur(60px);
   top: -200px; right: -200px;
   animation: floaty 18s ease-in-out infinite;
@@ -756,8 +756,8 @@
   font-size: 13px;
 }
 .adm-auth-form .ok {
-  background: rgba(24,240,161,.1);
-  border: 1px solid rgba(24,240,161,.3);
+  background: rgba(14,138,74,.1);
+  border: 1px solid rgba(14,138,74,.3);
   color: #9af0ce;
   padding: 10px 14px;
   border-radius: 10px;
@@ -823,12 +823,12 @@
   animation: slideIn .25s ease;
 }
 .adm-toast.error  { border-color: rgba(255,93,108,.45); }
-.adm-toast.success{ border-color: rgba(24,240,161,.45); }
+.adm-toast.success{ border-color: rgba(14,138,74,.45); }
 
 /* ============== status pills ============== */
 .bet-status     { font-size: 11px; padding: 3px 8px; border-radius: 999px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; display: inline-flex; align-items: center; gap: 5px; }
 .bet-status.open      { background: rgba(79,139,255,.14); color: var(--info); }
-.bet-status.won       { background: rgba(24,240,161,.14); color: var(--accent); }
+.bet-status.won       { background: rgba(14,138,74,.14); color: var(--accent); }
 .bet-status.lost      { background: rgba(255,93,108,.14); color: var(--danger); }
 .bet-status.void      { background: rgba(255,181,71,.14); color: var(--warn); }
 .bet-status.cashed_out{ background: rgba(124,92,255,.14); color: var(--brand); }
@@ -975,7 +975,7 @@
 .stage-progress .line {
   flex: 1;
   height: 2px;
-  background: linear-gradient(90deg, rgba(124,92,255,.4), rgba(245,166,35,.4), rgba(24,240,161,.4));
+  background: linear-gradient(90deg, rgba(124,92,255,.4), rgba(245,166,35,.4), rgba(14,138,74,.4));
   border-radius: 2px;
 }
 .stage-progress-label {

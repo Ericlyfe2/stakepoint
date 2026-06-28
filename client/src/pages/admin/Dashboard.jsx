@@ -74,8 +74,8 @@ export default function Dashboard() {
       {/* KPI strip */}
       <div className="adm-stat-grid">
         <Stat label="GGR · 24h"   value={moneyFmt(data?.kpis?.ggr24h)}  icon={<IconCash size={16} />} accent="linear-gradient(135deg,#7c5cff,#22d3ee)" delta={{ direction: 'up', label: '12.4%' }} />
-        <Stat label="Stake · 24h" value={moneyFmt(data?.kpis?.stake24h)} icon={<IconReceipt size={16} />} accent="linear-gradient(135deg,#22d3ee,#18f0a1)" delta={{ direction: 'up', label: '8.1%' }} />
-        <Stat label="Active users" prefix="" value={numFmt(data?.kpis?.onlineUsers)} icon={<IconUsers size={16} />} accent="linear-gradient(135deg,#18f0a1,#7c5cff)" />
+        <Stat label="Stake · 24h" value={moneyFmt(data?.kpis?.stake24h)} icon={<IconReceipt size={16} />} accent="linear-gradient(135deg,#22d3ee,#0E8A4A)" delta={{ direction: 'up', label: '8.1%' }} />
+        <Stat label="Active users" prefix="" value={numFmt(data?.kpis?.onlineUsers)} icon={<IconUsers size={16} />} accent="linear-gradient(135deg,#0E8A4A,#7c5cff)" />
         <Stat label="Bets · 24h"  value={numFmt(data?.kpis?.bets24h)}   icon={<IconLive size={16} />}    accent="linear-gradient(135deg,#ffb547,#ff5d6c)" delta={{ direction: 'up', label: '3.7%' }} />
       </div>
 
@@ -136,7 +136,7 @@ export default function Dashboard() {
         </Card>
         <Card title="User growth" subtitle="New signups per day">
           {loading ? <ChartSkeleton h={220} /> : (
-            <LineChart height={220} series={[{ key: 'g', label: 'Signups', color: '#18f0a1', data: (charts?.userGrowth || []).map((d) => ({ date: d.date, y: d.value })) }]} />
+            <LineChart height={220} series={[{ key: 'g', label: 'Signups', color: '#0E8A4A', data: (charts?.userGrowth || []).map((d) => ({ date: d.date, y: d.value })) }]} />
           )}
         </Card>
       </div>
@@ -209,7 +209,7 @@ function HealthRow({ label, ok, value }) {
       <span style={{
         width: 10, height: 10, borderRadius: 50,
         background: ok ? 'var(--accent)' : 'var(--warn)',
-        boxShadow: `0 0 0 4px ${ok ? 'rgba(24,240,161,.16)' : 'rgba(255,181,71,.16)'}`,
+        boxShadow: `0 0 0 4px ${ok ? 'rgba(14,138,74,.16)' : 'rgba(255,181,71,.16)'}`,
       }} />
       <div style={{ flex: 1 }}>
         <div style={{ fontSize: 13.5, fontWeight: 600 }}>{label}</div>

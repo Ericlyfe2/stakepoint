@@ -16,7 +16,7 @@ function ConfettiRain() {
     dur: 2.4 + Math.random() * 2.6,
     rot: Math.random() * 720,
     size: 5 + Math.random() * 7,
-    colors: ['#ffd76d', '#f3a01a', '#4ade80', '#22d3ee', '#c5ff3d', '#ff9f1c', '#a78bfa', '#fff7cc'],
+    colors: ['#ffd76d', '#f3a01a', '#0E8A4A', '#22d3ee', '#007A45', '#ff9f1c', '#a78bfa', '#fff7cc'],
     colorIdx: i % 8,
   })), []);
 
@@ -143,7 +143,7 @@ function TrophyGraphic() {
             <path d="M14 50 L10 94 L16 94 L18 56 Z" fill="url(#figL)" />
             <path d="M26 50 L30 94 L24 94 L22 56 Z" fill="url(#figL)" />
             {/* Leaf crown */}
-            <path d="M12 4 Q16 0 20 3 Q24 0 28 4" fill="#c5ff3d" opacity="0.35" />
+            <path d="M12 4 Q16 0 20 3 Q24 0 28 4" fill="#007A45" opacity="0.35" />
           </svg>
 
           {/* Center trophy */}
@@ -204,7 +204,7 @@ function TrophyGraphic() {
             <path d="M14 50 L10 94 L16 94 L18 56 Z" fill="url(#figR)" />
             <path d="M26 50 L30 94 L24 94 L22 56 Z" fill="url(#figR)" />
             {/* Leaf crown */}
-            <path d="M12 4 Q16 0 20 3 Q24 0 28 4" fill="#c5ff3d" opacity="0.35" />
+            <path d="M12 4 Q16 0 20 3 Q24 0 28 4" fill="#007A45" opacity="0.35" />
           </svg>
         </motion.div>
 
@@ -588,22 +588,22 @@ const STYLES = `
 }
 .wcm-btn-outline {
   background: transparent;
-  color: #22c55e;
-  border: 2px solid #22c55e;
+  color: #007A45;
+  border: 2px solid #007A45;
 }
 .wcm-btn-outline:hover {
-  background: rgba(34, 197, 94, 0.08);
+  background: rgba(0, 122, 69, 0.08);
 }
 .wcm-btn-solid {
-  background: #22c55e;
+  background: #007A45;
   color: #ffffff;
   border: none;
   font-weight: 900;
-  box-shadow: 0 8px 24px rgba(34, 197, 94, 0.35);
+  box-shadow: 0 8px 24px rgba(0, 122, 69, 0.35);
 }
 .wcm-btn-solid:hover {
-  background: #16a34a;
-  box-shadow: 0 12px 32px rgba(34, 197, 94, 0.5);
+  background: #005A32;
+  box-shadow: 0 12px 32px rgba(0, 122, 69, 0.5);
 }
 
 /* ── Responsive ── */

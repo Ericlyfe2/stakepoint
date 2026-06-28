@@ -45,7 +45,7 @@ function MobileHeader({ account, onSignIn, onSignUp, onAvatar, onSearch, onBalan
       <NavLink to="/" className="sb-logo" end>
         <svg width="22" height="22" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" style={{flexShrink:0}}>
           <rect width="64" height="64" rx="14" fill="#0a0d0c"/>
-          <path d="M32 6L54 16L54 36C54 50 32 60 32 60C32 60 10 50 10 36L10 16Z" fill="#22c55e"/>
+          <path d="M32 6L54 16L54 36C54 50 32 60 32 60C32 60 10 50 10 36L10 16Z" fill="#007A45"/>
           <path d="M22 22L22 43L33 43C38 43 42 40 42 35.5C42 33 40.5 31 38.5 30C40 29 41 27.5 41 25.5C41 23 38 22 34 22ZM26.5 26L33 26C35.5 26 37 27 37 29C37 31 35.5 32 33 32L26.5 32ZM26.5 35.5L33.5 35.5C36.5 35.5 37.5 37 37.5 39C37.5 41 35.5 39.5 33.5 39.5L26.5 39.5Z" fill="white"/>
         </svg>
         Bet<em>Xentra</em>
@@ -360,7 +360,7 @@ export default function AppShell() {
             <div className="logo-mark">
               <svg width="18" height="18" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
                 <path d="M32 2L58 14L58 36C58 52 32 64 32 64C32 64 6 52 6 36L6 14Z" fill="white" fillOpacity="0.95"/>
-                <path d="M20 20L20 44L33 44C39 44 44 40.5 44 35C44 32 42 29.5 39.5 28C41.5 26.5 43 24.5 43 22C43 19 39.5 20 35 20ZM25.5 25L33 25C35.5 25 37.5 26.5 37.5 29C37.5 31.5 35.5 33 33 33L25.5 33ZM25.5 37L34 37C37 37 38.5 38.5 38.5 40.5C38.5 42.5 36.5 39 34 39L25.5 39Z" fill="#16a34a"/>
+                <path d="M20 20L20 44L33 44C39 44 44 40.5 44 35C44 32 42 29.5 39.5 28C41.5 26.5 43 24.5 43 22C43 19 39.5 20 35 20ZM25.5 25L33 25C35.5 25 37.5 26.5 37.5 29C37.5 31.5 35.5 33 33 33L25.5 33ZM25.5 37L34 37C37 37 38.5 38.5 38.5 40.5C38.5 42.5 36.5 39 34 39L25.5 39Z" fill="#005A32"/>
               </svg>
             </div>
             <div className="logo-text">Bet<em>Xentra</em></div>
@@ -462,7 +462,7 @@ export default function AppShell() {
             position: 'relative',
             overflow: 'hidden'
           }}>
-            <div style={{ position: 'absolute', top: '-50%', left: '-50%', width: '200%', height: '200%', background: 'radial-gradient(circle, rgba(197,255,61,0.08) 0%, transparent 60%)', pointerEvents: 'none' }} />
+            <div style={{ position: 'absolute', top: '-50%', left: '-50%', width: '200%', height: '200%', background: 'radial-gradient(circle, rgba(0,122,69,0.08) 0%, transparent 60%)', pointerEvents: 'none' }} />
             <div style={{ fontSize: 11, textTransform: 'uppercase', color: 'var(--text-dim)', fontWeight: 700, letterSpacing: 1, marginBottom: 4 }}>Available Balance</div>
             <div style={{ fontSize: 32, fontWeight: 900, color: 'var(--accent)' }}>
               ₵{formatAmt(balance)}

@@ -221,7 +221,7 @@ const JP_CSS = `
   position: absolute; inset: -10%;
   background:
     radial-gradient(540px 320px at 90% -20%, rgba(255, 181, 71, .22), transparent 60%),
-    radial-gradient(420px 280px at -10% 110%, rgba(197, 255, 61, .12), transparent 60%);
+    radial-gradient(420px 280px at -10% 110%, rgba(0, 122, 69, .12), transparent 60%);
   pointer-events: none;
 }
 .jp-hero-inner { position: relative; z-index: 1; }
@@ -235,7 +235,7 @@ const JP_CSS = `
   color: var(--accent-warm);
 }
 .jp-badge.jp-badge-cool { background: rgba(106, 208, 255, .12); color: var(--accent-cool); }
-.jp-badge.jp-badge-warm { background: rgba(197, 255, 61, .14); color: var(--accent); }
+.jp-badge.jp-badge-warm { background: rgba(0, 122, 69, .14); color: var(--accent); }
 .jp-hero-inner h1 {
   margin: 4px 0 16px; font-size: 30px; font-weight: 900;
   letter-spacing: -.02em; line-height: 1.05;
@@ -315,7 +315,7 @@ const JP_CSS = `
   padding: 14px 16px;
   transition: border-color .15s ease, transform .15s ease;
 }
-.jp-leg:hover { border-color: rgba(197, 255, 61, .25); transform: translateY(-1px); }
+.jp-leg:hover { border-color: rgba(0, 122, 69, .25); transform: translateY(-1px); }
 .jp-leg.picked { border-color: color-mix(in srgb, var(--accent) 45%, var(--surface-2)); }
 .jp-leg-num {
   font-family: 'JetBrains Mono', 'Roboto Mono', monospace;
@@ -326,7 +326,7 @@ const JP_CSS = `
   padding: 6px 0;
   text-align: center;
 }
-.jp-leg.picked .jp-leg-num { color: var(--accent); background: rgba(197, 255, 61, .1); }
+.jp-leg.picked .jp-leg-num { color: var(--accent); background: rgba(0, 122, 69, .1); }
 .jp-leg-fix { font-size: 14px; font-weight: 700; }
 .jp-leg-meta { font-size: 11.5px; color: var(--text-dim); margin-top: 2px; }
 .jp-leg-picks { display: flex; gap: 6px; }

@@ -134,7 +134,7 @@ export default function BetsPage({ initialStatus = 'all' }) {
 
       <div className="adm-stat-grid">
         <SumTile label="Open"       value={numFmt(data?.summary?.open)}      accent="linear-gradient(135deg,#4f8bff,#22d3ee)" />
-        <SumTile label="Won"        value={numFmt(data?.summary?.won)}       accent="linear-gradient(135deg,#18f0a1,#22d3ee)" />
+        <SumTile label="Won"        value={numFmt(data?.summary?.won)}       accent="linear-gradient(135deg,#0E8A4A,#22d3ee)" />
         <SumTile label="Lost"       value={numFmt(data?.summary?.lost)}      accent="linear-gradient(135deg,#ff5d6c,#ff5fb1)" />
         <SumTile label="Cashed out" value={numFmt(data?.summary?.cashedOut)} accent="linear-gradient(135deg,#7c5cff,#22d3ee)" />
         <SumTile label="Cancelled"  value={numFmt(data?.summary?.cancelled)} accent="linear-gradient(135deg,#8c91a3,#5d6275)" />

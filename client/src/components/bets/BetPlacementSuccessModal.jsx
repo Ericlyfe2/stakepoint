@@ -197,7 +197,7 @@ export default function BetPlacementSuccessModal({
               <div className="bpsm-bk-footer-bar">
                 <svg width="22" height="22" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" style={{borderRadius:6,overflow:'hidden',flexShrink:0}}>
                   <rect width="64" height="64" rx="14" fill="#0a0d0c"/>
-                  <path d="M32 6L54 16L54 36C54 50 32 60 32 60C32 60 10 50 10 36L10 16Z" fill="#22c55e"/>
+                  <path d="M32 6L54 16L54 36C54 50 32 60 32 60C32 60 10 50 10 36L10 16Z" fill="#007A45"/>
                   <path d="M22 22L22 43L33 43C38 43 42 40 42 35.5C42 33 40.5 31 38.5 30C40 29 41 27.5 41 25.5C41 23 38 22 34 22ZM26.5 26L33 26C35.5 26 37 27 37 29C37 31 35.5 32 33 32L26.5 32ZM26.5 35.5L33.5 35.5C36.5 35.5 37.5 37 37.5 39C37.5 41 35.5 39.5 33.5 39.5L26.5 39.5Z" fill="white"/>
                 </svg>
                 <span className="bpsm-footer-name">betxentra.com</span>
@@ -362,7 +362,7 @@ export default function BetPlacementSuccessModal({
               <div className="bpsm-footer-brand">
                 <svg width="22" height="22" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" style={{borderRadius:6,overflow:'hidden',flexShrink:0}}>
                   <rect width="64" height="64" rx="14" fill="#0a0d0c"/>
-                  <path d="M32 6L54 16L54 36C54 50 32 60 32 60C32 60 10 50 10 36L10 16Z" fill="#22c55e"/>
+                  <path d="M32 6L54 16L54 36C54 50 32 60 32 60C32 60 10 50 10 36L10 16Z" fill="#007A45"/>
                   <path d="M22 22L22 43L33 43C38 43 42 40 42 35.5C42 33 40.5 31 38.5 30C40 29 41 27.5 41 25.5C41 23 38 22 34 22ZM26.5 26L33 26C35.5 26 37 27 37 29C37 31 35.5 32 33 32L26.5 32ZM26.5 35.5L33.5 35.5C36.5 35.5 37.5 37 37.5 39C37.5 41 35.5 39.5 33.5 39.5L26.5 39.5Z" fill="white"/>
                 </svg>
                 <span className="bpsm-footer-name">betxentra.com</span>

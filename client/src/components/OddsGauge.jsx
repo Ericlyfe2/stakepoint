@@ -43,14 +43,14 @@ export default function OddsGauge({ odds = 0, size = 80 }) {
           cy={size / 2}
           r={r}
           fill="none"
-          stroke="var(--accent, #c5ff3d)"
+          stroke="var(--accent, #007A45)"
           strokeWidth="5"
           strokeLinecap="round"
           strokeDasharray={circumference}
           strokeDashoffset={dashOffset}
           style={{
             transition: 'stroke-dashoffset 0.6s cubic-bezier(.4,0,.2,1)',
-            filter: 'drop-shadow(0 0 6px rgba(197, 255, 61, 0.4))',
+            filter: 'drop-shadow(0 0 6px rgba(0, 122, 69, 0.4))',
           }}
         />
       </svg>

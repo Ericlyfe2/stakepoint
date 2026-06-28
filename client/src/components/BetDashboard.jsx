@@ -510,7 +510,7 @@ const STYLES = `
   align-self: flex-start;
 }
 .bd-status-pending   { color: #3b82f6; background: rgba(59,130,246,0.10); }
-.bd-status-won       { color: #16a34a; background: rgba(22,163,74,0.10); }
+.bd-status-won       { color: #0E8A4A; background: rgba(14,138,74,0.10); }
 .bd-status-lost      { color: #dc2626; background: rgba(220,38,38,0.08); }
 .bd-status-cashed    { color: #d97706; background: rgba(217,119,6,0.10); }
 .bd-status-void      { color: #6b7280; background: #f3f4f6; }

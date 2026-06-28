@@ -279,7 +279,7 @@ const CM_CSS = `
 .cm-amount-subvalue { font-size: 14px; font-weight: 600; color: var(--text-soft); }
 .cm-divider { height: 1px; background: var(--surface-2); margin: 8px 0; }
 .cm-amount-pl { padding-top: 4px; }
-.cm-amount-pl.positive .cm-amount-pl-value { color: #16a34a; }
+.cm-amount-pl.positive .cm-amount-pl-value { color: #0E8A4A; }
 .cm-amount-pl.negative .cm-amount-pl-value { color: #e53935; }
 
 /* Residual card */
@@ -323,7 +323,7 @@ const CM_CSS = `
 .cm-btn:disabled { opacity: .5; cursor: not-allowed; }
 .cm-btn-cancel { background: var(--bg); color: var(--text); border: 1px solid var(--surface-2); }
 .cm-btn-cancel:hover:not(:disabled) { background: var(--surface-2); }
-.cm-btn-go { background: linear-gradient(135deg, #116f43, #1aa46a); color: #fff; }
+.cm-btn-go { background: linear-gradient(135deg, #004A2A, #005A32); color: #fff; }
 .cm-btn-go:hover:not(:disabled) { opacity: .9; transform: translateY(-1px); }
 .cm-btn-spinner {
   width: 14px; height: 14px;

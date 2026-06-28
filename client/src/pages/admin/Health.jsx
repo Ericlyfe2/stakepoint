@@ -132,7 +132,7 @@ export default function HealthPage() {
             </Card>
             <Card title="p95 latency (ms)" subtitle="Last 24h" pill={<Badge tone={tone(s?.p95Ms, { warnAt: 500, dangerAt: 1500 })} dot>p95 {fmtMs(s?.p95Ms)}</Badge>}>
               {series && series.p95.some((v) => v > 0)
-                ? <Sparkline data={series.p95} stroke="#18f0a1" fill="rgba(24,240,161,0.15)" />
+                ? <Sparkline data={series.p95} stroke="#0E8A4A" fill="rgba(14,138,74,0.15)" />
                 : <Empty title="No latency samples" />}
             </Card>
             <Card title="Error rate (%)" subtitle="Last 24h" pill={<Badge tone={tone(s?.errorRate24h * 100, { warnAt: 1, dangerAt: 5 })} dot>{s ? fmtPct(s.errorRate24h) : '—'}</Badge>}>
