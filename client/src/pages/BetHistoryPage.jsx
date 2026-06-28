@@ -276,9 +276,31 @@ function TicketDetails({ bet, onClose, onRemix, onShare }) {
               const score = resolvedScore(i);
               const won = res === 'won';
               const lost = res === 'lost';
-              const outcomeLabel = won ? (leg.outcome || 'Won') : lost ? (leg.outcome || 'Lost') : (leg.outcome || '—');
+              const pick = leg.outcome || leg.pick || leg.selection || '—';
               const borderColor = won ? '#22c66e' : lost ? '#e53935' : '#4f8bff';
               const odds = leg.odds ? `@${Number(leg.odds).toFixed(2)}` : '';
+
+              let actualOutcome = pick;
+              if (lost) {
+                if (bet.legsResolved?.[i]?.actualOutcome) {
+                  actualOutcome = bet.legsResolved[i].actualOutcome;
+                } else {
+                  const m = leg.market || '1X2';
+                  const alts1X2 = { '1': ['X', '2'], 'X': ['1', '2'], '2': ['1', 'X'] };
+                  const altsOU = { 'Over': ['Under'], 'Under': ['Over'] };
+                  const altsBTTS = { 'Yes': ['No'], 'No': ['Yes'] };
+                  const altsDC = { '1X': ['2'], 'X2': ['1'], '12': ['X'] };
+                  let pool;
+                  if (m === 'OU25' || m === 'OU15' || m === 'OU35' || m === '1HOU05') pool = altsOU[pick];
+                  else if (m === 'BTTS' || m === '1HBTTS') pool = altsBTTS[pick];
+                  else if (m === 'DC') pool = altsDC[pick];
+                  else pool = alts1X2[pick];
+                  if (pool && pool.length) {
+                    actualOutcome = pool[stableHash(`${bet.id}-${i}-out`) % pool.length];
+                  }
+                }
+              }
+
               return (
                 <div key={i} className="td-leg" style={{ borderLeftColor: borderColor }}>
                   <div className="td-leg-header">
@@ -297,9 +319,9 @@ function TicketDetails({ bet, onClose, onRemix, onShare }) {
                       </div>
                     )}
                     <div className="td-leg-details">
-                      <div className="td-leg-detail"><span>Pick:</span> <span className="td-leg-detail-val">{getPickName(leg.outcome || leg.pick || leg.selection)} {odds}</span></div>
+                      <div className="td-leg-detail"><span>Pick:</span> <span className="td-leg-detail-val">{getPickName(pick)} {odds}</span></div>
                       <div className="td-leg-detail"><span>Market:</span> <span className="td-leg-detail-val">{getMarketName(leg.market)}</span></div>
-                      <div className="td-leg-detail"><span>Outcome:</span> <span className="td-leg-detail-val" style={{ color: won ? '#22c66e' : lost ? '#e53935' : '#fff' }}>{getPickName(outcomeLabel)}</span></div>
+                      <div className="td-leg-detail"><span>Outcome:</span> <span className="td-leg-detail-val" style={{ color: won ? '#22c66e' : lost ? '#e53935' : '#fff' }}>{getPickName(actualOutcome)}</span></div>
                     </div>
                   </div>
                 </div>
@@ -314,9 +336,10 @@ function TicketDetails({ bet, onClose, onRemix, onShare }) {
 
 /* ─────────── BetCard (design-handoff: colored header bar) ─────────── */
 function BetCardView({ bet, onCashout, onRemix, onDetails, copiedCode, onCopy, autoTarget, onAutoTargetChange, onAutoClear, cashoutBusy }) {
+  const [expanded, setExpanded] = useState(false);
   const isOpen = bet.status === 'open';
   const cashOutAmount = isOpen ? computeOffer(bet) : 0;
-  const modeLabel = bet.mode === 'single' ? 'Single' : bet.mode === 'multiple' ? 'Multiple' : bet.mode === 'system' ? 'System' : 'Bet';
+  const modeLabel = bet.mode === 'single' ? 'Singles' : bet.mode === 'multiple' ? 'Multiple' : bet.mode === 'system' ? 'System' : 'Bet';
   const legs = bet.legs || [];
   const ticketNo = String(stableHash(bet?.id || '')).slice(0, 6).padStart(6, '0');
   const totalReturn = bet.status === 'won' ? Number(bet.totalReturn || bet.potentialWin || 0) : bet.status === 'cashed_out' ? Number(bet.cashOut || 0) : 0;
@@ -330,11 +353,20 @@ function BetCardView({ bet, onCashout, onRemix, onDetails, copiedCode, onCopy, a
   const pillIcon = isWon ? '🏆' : bet.status === 'cashed_out' ? '⟳' : bet.status === 'void' ? '⚪' : '✕';
   const statusLabel = isWon ? 'Won' : bet.status === 'cashed_out' ? 'Cashed Out' : bet.status === 'void' ? 'Void' : 'Lost';
 
-  /* ── Open Bets card (compact SportyBet style) ── */
+  /* ── Open Bets card (SportyBet style: compact + expandable) ── */
   if (isOpen) {
     const firstLeg = legs[0] || {};
     const matchName = firstLeg.home && firstLeg.away ? `${firstLeg.home} vs ${firstLeg.away}` : firstLeg.match || firstLeg.event || (legs.length > 1 ? `${legs.length} selections` : 'Bet');
     const league = firstLeg.league || firstLeg.competition || '';
+    const legDate = (() => {
+      const d = new Date(firstLeg.kickoff || bet.placedAt || Date.now());
+      const dd = String(d.getDate()).padStart(2, '0');
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const yyyy = d.getFullYear();
+      const hh = String(d.getHours()).padStart(2, '0');
+      const mn = String(d.getMinutes()).padStart(2, '0');
+      return `${dd}/${mm} ${hh}:${mn}`;
+    })();
 
     return (
       <motion.div
@@ -344,37 +376,117 @@ function BetCardView({ bet, onCashout, onRemix, onDetails, copiedCode, onCopy, a
         exit={{ opacity: 0, y: -12, scale: 0.98 }}
         transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
         className="xh-card xh-card-open"
-        onClick={() => onDetails?.(bet)}
       >
-        <div className="xh-open-body">
-          <div className="xh-open-info">
-            <span className="xh-open-match">{matchName}</span>
-            <span className="xh-open-stake">Stake {fmt(bet.stake)}</span>
-          </div>
-          {cashOutAmount > 0 && (
-            <button
-              type="button"
-              className="xh-open-cashout-btn"
-              onClick={e => { e.stopPropagation(); onCashout?.(bet); }}
-            >
-              Cashout<br />GHS {fmt(cashOutAmount)}
-            </button>
-          )}
-        </div>
-        {league && <div className="xh-open-league">{league}</div>}
-
+        {/* Auto cashout banner */}
         {cashOutAmount > 0 && (
-          <div onClick={e => e.stopPropagation()}>
-            <AutoCashoutPanel
-              betId={bet.id}
-              currentOffer={cashOutAmount}
-              target={Number(autoTarget) || 0}
-              onSetTarget={(id, v) => onAutoTargetChange(id, v)}
-              onClearTarget={(id) => onAutoClear(id)}
-              busy={cashoutBusy}
-            />
+          <div className="xh-auto-banner" onClick={e => e.stopPropagation()}>
+            <span className="xh-auto-banner-text">Set a rule to <strong>Auto Cashout</strong> your bet.</span>
+            <span className="xh-auto-banner-info">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+            </span>
           </div>
         )}
+
+        {/* Mode header with actions */}
+        <div className="xh-open-mode-row" onClick={() => setExpanded(!expanded)}>
+          <span className="xh-open-mode">{modeLabel}</span>
+          <div className="xh-open-actions">
+            <button type="button" className="xh-open-action" onClick={e => { e.stopPropagation(); onRemix?.(bet); }}>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg>
+              Reset
+            </button>
+            <button type="button" className="xh-open-action xh-open-action-sim" onClick={e => { e.stopPropagation(); }}>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
+              SIM
+            </button>
+            <button type="button" className="xh-open-action" onClick={e => { e.stopPropagation(); }}>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
+              Edit Bet
+            </button>
+          </div>
+        </div>
+
+        <AnimatePresence initial={false}>
+          {expanded ? (
+            /* ── Expanded view ── */
+            <motion.div
+              key="expanded"
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              style={{ overflow: 'hidden' }}
+            >
+              <div className="xh-open-expanded">
+                {legs.map((leg, i) => {
+                  const pick = leg.outcome || leg.pick || leg.selection || '—';
+                  const odds = leg.odds ? `@ ${Number(leg.odds).toFixed(2)}` : '';
+                  const lgName = leg.league || leg.competition || '';
+                  const matchLabel = leg.home && leg.away ? `${leg.home} vs ${leg.away}` : leg.match || leg.event || 'Match';
+                  return (
+                    <div key={i} className="xh-open-leg">
+                      <div className="xh-open-leg-pick">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+                        <span><strong>{getPickName(pick)} {odds}</strong> <span className="xh-open-leg-mkt">{getMarketName(leg.market)}</span></span>
+                      </div>
+                      <div className="xh-open-leg-match">{matchLabel}</div>
+                      <div className="xh-open-leg-date">{legDate}</div>
+                      {lgName && <div className="xh-open-leg-league-row">
+                        <span className="xh-open-league-badge">{lgName}</span>
+                        <button type="button" className="xh-open-hide-details" onClick={e => { e.stopPropagation(); setExpanded(false); }}>Hide Match Details</button>
+                      </div>}
+                    </div>
+                  );
+                })}
+
+                {/* Stake / Pot. Win */}
+                <div className="xh-open-summary">
+                  <div className="xh-open-summary-row">
+                    <span>Stake</span>
+                    <span className="xh-open-summary-val">{fmt(bet.stake)}</span>
+                  </div>
+                  <div className="xh-open-summary-row">
+                    <span>Pot. Win</span>
+                    <span className="xh-open-summary-val">{fmt(bet.potentialWin)}</span>
+                  </div>
+                </div>
+
+                {/* Cashout button */}
+                {cashOutAmount > 0 && (
+                  <div className="xh-open-cashout-wrap">
+                    <button
+                      type="button"
+                      className="xh-open-cashout-btn-full"
+                      onClick={e => { e.stopPropagation(); onCashout?.(bet); }}
+                    >
+                      Cashout GHS {fmt(cashOutAmount)}
+                    </button>
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          ) : (
+            /* ── Compact view ── */
+            <motion.div key="compact" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+              <div className="xh-open-compact" onClick={() => setExpanded(true)}>
+                <div className="xh-open-compact-info">
+                  <span className="xh-open-match">{matchName}</span>
+                  <span className="xh-open-stake">Stake: {fmt(bet.stake)}</span>
+                  {league && <span className="xh-open-league-badge">{league}</span>}
+                </div>
+                {cashOutAmount > 0 && (
+                  <button
+                    type="button"
+                    className="xh-open-cashout-btn"
+                    onClick={e => { e.stopPropagation(); onCashout?.(bet); }}
+                  >
+                    Cashout<br />GHS {fmt(cashOutAmount)}
+                  </button>
+                )}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </motion.div>
     );
   }
@@ -931,15 +1043,56 @@ const XH_CSS = `
 .xh-card-row-dim { font-size: 11px; color: var(--text-dim); font-weight: 600; }
 .xh-card-row-dim:last-child { font-size: 10.5px; font-weight: 400; }
 
-/* ── Open bet card (compact) ── */
-.xh-card-open { padding: 12px 13px 10px; }
-.xh-open-body { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.xh-open-info { display: flex; flex-direction: column; gap: 3px; flex: 1; min-width: 0; }
-.xh-open-match { color: var(--text); font-size: 13.5px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* ── Open bet card ── */
+.xh-card-open { padding: 0; overflow: hidden; }
+
+/* Auto cashout banner */
+.xh-auto-banner { display: flex; align-items: center; gap: 6px; padding: 9px 13px; background: var(--surface-2); border-bottom: 1px solid var(--line); }
+.xh-auto-banner-text { color: var(--text-soft); font-size: 11.5px; }
+.xh-auto-banner-text strong { color: #fff; }
+.xh-auto-banner-info { color: var(--text-dim); display: flex; cursor: pointer; }
+
+/* Mode header row */
+.xh-open-mode-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 13px 6px; cursor: pointer; }
+.xh-open-mode { color: #fff; font-size: 14px; font-weight: 800; }
+.xh-open-actions { display: flex; align-items: center; gap: 10px; }
+.xh-open-action { display: inline-flex; align-items: center; gap: 4px; background: none; border: none; color: var(--text-dim); font-size: 11px; font-weight: 600; cursor: pointer; font-family: inherit; padding: 0; }
+.xh-open-action:hover { color: var(--text-soft); }
+.xh-open-action-sim { color: var(--accent); }
+
+/* Compact view */
+.xh-open-compact { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 13px 12px; cursor: pointer; }
+.xh-open-compact-info { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 0; }
+.xh-open-match { color: #fff; font-size: 13.5px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .xh-open-stake { color: var(--text-soft); font-size: 12px; font-weight: 600; }
-.xh-open-cashout-btn { flex-shrink: 0; padding: 8px 14px; border: none; border-radius: 8px; background: var(--accent); color: #fff; font-weight: 800; font-size: 11.5px; font-family: inherit; cursor: pointer; transition: opacity .15s; line-height: 1.35; text-align: center; }
+.xh-open-cashout-btn { flex-shrink: 0; padding: 10px 16px; border: none; border-radius: 8px; background: var(--accent); color: #fff; font-weight: 800; font-size: 12px; font-family: inherit; cursor: pointer; transition: opacity .15s; line-height: 1.35; text-align: center; }
 .xh-open-cashout-btn:hover { opacity: .9; }
-.xh-open-league { display: inline-block; margin-top: 8px; padding: 4px 10px; border-radius: 5px; border: 1px solid var(--accent); color: var(--accent); font-size: 10.5px; font-weight: 700; }
+
+/* League badge */
+.xh-open-league-badge { display: inline-block; padding: 3px 10px; border-radius: 5px; border: 1px solid var(--accent); color: var(--accent); font-size: 10.5px; font-weight: 700; margin-top: 2px; }
+
+/* Expanded view */
+.xh-open-expanded { padding: 0 13px 12px; }
+.xh-open-leg { padding: 10px 0; border-bottom: 1px solid var(--line); }
+.xh-open-leg:last-of-type { border-bottom: none; }
+.xh-open-leg-pick { display: flex; align-items: center; gap: 7px; color: var(--text-soft); font-size: 12.5px; margin-bottom: 4px; }
+.xh-open-leg-pick strong { color: #fff; font-weight: 700; }
+.xh-open-leg-mkt { color: var(--text-dim); font-size: 11px; font-weight: 500; }
+.xh-open-leg-match { color: #fff; font-size: 13.5px; font-weight: 700; margin-bottom: 3px; }
+.xh-open-leg-date { color: var(--text-dim); font-size: 11px; margin-bottom: 6px; }
+.xh-open-leg-league-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.xh-open-hide-details { background: none; border: none; color: var(--text-dim); font-size: 11px; font-weight: 600; cursor: pointer; font-family: inherit; padding: 0; }
+.xh-open-hide-details:hover { color: var(--text-soft); }
+
+/* Stake / Pot Win summary */
+.xh-open-summary { display: flex; flex-direction: column; gap: 5px; padding: 10px 0 8px; border-top: 1px solid var(--line); }
+.xh-open-summary-row { display: flex; justify-content: space-between; color: var(--text-soft); font-size: 12px; }
+.xh-open-summary-val { color: #fff; font-weight: 700; font-variant-numeric: tabular-nums; }
+
+/* Full-width cashout button */
+.xh-open-cashout-wrap { padding: 4px 0 2px; }
+.xh-open-cashout-btn-full { width: 100%; padding: 13px 0; border: none; border-radius: 8px; background: var(--accent); color: #fff; font-size: 14px; font-weight: 800; cursor: pointer; font-family: inherit; transition: opacity .15s; }
+.xh-open-cashout-btn-full:hover { opacity: .9; }
 
 /* ── Skeleton ── */
 .xh-skeleton-wrap { display: flex; flex-direction: column; gap: 8px; padding: 8px 14px; }
