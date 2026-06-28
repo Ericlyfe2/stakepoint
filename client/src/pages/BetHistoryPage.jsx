@@ -307,21 +307,34 @@ function TicketDetails({ bet, onClose, onRemix, onShare }) {
                     <span>Game ID: {legGameId(leg, i)} | {legDate(leg)}</span>
                   </div>
                   <div className="td-leg-body">
-                    <div className="td-leg-teams">{leg.home} : {leg.away}</div>
-                    {score && (
-                      <div className="td-leg-score-row">
-                        <span className="td-leg-ft">FT Score: <strong>{score}</strong></span>
-                        <span className="td-leg-divider">|</span>
-                        <span className="td-leg-tracker">
-                          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg>
-                          Match Tracker
-                        </span>
+                    <div className="td-leg-body-inner">
+                      <div className="td-leg-content">
+                        <div className="td-leg-teams">{leg.home} : {leg.away}</div>
+                        {score && (
+                          <div className="td-leg-score-row">
+                            <span className="td-leg-ft">FT Score: <strong>{score}</strong></span>
+                            <span className="td-leg-divider">|</span>
+                            <span className="td-leg-tracker">
+                              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg>
+                              Match Tracker
+                            </span>
+                          </div>
+                        )}
+                        <div className="td-leg-details">
+                          <div className="td-leg-detail"><span>Pick:</span> <span className="td-leg-detail-val">{getPickName(pick)} {odds}</span></div>
+                          <div className="td-leg-detail"><span>Market:</span> <span className="td-leg-detail-val">{getMarketName(leg.market)}</span></div>
+                          <div className="td-leg-detail"><span>Outcome:</span> <span className="td-leg-detail-val" style={{ color: won ? '#22c66e' : lost ? '#e53935' : 'var(--text)' }}>{getPickName(actualOutcome)}</span></div>
+                        </div>
                       </div>
-                    )}
-                    <div className="td-leg-details">
-                      <div className="td-leg-detail"><span>Pick:</span> <span className="td-leg-detail-val">{getPickName(pick)} {odds}</span></div>
-                      <div className="td-leg-detail"><span>Market:</span> <span className="td-leg-detail-val">{getMarketName(leg.market)}</span></div>
-                      <div className="td-leg-detail"><span>Outcome:</span> <span className="td-leg-detail-val" style={{ color: won ? '#22c66e' : lost ? '#e53935' : 'var(--text)' }}>{getPickName(actualOutcome)}</span></div>
+                      {(won || lost) && (
+                        <span className={`td-leg-icon ${won ? 'td-leg-icon-won' : 'td-leg-icon-lost'}`}>
+                          {won ? (
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                          ) : (
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                          )}
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -1169,7 +1182,12 @@ const XH_CSS = `
 .td-matches { padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; }
 .td-leg { background: var(--surface); border-radius: 8px; overflow: hidden; border-left: 3px solid #22c66e; }
 .td-leg-header { background: var(--surface-2); padding: 8px 12px; color: var(--text-dim); font-size: 11px; font-weight: 600; }
-.td-leg-body { padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; }
+.td-leg-body { padding: 10px 12px; }
+.td-leg-body-inner { display: flex; align-items: flex-start; gap: 10px; }
+.td-leg-content { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.td-leg-icon { flex-shrink: 0; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; margin-top: 2px; }
+.td-leg-icon-won { background: rgba(34,198,110,0.15); color: #22c66e; }
+.td-leg-icon-lost { background: rgba(229,57,53,0.15); color: #e53935; }
 .td-leg-teams { color: var(--text); font-size: 13.5px; font-weight: 700; }
 .td-leg-score-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .td-leg-ft { color: var(--text-soft); font-size: 12px; }
