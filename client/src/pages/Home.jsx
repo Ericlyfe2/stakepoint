@@ -152,6 +152,7 @@ export default function Home({ initialChip }) {
   const [featuredTab, setFeaturedTab] = useState('featured');
   const [activeCategory, setActiveCategory] = useState(null);
   const [slipErr, setSlipErr] = useState('');
+  const [singleRawStakes, setSingleRawStakes] = useState({});
   const [isBooking, setIsBooking] = useState(false);
   const [isPlacing, setIsPlacing] = useState(false);
   const [showKeypad, setShowKeypad] = useState(false);
@@ -1204,7 +1205,7 @@ export default function Home({ initialChip }) {
           {/* Clear slip button */}
           <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '4px 12px 0' }}>
             {selectionCount > 0 && (
-              <button type="button" onClick={clearSlip} style={{ background: 'none', border: 0, color: '#d32f2f', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+              <button type="button" onClick={() => { clearSlip(); setSingleRawStakes({}); }} style={{ background: 'none', border: 0, color: '#d32f2f', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
                 Clear All
               </button>
             )}
@@ -1279,8 +1280,12 @@ export default function Home({ initialChip }) {
                           <span className="xb-stake-currency">GHS</span>
                           <input
                             type="text"
-                            value={stakes[s.id] > 0 ? stakes[s.id].toFixed(2) : ''}
-                            onChange={(e) => setSelectionStake(s.id, e.target.value)}
+                            value={singleRawStakes[s.id] ?? ''}
+                            onChange={(e) => {
+                              const raw = e.target.value.replace(/[^0-9.]/g, '');
+                              setSingleRawStakes(prev => ({ ...prev, [s.id]: raw }));
+                              setSelectionStake(s.id, raw);
+                            }}
                             inputMode="decimal"
                             placeholder="Min. 400"
                           />
@@ -1361,7 +1366,11 @@ export default function Home({ initialChip }) {
                 {[100, 200, 300, 500, 1000, 2000, 5000, 10000].map((amt) => (
                   <button key={amt} type="button" className="xb-quick-btn" onClick={() => {
                     if (betMode === 'single') {
-                      selections.forEach((s) => setSelectionStake(s.id, (stakes[s.id] || 0) + amt));
+                      selections.forEach((s) => {
+                        const newVal = (stakes[s.id] || 0) + amt;
+                        setSelectionStake(s.id, newVal);
+                        setSingleRawStakes(prev => ({ ...prev, [s.id]: String(newVal) }));
+                      });
                     } else {
                       setMultipleStake((stakes.multiple || 0) + amt);
                     }
