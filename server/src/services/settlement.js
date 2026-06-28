@@ -194,7 +194,7 @@ export async function settleNow() {
       status,
       settledAt: new Date().toISOString(),
       settledBy: 'auto',
-      totalReturn: Number(totalReturn.toFixed(2)),
+      totalReturn: Number((totalReturn || 0).toFixed(2)),
       legsResolved: legResults.map((r) => ({ matchId: r.leg.matchId, market: r.leg.market, outcome: r.leg.outcome, won: r.won, scoreHome: r.res.scoreHome, scoreAway: r.res.scoreAway })),
       ...(status === 'won' ? { wonNotAcknowledged: true } : {}),
     };
