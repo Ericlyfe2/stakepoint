@@ -478,7 +478,7 @@ export default function BetHistoryPage() {
   const [activeTicket, setActiveTicket] = useState(null);
 
   // History filter chips
-  const [historyFilter, setHistoryFilter] = useState('settled');
+  const historyFilter = 'all';
 
   // Pagination
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
@@ -743,23 +743,6 @@ export default function BetHistoryPage() {
           ))}
         </div>
 
-        {/* ── Filter chips (Bet History only) ── */}
-        {tab === 'history' && (
-          <div className="xh-filter-chips">
-            {[
-              { key: 'settled', label: 'Settled' },
-              { key: 'unsettled', label: 'Unsettled' },
-              { key: 'all', label: 'All' },
-            ].map(f => (
-              <button key={f.key} type="button" className={`xh-filter-chip${historyFilter === f.key ? ' active' : ''}`} onClick={() => setHistoryFilter(f.key)}>
-                {f.label}
-              </button>
-            ))}
-            <div style={{ flex: 1 }} />
-            <div className="xh-filter-dropdown">All Casino <span style={{ fontSize: 9 }}>▼</span></div>
-          </div>
-        )}
-
         {/* ── Content ── */}
         <AnimatePresence mode="wait">
           {error && !busy && filteredBets.length === 0 ? (
@@ -792,14 +775,14 @@ export default function BetHistoryPage() {
             <motion.div key={`list-${tab}-${searchQuery}`} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.25 }} className="xh-list">
               <AnimatePresence>
                 {groupedByDate.map((group, gi) => (
-                  <div key={`${group.dateLabel}-${group.monthLabel}-${gi}`} className="xh-date-group">
-                    {/* ── Date rail ── */}
-                    <div className="xh-date-rail">
-                      <span className="xh-date-day">{group.dateLabel}</span>
-                      <span className="xh-date-mon">{group.monthLabel}</span>
-                    </div>
-                    {/* ── Cards ── */}
-                    <div className="xh-date-cards">
+                  <div key={`${group.dateLabel}-${group.monthLabel}-${gi}`} className={tab === 'open' ? 'xh-date-group-flat' : 'xh-date-group'}>
+                    {tab !== 'open' && (
+                      <div className="xh-date-rail">
+                        <span className="xh-date-day">{group.dateLabel}</span>
+                        <span className="xh-date-mon">{group.monthLabel}</span>
+                      </div>
+                    )}
+                    <div className={tab === 'open' ? 'xh-date-cards-flat' : 'xh-date-cards'}>
                       {group.bets.map(b => (
                         <BetCardView
                           key={b.id}
@@ -911,10 +894,6 @@ const XH_CSS = `
 .xh-top-tab.active::after { content: ''; position: absolute; bottom: -1px; left: 0; right: 0; height: 3px; background: #c8102e; }
 
 /* ── Filter chips ── */
-.xh-filter-chips { display: flex; align-items: center; gap: 8px; padding: 12px 14px; overflow-x: auto; }
-.xh-filter-chip { padding: 7px 16px; border-radius: 20px; font-size: 12px; font-weight: 700; white-space: nowrap; background: #1b252d; color: #aeb9c2; border: 1px solid #2a3742; cursor: pointer; font-family: inherit; }
-.xh-filter-chip.active { background: #c8102e; color: #fff; border-color: #c8102e; }
-.xh-filter-dropdown { display: flex; align-items: center; gap: 6px; padding: 7px 12px; border-radius: 8px; background: #1b252d; color: #aeb9c2; font-size: 12px; font-weight: 700; white-space: nowrap; }
 
 /* ── Bet list ── */
 .xh-list { display: flex; flex-direction: column; gap: 0; padding: 0; }
@@ -925,6 +904,8 @@ const XH_CSS = `
 .xh-date-day { color: #fff; font-size: 18px; font-weight: 800; line-height: 1; }
 .xh-date-mon { color: #6b7883; font-size: 10px; font-weight: 700; letter-spacing: 1px; margin-top: 2px; }
 .xh-date-cards { flex: 1; padding: 10px 12px 4px; display: flex; flex-direction: column; gap: 10px; }
+.xh-date-group-flat { display: flex; flex-direction: column; }
+.xh-date-cards-flat { padding: 6px 14px; display: flex; flex-direction: column; gap: 10px; }
 
 /* ── Bet card ── */
 .xh-card { background: #19222b; border: 1px solid #222e38; border-radius: 10px; overflow: hidden; cursor: pointer; }
