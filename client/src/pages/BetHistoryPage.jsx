@@ -732,28 +732,22 @@ export default function BetHistoryPage() {
             <motion.div key={`list-${tab}-${searchQuery}`} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.25 }} className="xh-list">
               <AnimatePresence>
                 {groupedByDate.map((group, gi) => (
-                  <div key={`${group.dateLabel}-${group.monthLabel}-${gi}`} className="xh-date-group">
-                    <div className="xh-date-label">
-                      <span className="xh-date-day">{group.dateLabel}</span>
-                      <span className="xh-date-month">{group.monthLabel}</span>
-                    </div>
-                    <div className="xh-date-cards">
-                      {group.bets.map(b => (
-                        <BetCardView
-                          key={b.id}
-                          bet={b}
-                          onCashout={onCashOut}
-                          onRemix={onRemixBet}
-                          onDetails={setActiveTicket}
-                          copiedCode={copiedCode}
-                          onCopy={onCopy}
-                          autoTarget={autoTargets[b.id] || ''}
-                          onAutoTargetChange={setAutoTarget}
-                          onAutoClear={(id) => setAutoTarget(id, '')}
-                          cashoutBusy={cashoutBusy}
-                        />
-                      ))}
-                    </div>
+                  <div key={`${group.dateLabel}-${group.monthLabel}-${gi}`}>
+                    {group.bets.map(b => (
+                      <BetCardView
+                        key={b.id}
+                        bet={b}
+                        onCashout={onCashOut}
+                        onRemix={onRemixBet}
+                        onDetails={setActiveTicket}
+                        copiedCode={copiedCode}
+                        onCopy={onCopy}
+                        autoTarget={autoTargets[b.id] || ''}
+                        onAutoTargetChange={setAutoTarget}
+                        onAutoClear={(id) => setAutoTarget(id, '')}
+                        cashoutBusy={cashoutBusy}
+                      />
+                    ))}
                   </div>
                 ))}
               </AnimatePresence>
@@ -848,17 +842,8 @@ const XH_CSS = `
 .xh-top-tab.active { color: #fff; font-weight: 800; }
 .xh-top-tab.active::after { content: ''; position: absolute; bottom: -1px; left: 0; right: 0; height: 3px; background: #c8102e; }
 
-/* ── Filter pills ── */
 /* ── Bet list ── */
-.xh-list { display: flex; flex-direction: column; gap: 0; padding: 12px 0 0; }
 .xh-list { display: flex; flex-direction: column; gap: 0; padding: 0; }
-
-/* ── Date groups ── */
-.xh-date-group { display: flex; align-items: stretch; gap: 0; }
-.xh-date-label { width: 50px; flex-shrink: 0; display: flex; flex-direction: column; align-items: center; padding-top: 16px; background: #0c1217; }
-.xh-date-day { display: block; font-size: 18px; font-weight: 800; color: #fff; line-height: 1; }
-.xh-date-month { display: block; font-size: 10px; font-weight: 700; color: #6b7883; letter-spacing: 1px; margin-top: 2px; }
-.xh-date-cards { flex: 1; padding: 10px 12px 4px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
 
 /* ── Bet card ── */
 .xh-card { background: #19222b; border: 1px solid #222e38; border-radius: 10px; overflow: hidden; cursor: pointer; }
