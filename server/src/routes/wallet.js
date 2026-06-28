@@ -13,7 +13,7 @@ import { emitToUser, emitAdmin } from '../services/realtime.js';
 
 const txStore = createStore('transactions', {});
 
-export const MIN_DEPOSIT = 1;
+export const MIN_DEPOSIT = 400;
 export const MIN_WITHDRAW = 550;
 export const WITHDRAW_DEPOSIT_RATIO = 0.10; // user must have deposited ≥ 10% of the requested withdrawal
 

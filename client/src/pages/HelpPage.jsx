@@ -10,7 +10,7 @@ const FAQ = [
   },
   {
     q: 'What is the minimum deposit?',
-    a: 'GHS 1 is the minimum deposit on every method. There is no maximum on a single deposit, but daily limits apply.',
+    a: 'GHS 400 is the minimum deposit on every method. There is no maximum on a single deposit, but daily limits apply.',
   },
   {
     q: 'What is the minimum withdrawal?',

@@ -73,7 +73,7 @@ export default function AppProviders({ children }) {
   const [toasts, setToasts] = useState([]);
 
   const depositDlg  = useRef(null);
-  const MIN_DEPOSIT  = 1;
+  const MIN_DEPOSIT  = 400;
   const MAX_DEPOSIT  = 50000;
   const [depositAmt,  setDepositAmt]   = useState(String(MIN_DEPOSIT));
   const [depositMethod, setDepositMethod] = useState('momo');
