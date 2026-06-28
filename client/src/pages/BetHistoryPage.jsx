@@ -119,12 +119,6 @@ const STATUS_CONFIG = {
   open:       { label: 'BET PENDING',    cls: 'open',   color: '#4f8bff', bg: 'rgba(79,139,255,0.15)', border: 'rgba(79,139,255,0.4)', icon: '⏳' },
 };
 
-const STATUS_FILTERS = [
-  { key: 'settled', label: 'Settled' },
-  { key: 'unsettled', label: 'Unsettled' },
-  { key: 'all', label: 'All' },
-];
-
 const TABS = [
   { key: 'open', label: 'Open Bets' },
   { key: 'history', label: 'Bet History' },
@@ -397,9 +391,8 @@ export default function BetHistoryPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
 
-  // Tab & filter
+  // Tab
   const [tab, setTab] = useState('open');
-  const [statusFilter, setStatusFilter] = useState('settled');
 
   // Search
   const [searchQuery, setSearchQuery] = useState('');
@@ -522,9 +515,6 @@ export default function BetHistoryPage() {
     if (tab === 'open') result = openBets;
     else result = settledBets;
 
-    if (statusFilter === 'settled') result = result.filter(b => b.status !== 'open');
-    else if (statusFilter === 'unsettled') result = result.filter(b => b.status === 'open');
-
     if (searchQuery.trim()) {
       const q = searchQuery.trim().toLowerCase();
       result = result.filter(b => {
@@ -536,7 +526,7 @@ export default function BetHistoryPage() {
     }
 
     return result;
-  }, [tab, openBets, settledBets, statusFilter, searchQuery]);
+  }, [tab, openBets, settledBets, searchQuery]);
 
   const paginated = useMemo(() => filteredBets.slice(0, visibleCount), [filteredBets, visibleCount]);
 
@@ -704,22 +694,10 @@ export default function BetHistoryPage() {
         {/* ── Top tab bar ── */}
         <div className="xh-top-tabs" role="tablist">
           {TABS.map(t => (
-            <button key={t.key} type="button" role="tab" aria-selected={tab === t.key} className={`xh-top-tab${tab === t.key ? ' active' : ''}`} onClick={() => { setTab(t.key); setStatusFilter('settled'); setVisibleCount(PAGE_SIZE); }}>
+            <button key={t.key} type="button" role="tab" aria-selected={tab === t.key} className={`xh-top-tab${tab === t.key ? ' active' : ''}`} onClick={() => { setTab(t.key); setVisibleCount(PAGE_SIZE); }}>
               {t.label}{t.key === 'open' && totals.openCount > 0 ? ` (${totals.openCount})` : ''}
             </button>
           ))}
-        </div>
-
-        {/* ── Filter pills ── */}
-        <div className="xh-filter-row">
-          {STATUS_FILTERS.map(f => (
-            <button key={f.key} type="button" className={`xh-pill${statusFilter === f.key ? ' active' : ''}`} onClick={() => { setStatusFilter(f.key); setVisibleCount(PAGE_SIZE); }}>
-              {f.label}
-            </button>
-          ))}
-          <button type="button" className="xh-pill xh-pill-dropdown">
-            All Casino <span className="xh-pill-arrow">▼</span>
-          </button>
         </div>
 
         {/* ── Content ── */}
@@ -751,7 +729,7 @@ export default function BetHistoryPage() {
               <button type="button" className="xh-state-btn" onClick={() => navigate('/')}>Browse Markets</button>
             </motion.div>
           ) : (
-            <motion.div key={`list-${tab}-${statusFilter}-${searchQuery}`} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.25 }} className="xh-list">
+            <motion.div key={`list-${tab}-${searchQuery}`} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.25 }} className="xh-list">
               <AnimatePresence>
                 {groupedByDate.map((group, gi) => (
                   <div key={`${group.dateLabel}-${group.monthLabel}-${gi}`} className="xh-date-group">
@@ -871,13 +849,8 @@ const XH_CSS = `
 .xh-top-tab.active::after { content: ''; position: absolute; bottom: -1px; left: 0; right: 0; height: 3px; background: #c8102e; }
 
 /* ── Filter pills ── */
-.xh-filter-row { display: flex; align-items: center; gap: 8px; padding: 12px 14px; overflow-x: auto; }
-.xh-pill { padding: 7px 16px; border-radius: 20px; border: 1px solid #2a3742; background: #1b252d; color: #aeb9c2; font-size: 12px; font-weight: 700; cursor: pointer; font-family: inherit; white-space: nowrap; transition: all .15s; }
-.xh-pill.active { background: #c8102e; border-color: #c8102e; color: #fff; }
-.xh-pill-dropdown { border-radius: 8px !important; display: flex; align-items: center; gap: 6px; margin-left: auto; }
-.xh-pill-arrow { font-size: 9px; }
-
 /* ── Bet list ── */
+.xh-list { display: flex; flex-direction: column; gap: 0; padding: 12px 0 0; }
 .xh-list { display: flex; flex-direction: column; gap: 0; padding: 0; }
 
 /* ── Date groups ── */
