@@ -783,17 +783,16 @@ export default function BetHistoryPage() {
               {[1, 2, 3].map(i => <SkeletonCard key={i} />)}
             </motion.div>
           ) : filteredBets.length === 0 ? (
-            <motion.div key="empty" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="xh-state-card">
-              <div className="xh-state-icon">
-                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>
+            <motion.div key="empty" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="xh-empty-card">
+              <div className="xh-empty-icon">
+                <svg width="40" height="40" viewBox="0 0 24 24" fill="#7d8b97" stroke="none"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 15c-.55 0-1-.45-1-1v-4c0-.55.45-1 1-1s1 .45 1 1v4c0 .55-.45 1-1 1zm1-8h-2V7h2v2z"/></svg>
               </div>
-              <h3 className="xh-state-title">
-                {searchQuery ? 'No matches found' : tab === 'open' ? 'No open bets' : tab === 'cashout' ? 'No cashout available' : 'No settled bets yet'}
-              </h3>
-              <p className="xh-state-desc">
-                {searchQuery ? 'Try a different search term.' : tab === 'open' || tab === 'cashout' ? 'Pick a market on the home page to place your first ticket.' : 'Once your bets settle, they\'ll show up here.'}
+              <p className="xh-empty-text">
+                {searchQuery ? 'No matches found.' : tab === 'open' ? 'You currently have no Open Bets.' : 'No settled bets yet.'}
               </p>
-              <button type="button" className="xh-state-btn" onClick={() => navigate('/')}>Browse Markets</button>
+              {tab === 'open' && !searchQuery && (
+                <button type="button" className="xh-empty-link" onClick={() => {}}>What is Cashout?</button>
+              )}
             </motion.div>
           ) : (
             <motion.div key={`list-${tab}-${searchQuery}`} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.25 }} className="xh-list">
@@ -985,6 +984,12 @@ const XH_CSS = `
 .xh-state-title { margin: 0; font-size: 18px; font-weight: 800; color: #e8eef3; }
 .xh-state-desc { margin: 0; color: #7d8b97; font-size: 14px; max-width: 360px; line-height: 1.5; }
 .xh-state-btn { padding: 10px 24px; border-radius: 9px; border: none; background: #1aa64f; color: #fff; font-weight: 800; font-size: 13px; cursor: pointer; font-family: inherit; }
+
+/* ── Empty state (SportyBet style) ── */
+.xh-empty-card { display: flex; flex-direction: column; align-items: center; padding: 60px 24px 48px; text-align: center; }
+.xh-empty-icon { margin-bottom: 16px; opacity: .7; }
+.xh-empty-text { margin: 0; color: #aeb9c2; font-size: 14px; font-weight: 500; }
+.xh-empty-link { margin-top: 16px; background: none; border: none; color: #14b8a6; font-size: 14px; font-weight: 700; cursor: pointer; font-family: inherit; }
 
 /* ── Load more ── */
 .xh-load-more-wrap { display: flex; justify-content: center; padding: 12px; }
