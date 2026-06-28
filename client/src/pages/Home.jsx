@@ -1282,7 +1282,7 @@ export default function Home({ initialChip }) {
                             value={stakes[s.id] > 0 ? stakes[s.id].toFixed(2) : ''}
                             onChange={(e) => setSelectionStake(s.id, e.target.value)}
                             inputMode="decimal"
-                            placeholder="Stake"
+                            placeholder="Min. 400"
                           />
                         </div>
                         <div className="xb-sel-win">
@@ -1371,8 +1371,11 @@ export default function Home({ initialChip }) {
             )}
 
             {/* Warnings */}
-            {totalStake < 400 && totalStake > 0 && (
-              <div className="xb-warn">Minimum total stake is GHS 400.00.</div>
+            {betMode === 'multiple' && totalStake < 400 && totalStake > 0 && (
+              <div className="xb-warn">Minimum stake is GHS 400.00.</div>
+            )}
+            {betMode === 'single' && selections.some(s => (stakes[s.id] || 0) > 0 && (stakes[s.id] || 0) < 400) && (
+              <div className="xb-warn">Minimum stake per bet is GHS 400.00.</div>
             )}
             {totalStake > (account?.balance || 0) && betRealMode === 'REAL' && (
               <div className="xb-warn" style={{ color: '#d32f2f' }}>

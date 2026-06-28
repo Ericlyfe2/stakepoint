@@ -183,6 +183,8 @@ export function validateBetSlip({ selections, betMode, stakes, account, minStake
       const stake = stakes[sel.id] || 0;
       if (stake <= 0) {
         errors.push(`Enter a stake for "${sel.pickLabel}".`);
+      } else if (stake < minStake) {
+        errors.push(`Minimum stake per bet is GHS ${formatAmt(minStake)}.`);
       }
     }
   }
