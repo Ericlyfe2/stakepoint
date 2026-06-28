@@ -326,6 +326,54 @@ function BetCardView({ bet, onCashout, onRemix, onDetails, copiedCode, onCopy, a
   const pillIcon = isWon ? '🏆' : bet.status === 'cashed_out' ? '⟳' : bet.status === 'void' ? '⚪' : bet.status === 'open' ? '⏳' : '✕';
   const statusLabel = isWon ? 'Won' : bet.status === 'cashed_out' ? 'Cashed Out' : bet.status === 'void' ? 'Void' : bet.status === 'open' ? 'Pending' : 'Lost';
 
+  const firstLeg = legs[0] || {};
+  const matchName = firstLeg.match || firstLeg.event || (legs.length > 1 ? `${legs.length} selections` : 'Bet');
+  const league = firstLeg.league || firstLeg.competition || '';
+
+  if (isOpen) {
+    return (
+      <motion.div
+        layout
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: -12, scale: 0.98 }}
+        transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+        className="xh-card xh-card-open"
+        onClick={() => onDetails?.(bet)}
+      >
+        <div className="xh-open-body">
+          <div className="xh-open-info">
+            <span className="xh-open-match">{matchName}</span>
+            <span className="xh-open-stake">Stake {fmt(bet.stake)}</span>
+          </div>
+          {cashOutAmount > 0 && (
+            <button
+              type="button"
+              className="xh-open-cashout-btn"
+              onClick={e => { e.stopPropagation(); onCashout?.(bet); }}
+            >
+              Cashout<br />GHS {fmt(cashOutAmount)}
+            </button>
+          )}
+        </div>
+        {league && <div className="xh-open-league">{league}</div>}
+
+        {cashOutAmount > 0 && (
+          <div onClick={e => e.stopPropagation()}>
+            <AutoCashoutPanel
+              betId={bet.id}
+              currentOffer={cashOutAmount}
+              target={Number(autoTarget) || 0}
+              onSetTarget={(id, v) => onAutoTargetChange(id, v)}
+              onClearTarget={(id) => onAutoClear(id)}
+              busy={cashoutBusy}
+            />
+          </div>
+        )}
+      </motion.div>
+    );
+  }
+
   return (
     <motion.div
       layout
@@ -363,28 +411,6 @@ function BetCardView({ bet, onCashout, onRemix, onDetails, copiedCode, onCopy, a
           <span className="xh-card-row-dim">No. {ticketNo}</span>
         </div>
       </div>
-
-      {/* ── Cashout button (open bets only) ── */}
-      {isOpen && cashOutAmount > 0 && (
-        <div className="xh-cashout-wrap" onClick={e => e.stopPropagation()}>
-          <button type="button" className="xh-cashout-btn" onClick={() => onCashout?.(bet)}>
-            Cashout GHS {fmt(cashOutAmount)}
-          </button>
-        </div>
-      )}
-
-      {isOpen && cashOutAmount > 0 && (
-        <div onClick={e => e.stopPropagation()}>
-          <AutoCashoutPanel
-            betId={bet.id}
-            currentOffer={cashOutAmount}
-            target={Number(autoTarget) || 0}
-            onSetTarget={(id, v) => onAutoTargetChange(id, v)}
-            onClearTarget={(id) => onAutoClear(id)}
-            busy={cashoutBusy}
-          />
-        </div>
-      )}
     </motion.div>
   );
 }
@@ -921,10 +947,15 @@ const XH_CSS = `
 .xh-card-row-dim { font-size: 11px; color: #56636d; font-weight: 600; }
 .xh-card-row-dim:last-child { font-size: 10.5px; font-weight: 400; }
 
-/* ── Cashout button ── */
-.xh-cashout-wrap { padding: 6px 13px 11px; }
-.xh-cashout-btn { width: 100%; padding: 12px; border: none; border-radius: 9px; background: #1aa64f; color: #fff; font-weight: 800; font-size: 13px; font-family: inherit; cursor: pointer; transition: opacity .15s; }
-.xh-cashout-btn:hover { opacity: .9; }
+/* ── Open bet card ── */
+.xh-card-open { padding: 12px 13px 10px; }
+.xh-open-body { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.xh-open-info { display: flex; flex-direction: column; gap: 3px; flex: 1; min-width: 0; }
+.xh-open-match { color: #e8eef3; font-size: 13.5px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.xh-open-stake { color: #7d8b97; font-size: 12px; font-weight: 600; }
+.xh-open-cashout-btn { flex-shrink: 0; padding: 8px 14px; border: none; border-radius: 8px; background: #1aa64f; color: #fff; font-weight: 800; font-size: 11.5px; font-family: inherit; cursor: pointer; transition: opacity .15s; line-height: 1.35; text-align: center; }
+.xh-open-cashout-btn:hover { opacity: .9; }
+.xh-open-league { display: inline-block; margin-top: 8px; padding: 4px 10px; border-radius: 5px; border: 1px solid #1aa64f; color: #1aa64f; font-size: 10.5px; font-weight: 700; }
 
 /* ── Skeleton ── */
 .xh-skeleton-wrap { display: flex; flex-direction: column; gap: 8px; padding: 8px 14px; }
