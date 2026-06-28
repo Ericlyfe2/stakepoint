@@ -342,12 +342,12 @@ function BetCardView({ bet, onCashout, onRemix, onDetails, copiedCode, onCopy, a
         <div className="xh-card-row">
           <span className="xh-card-row-label">Total Return</span>
           <span className="xh-card-row-value" style={{ color: returnColor, fontWeight: 800 }}>
-            ₦{bet.status === 'won' || bet.status === 'cashed_out' ? fmt(totalReturn) : bet.status === 'lost' ? '0.00' : fmt(bet.potentialWin)}
+            GHS{bet.status === 'won' || bet.status === 'cashed_out' ? fmt(totalReturn) : bet.status === 'lost' ? '0.00' : fmt(bet.potentialWin)}
           </span>
         </div>
         <div className="xh-card-row">
           <span className="xh-card-row-label">Total Stake</span>
-          <span className="xh-card-row-value xh-val-stake">₦{fmt(bet.stake)}</span>
+          <span className="xh-card-row-value xh-val-stake">GHS{fmt(bet.stake)}</span>
         </div>
         <div className="xh-card-row xh-card-row-bottom">
           <span className="xh-card-row-dim">{selectionLabel}</span>
@@ -359,7 +359,7 @@ function BetCardView({ bet, onCashout, onRemix, onDetails, copiedCode, onCopy, a
       {isOpen && cashOutAmount > 0 && (
         <div className="xh-cashout-wrap" onClick={e => e.stopPropagation()}>
           <button type="button" className="xh-cashout-btn" onClick={() => onCashout?.(bet)}>
-            Cashout ₦ {fmt(cashOutAmount)}
+            Cashout GHS {fmt(cashOutAmount)}
           </button>
         </div>
       )}
@@ -602,7 +602,7 @@ export default function BetHistoryPage() {
       const res = await executeCashout(id, cashoutCurrentOffer, f);
       const cash = res.bet.cashOut || 0;
       const partial = f > 0 && f < 1;
-      adjustBalance(cash, partial ? `Partial cash-out: ₦ ${fmt(cash)}. Remainder still in play.` : `Cashed out: ₦ ${fmt(cash)}.`);
+      adjustBalance(cash, partial ? `Partial cash-out: GHS ${fmt(cash)}. Remainder still in play.` : `Cashed out: GHS ${fmt(cash)}.`);
       showWin({ ...res.bet, status: 'cashed_out', settledAt: res.bet.settledAt || new Date().toISOString() });
       setAutoTargets(prev => {
         if (prev[id] == null) return prev;
@@ -612,7 +612,7 @@ export default function BetHistoryPage() {
       });
       closeCashout();
       await refresh();
-      toast(`Cash-out successful! ₦ ${fmt(cash)} credited.`, 'success');
+      toast(`Cash-out successful! GHS ${fmt(cash)} credited.`, 'success');
     } catch (e) {
       setCashoutProcessing(false);
       setCashoutBusy(false);
@@ -642,11 +642,11 @@ export default function BetHistoryPage() {
       const res = await executeCashout(confirmCashOut.id, newOffer, f);
       const cash = res.bet.cashOut || 0;
       const partial = f > 0 && f < 1;
-      adjustBalance(cash, partial ? `Partial cash-out: ₦ ${fmt(cash)}. Remainder still in play.` : `Cashed out: ₦ ${fmt(cash)}.`);
+      adjustBalance(cash, partial ? `Partial cash-out: GHS ${fmt(cash)}. Remainder still in play.` : `Cashed out: GHS ${fmt(cash)}.`);
       showWin({ ...res.bet, status: 'cashed_out', settledAt: res.bet.settledAt || new Date().toISOString() });
       closeCashout();
       await refresh();
-      toast(`Cash-out successful! ₦ ${fmt(cash)} credited.`, 'success');
+      toast(`Cash-out successful! GHS ${fmt(cash)} credited.`, 'success');
     } catch (e) {
       setCashoutProcessing(false);
       setCashoutBusy(false);
@@ -801,7 +801,7 @@ export default function BetHistoryPage() {
           onShare={(bet) => {
             const code = bet.bookingCode || toBookingCode(bet.id);
             if (navigator.share) {
-              navigator.share({ title: 'My BetXentra Ticket', text: `Check out my bet ticket on BetXentra!\n\nBooking Code: ${code}\nStake: ₦ ${fmt(bet.stake)}\nPotential Win: ₦ ${fmt(bet.potentialWin)}\nStatus: ${(bet.status || '').toUpperCase()}` }).catch(() => {});
+              navigator.share({ title: 'My BetXentra Ticket', text: `Check out my bet ticket on BetXentra!\n\nBooking Code: ${code}\nStake: GHS ${fmt(bet.stake)}\nPotential Win: GHS ${fmt(bet.potentialWin)}\nStatus: ${(bet.status || '').toUpperCase()}` }).catch(() => {});
             } else {
               navigator.clipboard?.writeText(code).then(() => toast('Booking code copied! Share it with friends.', 'success')).catch(() => toast('Share your booking code: ' + code, 'info'));
             }
