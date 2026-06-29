@@ -11,12 +11,39 @@ import {
   formatAmt,
 } from '../lib/betslipEngine';
 
+const SLIP_KEY = 'betxentra_betslip';
+
+function loadSavedSlip() {
+  try {
+    const raw = localStorage.getItem(SLIP_KEY);
+    if (!raw) return null;
+    const data = JSON.parse(raw);
+    if (!data || !Array.isArray(data.selections) || !data.selections.length) return null;
+    return data;
+  } catch { return null; }
+}
+
+function saveSlip(selections, betMode, stakes) {
+  try {
+    if (!selections.length) {
+      localStorage.removeItem(SLIP_KEY);
+      return;
+    }
+    localStorage.setItem(SLIP_KEY, JSON.stringify({ selections, betMode, stakes }));
+  } catch {}
+}
+
 export default function useBetslip(initialBetMode = 'multiple') {
-  const [selections, setSelections] = useState([]);
-  const [betMode, setBetModeRaw] = useState(initialBetMode);
-  const [stakes, setStakes] = useState({ multiple: 0 });
+  const saved = useRef(loadSavedSlip());
+  const [selections, setSelections] = useState(saved.current?.selections || []);
+  const [betMode, setBetModeRaw] = useState(saved.current?.betMode || initialBetMode);
+  const [stakes, setStakes] = useState(saved.current?.stakes || { multiple: 0 });
   const [oddsChanges, setOddsChanges] = useState([]);
   const selectionIdCounter = useRef(0);
+
+  useEffect(() => {
+    saveSlip(selections, betMode, stakes);
+  }, [selections, betMode, stakes]);
 
   const nextId = useCallback(() => {
     selectionIdCounter.current += 1;
@@ -58,6 +85,7 @@ export default function useBetslip(initialBetMode = 'multiple') {
     setSelections([]);
     setStakes({ multiple: 0 });
     setOddsChanges([]);
+    localStorage.removeItem(SLIP_KEY);
   }, []);
 
   const setBetMode = useCallback((mode) => {

@@ -183,6 +183,14 @@ export default function Home({ initialChip }) {
     buildPlaceBetPayload,
     loadSelections,
   } = useBetslip('multiple');
+
+  useEffect(() => {
+    if (betMode === 'single' && selections.length) {
+      const raw = {};
+      selections.forEach(s => { if (stakes[s.id] > 0) raw[s.id] = String(stakes[s.id]); });
+      if (Object.keys(raw).length) setSingleRawStakes(raw);
+    }
+  }, []);
   const [systemType, setSystemType]   = useState(null);
 
   const [codeModalOpen, setCodeModalOpen] = useState(false);
