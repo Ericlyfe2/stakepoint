@@ -153,6 +153,7 @@ export default function Home({ initialChip }) {
   const [activeCategory, setActiveCategory] = useState(null);
   const [slipErr, setSlipErr] = useState('');
   const [singleRawStakes, setSingleRawStakes] = useState({});
+  const [multipleRawStake, setMultipleRawStake] = useState('');
   const [isBooking, setIsBooking] = useState(false);
   const [isPlacing, setIsPlacing] = useState(false);
   const [showKeypad, setShowKeypad] = useState(false);
@@ -190,7 +191,13 @@ export default function Home({ initialChip }) {
       selections.forEach(s => { if (stakes[s.id] > 0) raw[s.id] = String(stakes[s.id]); });
       if (Object.keys(raw).length) setSingleRawStakes(raw);
     }
+    if (betMode === 'multiple' && stakes.multiple > 0) {
+      setMultipleRawStake(String(stakes.multiple));
+    }
   }, []);
+  useEffect(() => {
+    if (!selections.length) { setSingleRawStakes({}); setMultipleRawStake(''); }
+  }, [selections.length]);
   const [systemType, setSystemType]   = useState(null);
 
   const [codeModalOpen, setCodeModalOpen] = useState(false);
@@ -506,26 +513,45 @@ export default function Home({ initialChip }) {
       return;
     }
 
-    const linePrice = betMode === 'multiple'
-      ? parseStake(stakes.multiple || 0)
-      : totalStake;
-
     setIsBooking(true);
     try {
-      const payload = {
-        mode: betMode,
-        stake: linePrice,
-        ...(betMode === 'system' ? { systemType } : {}),
-        selections: selections.map((s) => ({
-          matchId: s.matchId, market: s.market, outcome: s.outcome, odds: s.odds,
-        })),
-      };
-      const res = await bookBet(payload);
-      clearSlip();
-      setSlipOpen(false);
-      setSuccessType('booked');
-      setSuccessBet(res.bet);
-      toast(`Bet booked - code ${res.bet.bookingCode}.`);
+      if (betMode === 'single') {
+        const results = [];
+        for (const sel of selections) {
+          const selStake = parseStake(stakes[sel.id] || 0);
+          if (selStake <= 0) continue;
+          const payload = {
+            mode: 'single',
+            stake: selStake,
+            selections: [{ matchId: sel.matchId, market: sel.market, outcome: sel.outcome, odds: sel.odds }],
+          };
+          const res = await bookBet(payload);
+          results.push(res.bet);
+        }
+        clearSlip();
+        setSlipOpen(false);
+        setSuccessType('booked');
+        setSuccessBet(results[0]);
+        toast(`${results.length} bet${results.length > 1 ? 's' : ''} booked.`);
+      } else {
+        const linePrice = betMode === 'multiple'
+          ? parseStake(stakes.multiple || 0)
+          : totalStake;
+        const payload = {
+          mode: betMode,
+          stake: linePrice,
+          ...(betMode === 'system' ? { systemType } : {}),
+          selections: selections.map((s) => ({
+            matchId: s.matchId, market: s.market, outcome: s.outcome, odds: s.odds,
+          })),
+        };
+        const res = await bookBet(payload);
+        clearSlip();
+        setSlipOpen(false);
+        setSuccessType('booked');
+        setSuccessBet(res.bet);
+        toast(`Bet booked - code ${res.bet.bookingCode}.`);
+      }
     } catch (e) {
       if (e.status === 409) {
         setSlipErr(e.message || 'Odds changed or market closed - refreshing.');
@@ -560,34 +586,60 @@ export default function Home({ initialChip }) {
       return;
     }
 
-    const linePrice = betMode === 'multiple'
-      ? parseStake(stakes.multiple || 0)
-      : totalStake;
-
     setIsPlacing(true);
     adjustBalance(-totalStake);
     try {
-      const payload = {
-        mode: betMode,
-        stake: linePrice,
-        ...(betMode === 'system' ? { systemType } : {}),
-        selections: selections.map((s) => ({
-          matchId: s.matchId, market: s.market, outcome: s.outcome, odds: s.odds,
-        })),
-      };
-      const res = await placeBet(payload);
-      if (res.account) setAccount(res.account);
-      toast(`Bet placed - booking code ${res.bet.bookingCode}.`);
-      try {
-        const stored = localStorage.getItem('betxentra_recent_codes');
-        let list = stored ? JSON.parse(stored) : [];
-        list = [res.bet.bookingCode, ...list.filter((c) => c !== res.bet.bookingCode)].slice(0, 8);
-        localStorage.setItem('betxentra_recent_codes', JSON.stringify(list));
-      } catch { /* ignore */ }
-      clearSlip();
-      setSlipOpen(false);
-      setSuccessType('placed');
-      setSuccessBet(res.bet);
+      if (betMode === 'single') {
+        const results = [];
+        for (const sel of selections) {
+          const selStake = parseStake(stakes[sel.id] || 0);
+          if (selStake <= 0) continue;
+          const payload = {
+            mode: 'single',
+            stake: selStake,
+            selections: [{ matchId: sel.matchId, market: sel.market, outcome: sel.outcome, odds: sel.odds }],
+          };
+          const res = await placeBet(payload);
+          if (res.account) setAccount(res.account);
+          results.push(res.bet);
+          try {
+            const stored = localStorage.getItem('betxentra_recent_codes');
+            let list = stored ? JSON.parse(stored) : [];
+            list = [res.bet.bookingCode, ...list.filter((c) => c !== res.bet.bookingCode)].slice(0, 8);
+            localStorage.setItem('betxentra_recent_codes', JSON.stringify(list));
+          } catch { /* ignore */ }
+        }
+        toast(`${results.length} bet${results.length > 1 ? 's' : ''} placed.`);
+        clearSlip();
+        setSlipOpen(false);
+        setSuccessType('placed');
+        setSuccessBet(results[0]);
+      } else {
+        const linePrice = betMode === 'multiple'
+          ? parseStake(stakes.multiple || 0)
+          : totalStake;
+        const payload = {
+          mode: betMode,
+          stake: linePrice,
+          ...(betMode === 'system' ? { systemType } : {}),
+          selections: selections.map((s) => ({
+            matchId: s.matchId, market: s.market, outcome: s.outcome, odds: s.odds,
+          })),
+        };
+        const res = await placeBet(payload);
+        if (res.account) setAccount(res.account);
+        toast(`Bet placed - booking code ${res.bet.bookingCode}.`);
+        try {
+          const stored = localStorage.getItem('betxentra_recent_codes');
+          let list = stored ? JSON.parse(stored) : [];
+          list = [res.bet.bookingCode, ...list.filter((c) => c !== res.bet.bookingCode)].slice(0, 8);
+          localStorage.setItem('betxentra_recent_codes', JSON.stringify(list));
+        } catch { /* ignore */ }
+        clearSlip();
+        setSlipOpen(false);
+        setSuccessType('placed');
+        setSuccessBet(res.bet);
+      }
     } catch (e) {
       adjustBalance(totalStake);
       if (e.status === 409) {
@@ -1213,7 +1265,7 @@ export default function Home({ initialChip }) {
           {/* Clear slip button */}
           <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '4px 12px 0' }}>
             {selectionCount > 0 && (
-              <button type="button" onClick={() => { clearSlip(); setSingleRawStakes({}); }} style={{ background: 'none', border: 0, color: '#d32f2f', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+              <button type="button" onClick={() => { clearSlip(); setSingleRawStakes({}); setMultipleRawStake(''); }} style={{ background: 'none', border: 0, color: '#d32f2f', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
                 Clear All
               </button>
             )}
@@ -1352,8 +1404,12 @@ export default function Home({ initialChip }) {
                   <div className="xb-stake-input-wrap">
                     <input
                       type="text"
-                      value={stakes.multiple > 0 ? stakes.multiple.toFixed(2) : ''}
-                      onChange={(e) => setMultipleStake(e.target.value)}
+                      value={multipleRawStake}
+                      onChange={(e) => {
+                        const raw = e.target.value.replace(/[^0-9.]/g, '');
+                        setMultipleRawStake(raw);
+                        setMultipleStake(raw);
+                      }}
                       inputMode="decimal"
                       placeholder="Enter stake"
                       autoComplete="off"
@@ -1380,7 +1436,9 @@ export default function Home({ initialChip }) {
                         setSingleRawStakes(prev => ({ ...prev, [s.id]: String(newVal) }));
                       });
                     } else {
-                      setMultipleStake((stakes.multiple || 0) + amt);
+                      const newVal = (stakes.multiple || 0) + amt;
+                      setMultipleStake(newVal);
+                      setMultipleRawStake(String(newVal));
                     }
                   }}>+{amt}</button>
                 ))}
