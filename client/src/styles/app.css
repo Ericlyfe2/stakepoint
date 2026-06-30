@@ -3343,6 +3343,10 @@ nav a:active { transform: scale(.96); }
   background: #005A32;
   color: #fff;
 }
+.xb-mode-tab:disabled, .xb-mode-tab.disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
 .xb-mode-close {
   background: none;
   border: 0;

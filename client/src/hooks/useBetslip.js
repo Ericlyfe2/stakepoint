@@ -218,6 +218,17 @@ export default function useBetslip(initialBetMode = 'multiple') {
 
   const selectionCount = selections.length;
 
+  const hasSameMatchSelections = useMemo(() => {
+    const matchIds = selections.map(s => s.matchId);
+    return new Set(matchIds).size < matchIds.length;
+  }, [selections]);
+
+  useEffect(() => {
+    if (hasSameMatchSelections && betMode === 'multiple') {
+      setBetModeRaw('single');
+    }
+  }, [hasSameMatchSelections, betMode]);
+
   const hasOddsChanges = oddsChanges.length > 0;
 
   const buildPlaceBetPayload = useCallback(() => {
@@ -266,6 +277,7 @@ export default function useBetslip(initialBetMode = 'multiple') {
     payout,
     selectionPayouts,
     selectionCount,
+    hasSameMatchSelections,
     hasOddsChanges,
     buildPlaceBetPayload,
     loadSelections,

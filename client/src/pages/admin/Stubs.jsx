@@ -646,18 +646,6 @@ function IssueBonusModal({ open, campaign, onClose, onIssued, showToast }) {
     </Modal>
   );
 }
-  <ComingSoon
-    title="Bonuses &amp; Promotions"
-    intro="Design, issue, and manage bonus campaigns and promotional offers."
-    icon={<IconSparkles />}
-    items={[
-      { title: 'Bonus campaigns',  subtitle: 'Create deposit, free bet, and cashback bonuses.',  bullets: ['Percentage / fixed amount', 'Min deposit threshold', 'Wagering requirements', 'Valid sport / market scope'] },
-      { title: 'Promo codes',      subtitle: 'Generate and track promo code redemptions.',       bullets: ['Single-use or multi-use', 'Expiry dates and usage caps', 'Segment by player tier', 'Redemption analytics'] },
-      { title: 'Manual awards',    subtitle: 'Issue bonuses to specific players.',               bullets: ['Select by email or ID', 'Custom amount and reason', 'Auto-apply or claimable', 'Audit entry required'] },
-      { title: 'Campaign reports', subtitle: 'ROI and uptake metrics for each campaign.',        bullets: ['Total issued vs wagered', 'Conversion to real play', 'Cost per acquisition', 'Campaign comparison'] },
-    ]}
-  />
-);
 
 export function KYCSPage() {
   const { hasRole, showToast } = useAdmin();
