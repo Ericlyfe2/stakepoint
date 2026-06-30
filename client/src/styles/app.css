@@ -781,8 +781,13 @@ nav a .live-dot {
     color: var(--text-inv);
   }
 }
-.odd-btn { position: relative; }
+.odd-btn {
+  position: relative;
+  transition: background .2s ease, color .2s ease, box-shadow .2s ease, transform .12s ease;
+}
+.odd-btn:active { transform: scale(0.95); }
 .odd-btn.selected {
+  animation: odd-sel-pop 280ms cubic-bezier(.2,1.3,.4,1) 1;
   background: var(--accent);
   color: var(--text-inv);
   font-weight: 800;
@@ -806,6 +811,11 @@ nav a .live-dot {
   opacity: 0.4;
   cursor: not-allowed;
   text-decoration: line-through;
+}
+@keyframes odd-sel-pop {
+  0%   { transform: scale(0.90); }
+  55%  { transform: scale(1.06); }
+  100% { transform: scale(1); }
 }
 .odd-btn.up::after, .odd-btn.down::after {
   content: '';

@@ -188,6 +188,7 @@ export default function Home({ initialChip }) {
     payout,
     selectionPayouts,
     selectionCount,
+    hasSameMatchSelections,
     hasOddsChanges,
     buildPlaceBetPayload,
     loadSelections,
@@ -1473,6 +1474,11 @@ export default function Home({ initialChip }) {
               </div>
             )}
             {slipErr && <div className="xb-warn" style={{ color: '#d32f2f' }}>{slipErr}</div>}
+            {hasSameMatchSelections && betMode === 'multiple' && (
+              <div className="xb-warn" style={{ color: '#e65100' }}>
+                Multiple selections from the same match detected. Switch to Single mode or remove duplicates.
+              </div>
+            )}
 
             {/* Booking code section */}
             <div className="xb-booking-section">

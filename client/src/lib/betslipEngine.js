@@ -208,6 +208,17 @@ export function checkConflicts(selections) {
   return conflicts;
 }
 
+// Remove conflicting selections from a list, keeping the last one per match+market.
+// Used when loading booking codes, recommended legs, or any bulk-insert path.
+export function deduplicateSelections(selections) {
+  const seen = new Map();
+  for (const s of selections) {
+    const key = `${s.matchId}:${s.market}`;
+    seen.set(key, s);
+  }
+  return [...seen.values()];
+}
+
 export function validateBetSlip({ selections, betMode, stakes, account, minStake = 400 }) {
   const errors = [];
 
@@ -218,6 +229,10 @@ export function validateBetSlip({ selections, betMode, stakes, account, minStake
 
   if (betMode === 'multiple' && selections.length < 2) {
     errors.push('Multiple bets need at least 2 selections.');
+  }
+
+  if (betMode !== 'single' && hasConflictingPicks(selections)) {
+    errors.push('You have conflicting selections from the same market. Remove duplicates before placing.');
   }
 
   if (betMode === 'single') {
