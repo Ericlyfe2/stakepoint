@@ -166,6 +166,48 @@ export function computeTotalOdds(selections) {
   return selections.reduce((p, s) => p * s.odds, 1);
 }
 
+export function findConflictingSelection(selections, matchId, market) {
+  return selections.find(
+    (s) => s.matchId === matchId && s.market === market
+  );
+}
+
+export function hasConflictingPicks(selections) {
+  const groups = new Map();
+  for (const s of selections) {
+    const key = `${s.matchId}:${s.market}`;
+    if (groups.has(key) && groups.get(key) !== s.outcome) return true;
+    groups.set(key, s.outcome);
+  }
+  return false;
+}
+
+export function checkConflicts(selections) {
+  const groups = new Map();
+  for (const s of selections) {
+    const key = `${s.matchId}:${s.market}`;
+    if (!groups.has(key)) {
+      groups.set(key, [s]);
+    } else {
+      groups.get(key).push(s);
+    }
+  }
+  const conflicts = [];
+  for (const [key, group] of groups) {
+    if (group.length > 1) {
+      const unique = new Set(group.map((s) => s.outcome));
+      if (unique.size > 1) {
+        conflicts.push({
+          matchId: group[0].matchId,
+          market: group[0].market,
+          selections: group,
+        });
+      }
+    }
+  }
+  return conflicts;
+}
+
 export function validateBetSlip({ selections, betMode, stakes, account, minStake = 400 }) {
   const errors = [];
 

@@ -128,6 +128,16 @@ function attachCashoutOffer(bet) {
   return { ...bet, cashoutOffer };
 }
 
+function hasConflictingPicks(selections) {
+  const groups = {};
+  for (const s of selections) {
+    const key = `${s.matchId}:${s.market}`;
+    if (groups[key] && groups[key] !== s.outcome) return true;
+    groups[key] = s.outcome;
+  }
+  return false;
+}
+
 /* ------------ schemas ------------ */
 const bookSchema = z.object({
   mode: z.enum(['single', 'multiple', 'system']).default('multiple'),
@@ -336,6 +346,9 @@ router.post('/book',
     }
     if (mode === 'single' && normalized.length > 1) return res.json({ success: false, error: 'Single mode allows only one selection.' });
     if (mode === 'multiple' && normalized.length < 2) return res.json({ success: false, error: 'Multiple bets need at least two selections.' });
+    if (mode !== 'single' && hasConflictingPicks(normalized)) {
+      return res.json({ success: false, error: 'Conflicting picks in the same match and market.', code: 'CONFLICTING_PICKS' });
+    }
 
     let totalOdds, totalStake, potentialWin, systemDef = null, linesCount = null, stakePerLine = null;
 
@@ -440,6 +453,9 @@ router.post('/place',
     }
     if (mode === 'single' && normalized.length > 1) return res.json({ success: false, error: 'Single mode allows only one selection.' });
     if (mode === 'multiple' && normalized.length < 2) return res.json({ success: false, error: 'Multiple bets need at least two selections.' });
+    if (mode !== 'single' && hasConflictingPicks(normalized)) {
+      return res.json({ success: false, error: 'Conflicting picks in the same match and market.', code: 'CONFLICTING_PICKS' });
+    }
 
     // Compute totals based on the bet mode.
     let totalOdds, totalStake, potentialWin, systemDef = null, linesCount = null, stakePerLine = null;

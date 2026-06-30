@@ -3,6 +3,8 @@ import {
   generateId,
   buildSelection,
   isDuplicate,
+  findConflictingSelection,
+  pickLabel,
   parseStake,
   computeTotalOdds,
   computeSinglePayout,
@@ -39,11 +41,19 @@ export default function useBetslip(initialBetMode = 'multiple') {
   const [betMode, setBetModeRaw] = useState(saved.current?.betMode || initialBetMode);
   const [stakes, setStakes] = useState(saved.current?.stakes || { multiple: 0 });
   const [oddsChanges, setOddsChanges] = useState([]);
+  const [replacedSelection, setReplacedSelection] = useState(null);
   const selectionIdCounter = useRef(0);
 
   useEffect(() => {
     saveSlip(selections, betMode, stakes);
   }, [selections, betMode, stakes]);
+
+  useEffect(() => {
+    if (replacedSelection) {
+      const t = setTimeout(() => setReplacedSelection(null), 4000);
+      return () => clearTimeout(t);
+    }
+  }, [replacedSelection]);
 
   const nextId = useCallback(() => {
     selectionIdCounter.current += 1;
@@ -51,6 +61,7 @@ export default function useBetslip(initialBetMode = 'multiple') {
   }, []);
 
   const toggleSelection = useCallback((match, market, outcome, odds) => {
+    let replaced = null;
     setSelections((prev) => {
       const existingIdx = prev.findIndex(
         (s) => s.matchId === match.id && s.market === market && s.outcome === outcome
@@ -64,9 +75,22 @@ export default function useBetslip(initialBetMode = 'multiple') {
 
       if (odds == null || !Number.isFinite(Number(odds))) return prev;
 
+      const conflict = findConflictingSelection(prev, match.id, market);
+      if (conflict) {
+        replaced = { oldPickLabel: conflict.pickLabel, newPickLabel: pickLabel(market, outcome, match) };
+        const next = prev.filter((s) => s.id !== conflict.id);
+        const newPick = buildSelection(match, market, outcome, Number(odds));
+        return [...next, newPick];
+      }
+
       const newPick = buildSelection(match, market, outcome, Number(odds));
       return [...prev, newPick];
     });
+    if (replaced) setReplacedSelection(replaced);
+  }, []);
+
+  const clearReplacedSelection = useCallback(() => {
+    setReplacedSelection(null);
   }, []);
 
   const removeSelection = useCallback((id) => {
@@ -223,12 +247,6 @@ export default function useBetslip(initialBetMode = 'multiple') {
     return new Set(matchIds).size < matchIds.length;
   }, [selections]);
 
-  useEffect(() => {
-    if (hasSameMatchSelections && betMode === 'multiple') {
-      setBetModeRaw('single');
-    }
-  }, [hasSameMatchSelections, betMode]);
-
   const hasOddsChanges = oddsChanges.length > 0;
 
   const buildPlaceBetPayload = useCallback(() => {
@@ -262,9 +280,11 @@ export default function useBetslip(initialBetMode = 'multiple') {
     setBetMode,
     stakes,
     oddsChanges,
+    replacedSelection,
     toggleSelection,
     removeSelection,
     clearSlip,
+    clearReplacedSelection,
     syncOdds,
     refreshOdds,
     acceptOddsChanges,

@@ -174,6 +174,8 @@ export default function Home({ initialChip }) {
     toggleSelection,
     removeSelection,
     clearSlip,
+    clearReplacedSelection,
+    replacedSelection,
     syncOdds,
     refreshOdds,
     acceptOddsChanges,
@@ -186,7 +188,6 @@ export default function Home({ initialChip }) {
     payout,
     selectionPayouts,
     selectionCount,
-    hasSameMatchSelections,
     hasOddsChanges,
     buildPlaceBetPayload,
     loadSelections,
@@ -401,6 +402,13 @@ export default function Home({ initialChip }) {
       return false;
     }
   }, [toast]);
+
+  // Show toast when a conflicting selection is auto-replaced
+  useEffect(() => {
+    if (replacedSelection) {
+      toast(`Replaced ${replacedSelection.oldPickLabel} with ${replacedSelection.newPickLabel}`, 'info');
+    }
+  }, [replacedSelection, toast]);
 
   // Load ticket code from sessionStorage (set by /ticket/:code route)
   useEffect(() => {
@@ -1281,7 +1289,7 @@ export default function Home({ initialChip }) {
           <div className="betslip" style={{ padding: '0 12px 12px' }}>
             {/* Mode tabs — Multiple / Single */}
             <div className="xb-mode-tabs">
-              <button type="button" className={`xb-mode-tab${betMode === 'multiple' ? ' active' : ''}${hasSameMatchSelections ? ' disabled' : ''}`} disabled={hasSameMatchSelections} onClick={() => setBetMode('multiple')} title={hasSameMatchSelections ? 'Cannot combine selections from the same match' : ''}>Multiple</button>
+              <button type="button" className={`xb-mode-tab${betMode === 'multiple' ? ' active' : ''}`} onClick={() => setBetMode('multiple')}>Multiple</button>
               <button type="button" className={`xb-mode-tab${betMode === 'single' ? ' active' : ''}`} onClick={() => setBetMode('single')}>Single</button>
               <button type="button" className="xb-mode-close" onClick={() => setSlipOpen(false)} aria-label="Close">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
