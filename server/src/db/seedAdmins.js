@@ -1,43 +1,91 @@
-/**
- * Create the initial super admin from environment variables on first boot.
- * NO hardcoded admin accounts — only ADMIN_EMAIL / ADMIN_PASSWORD from env.
- * Only runs when the user store has zero admins and only in dev without Postgres.
- */
-import { allUsers, createUser, findByEmail, updateUser } from './users.js';
-import { hashPassword } from '../services/password.js';
+import bcrypt from 'bcrypt';
+import crypto from 'crypto';
+import { allUsers, findByEmail } from './users.js';
+import { createStore } from './store.js';
 import { log } from '../utils/logger.js';
 
+const adminStore = createStore('admin_accounts', {});
+
+function generateId() {
+  return `admin-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;
+}
+
+function migrateUsersToAdminStore() {
+  const userAdmins = allUsers().filter((u) => u.role === 'admin');
+  const existingAdminIds = new Set(adminStore.list().map((a) => a.email));
+  let migrated = 0;
+  for (const u of userAdmins) {
+    if (existingAdminIds.has(u.email?.toLowerCase())) continue;
+    const admin = {
+      id: generateId(),
+      email: u.email?.toLowerCase(),
+      name: u.displayName || u.email?.split('@')[0] || 'Admin',
+      passwordHash: u.passwordHash,
+      role: 'admin',
+      adminRole: u.adminRole || 'support',
+      permissionOverrides: null,
+      suspended: !!u.suspended,
+      twoFactorEnabled: !!u.twoFactorEnabled,
+      twoFactorSecret: u.twoFactorSecret || null,
+      backupCodes: [],
+      createdAt: u.createdAt || new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      lastLoginAt: u.lastLoginAt || null,
+      createdBy: null,
+      sessionCount: 0,
+      avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(u.displayName || u.email || 'Admin')}&background=00a86b&color=fff`,
+    };
+    adminStore.set(admin.id, admin);
+    migrated++;
+  }
+  return migrated;
+}
+
 export async function seedAdmins() {
-  if (process.env.NODE_ENV === 'production' || process.env.DATABASE_URL) return 0;
-  const existing = allUsers().filter((u) => u.role === 'admin');
+  const migrated = migrateUsersToAdminStore();
+  if (migrated > 0) log.info(`Migrated ${migrated} admin(s) from users store to admin_accounts`);
+
+  const existing = adminStore.list();
   if (existing.length > 0) return existing.length;
+
+  if (process.env.NODE_ENV === 'production' || process.env.DATABASE_URL) return 0;
 
   const adminEmail = (process.env.ADMIN_EMAIL || '').trim().toLowerCase();
   const adminPassword = process.env.ADMIN_PASSWORD || '';
 
   if (!adminEmail || !adminPassword) {
-    log.warn('No ADMIN_EMAIL/ADMIN_PASSWORD set — skipping admin seed. Use /api/admin/auth/signup to create the first admin.');
+    log.warn('No ADMIN_EMAIL/ADMIN_PASSWORD set — skipping admin seed.');
     return 0;
   }
 
-  const passwordHash = await hashPassword(adminPassword);
-  const present = findByEmail(adminEmail);
-  if (present) {
-    await updateUser(present.id, { role: 'admin', adminRole: 'super_admin', emailVerified: true, passwordHash, displayName: present.displayName });
-    log.info(`Promoted existing user ${adminEmail} to super_admin`);
-    return 1;
-  }
+  const passwordHash = await bcrypt.hash(adminPassword, 12);
+  const existingUser = findByEmail(adminEmail);
 
-  await createUser({
+  const admin = {
+    id: generateId(),
     email: adminEmail,
-    displayName: 'Platform Admin',
+    name: existingUser?.displayName || 'Platform Admin',
     passwordHash,
-    emailVerified: true,
     role: 'admin',
-    balance: 0,
-  });
-  await updateUser(adminEmail, { adminRole: 'super_admin', kycStatus: 'verified', twoFactorEnabled: false });
+    adminRole: 'super_admin',
+    permissionOverrides: null,
+    suspended: false,
+    twoFactorEnabled: false,
+    twoFactorSecret: null,
+    backupCodes: [],
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    lastLoginAt: null,
+    createdBy: null,
+    sessionCount: 0,
+    avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(existingUser?.displayName || 'Admin')}&background=00a86b&color=fff`,
+  };
+  adminStore.set(admin.id, admin);
 
-  log.info(`Super admin created: ${adminEmail}`);
+  if (existingUser) {
+    log.info(`Promoted existing user ${adminEmail} to super_admin in admin_accounts`);
+  } else {
+    log.info(`Super admin created: ${adminEmail}`);
+  }
   return 1;
 }

@@ -23,7 +23,7 @@ import {
   compiledLeagues, adminListFixtures, adminLookupFixture,
   patchOverride, setOddsOverride, clearOddsOverride,
   setSuspension, clearSuspension, setResult,
-  addCustomFixture, deleteCustomFixture, addCustomLeague,
+  addCustomFixture, deleteCustomFixture, addCustomLeague, updateCustomLeague, deleteCustomLeague,
   addMarketToFixture, removeMarketFromFixture,
 } from '../../db/sportsAdmin.js';
 import { settleNow } from '../../services/settlement.js';
@@ -84,6 +84,31 @@ router.post('/leagues',
     res.status(201).json({ league: lg });
   }
 );
+
+router.patch('/leagues/:id',
+  requireAdmin, requireRole('odds_manager'),
+  validate(z.object({
+    name: z.string().min(2).optional(),
+    region: z.string().optional(),
+    countryMeta: z.string().optional(),
+  })),
+  (req, res, next) => {
+    const patch = { ...req.body };
+    if (patch.name) {
+      patch.crest = { style: 'background:linear-gradient(135deg,#7c5cff,#22d3ee);color:#fff', label: patch.name.slice(0, 3).toUpperCase() };
+    }
+    const updated = updateCustomLeague(req.params.id, patch);
+    if (!updated) return next(notFound('League not found or not a custom league'));
+    audit(req, { action: 'sports.league.update', target: req.params.id, targetType: 'league', meta: patch });
+    res.json({ league: updated });
+  }
+);
+
+router.delete('/leagues/:id', requireAdmin, requireRole('odds_manager'), (req, res) => {
+  deleteCustomLeague(req.params.id);
+  audit(req, { action: 'sports.league.delete', target: req.params.id, targetType: 'league', severity: 'warning' });
+  res.json({ ok: true });
+});
 
 const extraMarketItem = z.object({
   market: z.string().min(1),

@@ -1,47 +1,62 @@
-/**
- * The chrome that wraps every protected admin page.
- *  - Sidebar with role-aware visibility
- *  - Top bar with search, theme toggle, notifications, account
- *  - Breadcrumb derived from route
- *  - Toast portal
- */
-import { useMemo } from 'react';
-import { NavLink, Outlet, useLocation } from 'react-router-dom';
+import { useMemo, useState, useEffect, useRef, useCallback } from 'react';
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAdmin } from '../providers/AdminProvider.jsx';
 import { Toast } from '../components/admin/primitives.jsx';
 import {
   IconDashboard, IconUsers, IconReceipt, IconChart, IconShield, IconCash, IconBell,
   IconLifebuoy, IconCog, IconSearch, IconSun, IconMoon, IconMenu, IconLogout,
   IconChevronRight, IconLive, IconBot, IconBook, IconSparkles, IconActivity,
+  IconTarget, IconFlag, IconAward, IconTrending, IconShieldOff, IconLock,
+  IconGift, IconUsers2, IconCode, IconSend, IconBarChart, IconFileText,
+  IconSettings, IconServer, IconRefresh, IconKey, IconEye, IconCheck,
 } from '../components/admin/Icons.jsx';
 
 const NAV = [
   { section: 'Overview', items: [
-    { to: '/admin',            label: 'Dashboard',     icon: <IconDashboard />, exact: true },
-    { to: '/admin/live',       label: 'Live betting',  icon: <IconLive />, badge: 'LIVE' },
-    { to: '/admin/analytics',  label: 'Analytics',     icon: <IconChart /> },
+    { to: '/admin', label: 'Dashboard', icon: <IconDashboard />, exact: true, perm: null },
+    { to: '/admin/live', label: 'Live betting', icon: <IconLive />, badge: 'LIVE', perm: 'live.manage' },
+    { to: '/admin/analytics', label: 'Analytics', icon: <IconChart />, perm: null },
+  ]},
+  { section: 'Sportsbook', items: [
+    { to: '/admin/sports', label: 'Sports', icon: <IconTarget />, perm: 'sports.view' },
+    { to: '/admin/leagues', label: 'Leagues', icon: <IconFlag />, perm: 'leagues.view' },
+    { to: '/admin/fixtures', label: 'Fixtures', icon: <IconBook />, perm: 'fixtures.view' },
+    { to: '/admin/teams', label: 'Teams', icon: <IconUsers2 />, perm: 'teams.view' },
+    { to: '/admin/markets', label: 'Markets & Odds', icon: <IconTrending />, perm: 'markets.view' },
+    { to: '/admin/results', label: 'Results & Settle', icon: <IconCheck />, perm: 'results.view' },
+    { to: '/admin/trading', label: 'Trading Desk', icon: <IconShieldOff />, perm: 'trading.liability' },
   ]},
   { section: 'Operations', items: [
-    { to: '/admin/users',      label: 'Users',         icon: <IconUsers /> },
-    { to: '/admin/stages',     label: 'Player stages', icon: <IconActivity /> },
-    { to: '/admin/bets',       label: 'Bets',          icon: <IconReceipt /> },
-    { to: '/admin/sports',     label: 'Sports & odds', icon: <IconBook />,    roles: ['odds_manager'] },
-    { to: '/admin/promotions', label: 'Promotions',    icon: <IconSparkles /> },
-    { to: '/admin/finance',    label: 'Finance',       icon: <IconCash />,    roles: ['finance_admin'] },
-    { to: '/admin/deposits',   label: 'Deposits',      icon: <IconCash />,    roles: ['finance_admin'] },
+    { to: '/admin/users', label: 'Users', icon: <IconUsers />, perm: 'users.view' },
+    { to: '/admin/bets', label: 'Bets', icon: <IconReceipt />, perm: 'bets.view' },
+    { to: '/admin/finance', label: 'Finance', icon: <IconCash />, perm: 'finance.view' },
+    { to: '/admin/deposits', label: 'Deposits', icon: <IconCash />, perm: 'finance.deposits.approve' },
+    { to: '/admin/withdrawals', label: 'Withdrawals', icon: <IconSend />, perm: 'finance.withdrawals.approve' },
+    { to: '/admin/bonuses', label: 'Bonuses', icon: <IconGift />, perm: 'bonuses.create' },
+    { to: '/admin/promotions', label: 'Promotions', icon: <IconSparkles />, perm: 'promotions.create' },
   ]},
-  { section: 'Trust & safety', items: [
-    { to: '/admin/fraud',      label: 'Fraud & AI',    icon: <IconBot />,    roles: ['moderator'] },
-    { to: '/admin/audit',      label: 'Audit logs',    icon: <IconShield /> },
-    { to: '/admin/notifications', label: 'Notifications', icon: <IconBell /> },
-    { to: '/admin/support',    label: 'Support',       icon: <IconLifebuoy />, roles: ['support'] },
+  { section: 'Risk & Compliance', items: [
+    { to: '/admin/fraud', label: 'Fraud & AI', icon: <IconBot />, perm: 'fraud.view' },
+    { to: '/admin/kyc', label: 'KYC/AML', icon: <IconShield />, perm: 'compliance.kyc' },
+    { to: '/admin/referrals', label: 'Referrals', icon: <IconUsers2 />, perm: 'referrals.view' },
+    { to: '/admin/codes', label: 'Booking Codes', icon: <IconCode />, perm: 'codes.view' },
+    { to: '/admin/cashout', label: 'Cashout Settings', icon: <IconRefresh />, perm: 'cashout.configure' },
   ]},
-  { section: 'Integrations', items: [
-    { to: '/admin/providers',  label: 'API providers', icon: <IconActivity /> },
+  { section: 'Content & Comms', items: [
+    { to: '/admin/notifications', label: 'Notifications', icon: <IconBell />, perm: 'notifications.send' },
+    { to: '/admin/support', label: 'Support', icon: <IconLifebuoy />, perm: 'support.tickets' },
+    { to: '/admin/cms', label: 'CMS', icon: <IconFileText />, perm: 'cms.banners' },
+  ]},
+  { section: 'Intelligence', items: [
+    { to: '/admin/reports', label: 'Reports', icon: <IconBarChart />, perm: 'reports.view' },
+    { to: '/admin/audit', label: 'Audit Logs', icon: <IconEye />, perm: 'admin.audit' },
   ]},
   { section: 'System', items: [
-    { to: '/admin/health',     label: 'Health',        icon: <IconActivity /> },
-    { to: '/admin/settings',   label: 'Settings',      icon: <IconCog /> },
+    { to: '/admin/providers', label: 'API Providers', icon: <IconActivity />, perm: 'system.providers' },
+    { to: '/admin/security', label: 'Security', icon: <IconLock />, perm: 'admin.view' },
+    { to: '/admin/management', label: 'Admin Mgmt', icon: <IconKey />, perm: 'admin.view' },
+    { to: '/admin/settings', label: 'Settings', icon: <IconCog />, perm: 'admin.settings' },
+    { to: '/admin/health', label: 'Health', icon: <IconServer />, perm: 'admin.health' },
   ]},
 ];
 
@@ -53,15 +68,50 @@ function crumbsFor(pathname) {
   }));
 }
 
-export default function AdminShell() {
-  const { admin, theme, toggleTheme, collapsed, setCollapsed, mobileOpen, setMobileOpen, signOut, toast, hasRole } = useAdmin();
-  const loc = useLocation();
+function useCommandPalette() {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const navigate = useNavigate();
+  const inputRef = useRef(null);
 
+  useEffect(() => {
+    const handler = (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        setOpen((o) => !o);
+      }
+      if (e.key === 'Escape') setOpen(false);
+    };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, []);
+
+  useEffect(() => {
+    if (open) setTimeout(() => inputRef.current?.focus(), 50);
+  }, [open]);
+
+  const allItems = NAV.flatMap((s) => s.items.map((i) => ({ ...i, section: s.section })));
+  const filtered = query
+    ? allItems.filter((i) => i.label.toLowerCase().includes(query.toLowerCase()))
+    : allItems;
+
+  const go = useCallback((to) => {
+    navigate(to);
+    setOpen(false);
+    setQuery('');
+  }, [navigate]);
+
+  return { open, setOpen, query, setQuery, filtered, go, inputRef };
+}
+
+export default function AdminShell() {
+  const { admin, theme, toggleTheme, collapsed, setCollapsed, mobileOpen, setMobileOpen, signOut, toast, can } = useAdmin();
+  const loc = useLocation();
   const crumbs = useMemo(() => crumbsFor(loc.pathname), [loc.pathname]);
+  const palette = useCommandPalette();
 
   return (
     <div className={`adm-app ${collapsed ? 'collapsed' : ''}`} data-admin-root data-theme={theme}>
-      {/* Sidebar */}
       <aside className={`adm-side ${mobileOpen ? 'open' : ''}`}>
         <div className="adm-brand">
           <div className="mark">
@@ -79,7 +129,7 @@ export default function AdminShell() {
 
         <nav className="adm-nav">
           {NAV.map((sec) => {
-            const visibleItems = sec.items.filter((it) => !it.roles || hasRole(...it.roles));
+            const visibleItems = sec.items.filter((it) => !it.perm || can(it.perm));
             if (visibleItems.length === 0) return null;
             return (
               <div key={sec.section}>
@@ -98,16 +148,15 @@ export default function AdminShell() {
         </nav>
 
         <div className="adm-side-foot">
-          <div className="avatar">{(admin?.displayName || admin?.email || 'A').charAt(0).toUpperCase()}</div>
+          <div className="avatar">{(admin?.name || admin?.email || 'A').charAt(0).toUpperCase()}</div>
           <div className="who">
-            <div className="n">{admin?.displayName || admin?.email}</div>
+            <div className="n">{admin?.name || admin?.email}</div>
             <div className="r">{ADMIN_ROLE_LABEL[admin?.adminRole] || admin?.adminRole}</div>
           </div>
           <button title="Logout" onClick={signOut} aria-label="Logout"><IconLogout /></button>
         </div>
       </aside>
 
-      {/* Main column */}
       <div className="adm-main">
         <header className="adm-top">
           <button className="toggle" onClick={() => {
@@ -128,9 +177,9 @@ export default function AdminShell() {
             ))}
           </div>
 
-          <div className="adm-search">
+          <div className="adm-search" onClick={() => palette.setOpen(true)}>
             <span className="icn"><IconSearch size={16} /></span>
-            <input placeholder="Search users, bets, matches, transactions…" aria-label="Search" />
+            <input placeholder="Search users, bets, matches, transactions..." readOnly aria-label="Search" />
             <kbd>⌘K</kbd>
           </div>
 
@@ -143,7 +192,7 @@ export default function AdminShell() {
               <span className="dot" />
             </button>
             <button className="adm-icon-btn" aria-label="Account" style={{ background: 'var(--grad-brand)', color: '#fff', borderColor: 'transparent' }}>
-              {(admin?.displayName || admin?.email || 'A').charAt(0).toUpperCase()}
+              {(admin?.name || admin?.email || 'A').charAt(0).toUpperCase()}
             </button>
           </div>
         </header>
@@ -153,15 +202,48 @@ export default function AdminShell() {
         </main>
       </div>
 
+      {palette.open && (
+        <div className="adm-palette-overlay" onClick={() => palette.setOpen(false)}>
+          <div className="adm-palette" onClick={(e) => e.stopPropagation()}>
+            <div className="adm-palette-input">
+              <IconSearch size={18} />
+              <input
+                ref={palette.inputRef}
+                value={palette.query}
+                onChange={(e) => palette.setQuery(e.target.value)}
+                placeholder="Type to search..."
+                aria-label="Command search"
+              />
+              <kbd>ESC</kbd>
+            </div>
+            <div className="adm-palette-results">
+              {palette.filtered.map((item) => (
+                <button key={item.to} className="adm-palette-item" onClick={() => palette.go(item.to)}>
+                  <span className="icn">{item.icon}</span>
+                  <span className="lbl">{item.label}</span>
+                  <span className="sec">{item.section}</span>
+                </button>
+              ))}
+              {palette.filtered.length === 0 && (
+                <div className="adm-palette-empty">No results found</div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       <Toast {...toast} />
     </div>
   );
 }
 
 const ADMIN_ROLE_LABEL = {
-  super_admin: 'Super admin',
-  finance_admin: 'Finance lead',
-  odds_manager: 'Trading desk',
-  support: 'Support',
-  moderator: 'Risk & moderation',
+  super_admin: 'Super Admin',
+  trader: 'Trader',
+  risk_manager: 'Risk Manager',
+  finance_admin: 'Finance Admin',
+  compliance_officer: 'Compliance Officer',
+  support_agent: 'Support Agent',
+  marketing_manager: 'Marketing Manager',
+  readonly_auditor: 'Read-Only Auditor',
 };

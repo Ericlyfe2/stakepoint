@@ -74,3 +74,22 @@ export const IconSparkles = wrap(<><path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.5 5
 export const IconEye = wrap(<><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z" /><circle cx="12" cy="12" r="3.5" /></>);
 export const IconBan = wrap(<><circle cx="12" cy="12" r="9" /><path d="m5.6 5.6 12.8 12.8" /></>);
 export const IconSettle = wrap(<><path d="M3 12h18M12 3v18" /><circle cx="12" cy="12" r="9" /></>);
+export const IconEdit = wrap(<><path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" /></>);
+export const IconStar = wrap(<><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" /></>);
+
+export const IconTarget = wrap(<><circle cx="12" cy="12" r="9" /><path d="M12 3v3M12 18v3M3 12h3M18 12h3M8.5 8.5l2 2M13.5 13.5l2 2" /></>);
+export const IconFlag = wrap(<><path d="M4 21V3l13 4-4 3 4 3z" /></>);
+export const IconAward = wrap(<><circle cx="12" cy="9" r="5" /><path d="M8 21h8M12 14v7M6 4l1-2h10l1 2-1 2H7z" /></>);
+export const IconTrending = wrap(<><polyline points="23 6 13.5 15.5 8.5 10.5 1 18" /><polyline points="17 6 23 6 23 12" /></>);
+export const IconShieldOff = wrap(<><path d="M12 3 4 6v6c0 5 3.5 8 8 9 1.2-.3 2.3-.8 3.3-1.5M2 2l20 20" /></>);
+export const IconLock = wrap(<><rect x="4" y="9" width="16" height="12" rx="2" /><path d="M9 9V6a3 3 0 0 1 5.5-1.7M9 15h6" /></>);
+export const IconGift = wrap(<><polyline points="20 12 20 22 4 22 4 12" /><rect x="2" y="7" width="20" height="5" /><path d="M12 7V3M8 7a3 3 0 1 1 0-6 4 4 0 0 0 4 3M16 7a3 3 0 1 0 0-6 4 4 0 0 1-4 3" /></>);
+export const IconUsers2 = wrap(<><path d="M14 19a6 6 0 0 0-12 0" /><circle cx="8" cy="9" r="4" /><path d="M16 21v-1a4 4 0 0 0-4-4h-1" /><path d="M18 21v-1a6 6 0 0 0-3-5" /><circle cx="17" cy="7" r="3" /></>);
+export const IconCode = wrap(<><polyline points="16 18 22 12 16 6" /><polyline points="8 6 2 12 8 18" /></>);
+export const IconSend = wrap(<><path d="M22 2 11 13" /><path d="M22 2 15 22l-4-9-9-4z" /></>);
+export const IconBarChart = wrap(<><path d="M4 20V8M10 20V4M16 20v-7M22 20H2" /></>);
+export const IconFileText = wrap(<><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><path d="M8 13h8M8 17h6" /></>);
+export const IconSettings = wrap(<><circle cx="12" cy="12" r="3.5" /><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.7l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-1.7-.3 1.6 1.6 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.6 1.6 0 0 0-1-1.5 1.6 1.6 0 0 0-1.7.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0 .3-1.7 1.6 1.6 0 0 0-1.5-1H3a2 2 0 0 1 0-4h.1a1.6 1.6 0 0 0 1.5-1 1.6 1.6 0 0 0-.3-1.7l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.7.3h.1a1.6 1.6 0 0 0 1-1.5V3a2 2 0 0 1 4 0v.1a1.6 1.6 0 0 0 1 1.5 1.6 1.6 0 0 0 1.7-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.7v.1a1.6 1.6 0 0 0 1.5 1H21a2 2 0 0 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1z" /></>);
+export const IconServer = wrap(<><rect x="3" y="3" width="18" height="6" rx="2" /><rect x="3" y="9" width="18" height="6" rx="2" /><rect x="3" y="15" width="18" height="6" rx="2" /><circle cx="8" cy="6" r="1.5" /><circle cx="8" cy="12" r="1.5" /><circle cx="8" cy="18" r="1.5" /></>);
+export const IconPlus = wrap(<><path d="M12 5v14M5 12h14" /></>);
+export const IconTrash = wrap(<><polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /><path d="M10 11v6M14 11v6M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" /></>);

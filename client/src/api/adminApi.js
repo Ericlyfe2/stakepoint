@@ -177,6 +177,12 @@ export const adminCreatePromotion = (body) => post('/promotions', body);
 export const adminPatchPromotion  = (id, body) => patch_(`/promotions/${encodeURIComponent(id)}`, body);
 export const adminDeletePromotion = (id)   => del(`/promotions/${encodeURIComponent(id)}`);
 
+/* teams CRUD */
+export const adminTeamsList    = ()     => get('/teams');
+export const adminCreateTeam   = (body) => post('/teams', body);
+export const adminUpdateTeam   = (id, body) => put_(`/teams/${encodeURIComponent(id)}`, body);
+export const adminDeleteTeam   = (id)   => del(`/teams/${encodeURIComponent(id)}`);
+
 /* stats */
 export const adminStatsSummary    = (window) => get(`/stats/summary${qs({ window })}`);
 export const adminStatsTopPlayers = ()       => get('/stats/top-players');
@@ -219,6 +225,113 @@ export const adminListPendingDeposits = ()    => get('/deposits/pending');
 export const adminApproveDeposit     = (id)  => post(`/deposits/${encodeURIComponent(id)}/approve`);
 export const adminRejectDeposit      = (id, body) => post(`/deposits/${encodeURIComponent(id)}/reject`, body);
 
+/* admin management */
+export const adminListAdmins = (params) => get(`/management${qs(params)}`);
+export const adminGetAdmin = (id) => get(`/management/${encodeURIComponent(id)}`);
+export const adminCreateAdmin = (body) => post('/management', body);
+export const adminUpdateAdmin = (id, body) => put_(`/management/${encodeURIComponent(id)}`, body);
+export const adminDeleteAdmin = (id) => del(`/management/${encodeURIComponent(id)}`);
+export const adminResetAdminPassword = (id, newPassword) => post(`/management/${encodeURIComponent(id)}/reset-password`, { newPassword });
+export const adminAdminStats = () => get('/management/stats');
+export const adminAdminSessions = () => get('/management/sessions');
+export const adminBulkUpdateAdmins = (body) => post('/management/bulk-update', body);
+
+/* audit */
+export const adminAuditLog = (params) => get(`/management/audit-log${qs(params)}`);
+export const adminAuditStats = () => get('/management/audit-stats');
+
+/* leagues CRUD (sports admin) */
+export const adminUpdateLeague = (id, body) => patch_(`/sports/leagues/${encodeURIComponent(id)}`, body);
+export const adminDeleteLeague = (id) => del(`/sports/leagues/${encodeURIComponent(id)}`);
+
+/* result management */
+export const adminEnterResult = (fixtureId, body) => post(`/sports/fixtures/${encodeURIComponent(fixtureId)}/result`, body);
+export const adminReverseResult = (fixtureId) => del(`/sports/fixtures/${encodeURIComponent(fixtureId)}/result`);
+export const adminTriggerSettlement = (fixtureId) => post(`/sports/fixtures/${encodeURIComponent(fixtureId)}/settle`);
+export const adminReverseSettlement = (fixtureId) => post(`/sports/fixtures/${encodeURIComponent(fixtureId)}/reverse-settle`);
+
+/* withdrawals management */
+export const adminListWithdrawals = (params) => get(`/withdrawals${qs(params)}`);
+export const adminWithdrawalStats = () => get('/withdrawals/stats');
+
 /* platform settings */
 export const adminGetSettings    = ()     => get('/settings');
 export const adminUpdateSettings = (body) => put_('/settings', body);
+
+/* market templates */
+export const adminListMarkets = (params) => get(`/markets${qs(params)}`);
+export const adminGetMarket    = (key) => get(`/markets/${encodeURIComponent(key)}`);
+export const adminCreateMarket = (body) => post('/markets', body);
+export const adminUpdateMarket = (key, body) => put_(`/markets/${encodeURIComponent(key)}`, body);
+export const adminPatchMarket  = (key, body) => patch_(`/markets/${encodeURIComponent(key)}`, body);
+export const adminDeleteMarket = (key) => del(`/markets/${encodeURIComponent(key)}`);
+
+/* trading desk / exposure */
+export const adminExposureOverview = () => get('/exposure/overview');
+export const adminExposureFixtures = () => get('/exposure/fixtures');
+
+/* results & settlement */
+export const adminSettlementQueue = () => get('/settlement/queue');
+export const adminSettlementFixtures = (params) => get(`/settlement/fixtures${qs(params)}`);
+export const adminSettlementRecordResult = (id, body) => post(`/settlement/fixtures/${encodeURIComponent(id)}/result`, body);
+export const adminSettlementTrigger = (id) => post(`/settlement/fixtures/${encodeURIComponent(id)}/settle`);
+export const adminSettlementSettleBet = (id, body) => post(`/settlement/bets/${encodeURIComponent(id)}/settle`, body);
+export const adminSettlementBulk = (body) => post('/settlement/bulk', body);
+
+/* KYC */
+export const adminListKyc        = (params) => get(`/kyc${qs(params)}`);
+export const adminGetKyc         = (id) => get(`/kyc/${encodeURIComponent(id)}`);
+export const adminApproveKyc     = (id, note) => post(`/kyc/${encodeURIComponent(id)}/approve`, { note });
+export const adminRejectKyc      = (id, reason) => post(`/kyc/${encodeURIComponent(id)}/reject`, { reason });
+export const adminKycStats       = () => get('/kyc/stats');
+
+/* Reports */
+export const adminRevenueReport       = () => get('/reports/revenue');
+export const adminPlayerReport        = () => get('/reports/players');
+export const adminOperationalReport   = () => get('/reports/operational');
+export const adminListExports         = () => get('/reports/export');
+export const adminCreateExport        = (body) => post('/reports/export', body);
+
+/* Bonuses */
+export const adminListBonuses   = (params) => get(`/bonuses${qs(params)}`);
+export const adminGetBonus      = (id) => get(`/bonuses/${encodeURIComponent(id)}`);
+export const adminCreateBonus   = (body) => post('/bonuses', body);
+export const adminUpdateBonus   = (id, body) => patch_(`/bonuses/${encodeURIComponent(id)}`, body);
+export const adminDeleteBonus   = (id) => del(`/bonuses/${encodeURIComponent(id)}`);
+export const adminIssueBonus    = (id, body) => post(`/bonuses/${encodeURIComponent(id)}/issue`, body);
+export const adminClawbackBonus = (id) => post(`/bonuses/${encodeURIComponent(id)}/clawback`);
+export const adminBonusStats    = () => get('/bonuses/stats');
+
+/* Referrals */
+export const adminReferralStats   = () => get('/referrals');
+export const adminReferralPayouts = () => get('/referrals/payouts');
+export const adminCreateReferralPayout = (body) => post('/referrals/payouts', body);
+
+/* Promo Codes */
+export const adminListCodes   = (params) => get(`/codes${qs(params)}`);
+export const adminGetCode     = (id) => get(`/codes/${encodeURIComponent(id)}`);
+export const adminCreateCode  = (body) => post('/codes', body);
+export const adminBulkCreateCodes = (body) => post('/codes/bulk', body);
+export const adminUpdateCode  = (id, body) => patch_(`/codes/${encodeURIComponent(id)}`, body);
+export const adminDeleteCode  = (id) => del(`/codes/${encodeURIComponent(id)}`);
+export const adminCodeStats   = () => get('/codes/stats');
+
+/* Cashout */
+export const adminCashoutRules    = () => get('/cashout/rules');
+export const adminUpdateCashoutRules = (body) => put_('/cashout/rules', body);
+export const adminCashoutOffers   = () => get('/cashout/offers');
+export const adminCashoutStats    = () => get('/cashout/stats');
+
+/* CMS */
+export const adminListPages        = (params) => get(`/cms/pages${qs(params)}`);
+export const adminGetPage          = (id) => get(`/cms/pages/${encodeURIComponent(id)}`);
+export const adminCreatePage       = (body) => post('/cms/pages', body);
+export const adminUpdatePage       = (id, body) => patch_(`/cms/pages/${encodeURIComponent(id)}`, body);
+export const adminDeletePage       = (id) => del(`/cms/pages/${encodeURIComponent(id)}`);
+export const adminListBanners      = (params) => get(`/cms/banners${qs(params)}`);
+export const adminCreateBanner     = (body) => post('/cms/banners', body);
+export const adminUpdateBanner     = (id, body) => patch_(`/cms/banners/${encodeURIComponent(id)}`, body);
+export const adminDeleteBanner     = (id) => del(`/cms/banners/${encodeURIComponent(id)}`);
+export const adminListAnnouncements = () => get('/cms/announcements');
+export const adminCreateAnnouncement = (body) => post('/cms/announcements', body);
+export const adminDeleteAnnouncement = (id) => del(`/cms/announcements/${encodeURIComponent(id)}`);

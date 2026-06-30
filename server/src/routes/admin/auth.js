@@ -1,317 +1,255 @@
-/**
- * Admin authentication routes.
- *
- * Flow:
- *   1. POST /login           -> validates credentials. If 2FA enabled, returns
- *                              { requires2fa: true, challenge } and emails an OTP.
- *                              Otherwise returns a full admin session.
- *   2. POST /verify-2fa      -> { challenge, code }                -> session
- *   3. POST /refresh         -> rotates refresh token              -> new access
- *   4. POST /logout          -> revokes refresh token
- *   5. GET  /me              -> admin profile
- *   6. GET  /sessions        -> active refresh tokens for this admin
- *   7. DELETE /sessions/:id  -> revoke a specific session
- *   8. POST /2fa/enable      -> turn on email-OTP 2FA
- *   9. POST /2fa/disable     -> turn off 2FA (requires password)
- */
 import { Router } from 'express';
+import bcrypt from 'bcrypt';
+import speakeasy from 'speakeasy';
+import qrcode from 'qrcode';
 import { z } from 'zod';
-import { findByEmail, updateUser, publicUser, logActivity, getUserById, createUser } from '../../db/users.js';
-import { verifyPassword, hashPassword, passwordIssues } from '../../services/password.js';
-import {
-  ADMIN_INVITE_ROLES,
-  listAdminInvites, createAdminInvite, findInviteByToken, consumeInvite, revokeAdminInvite,
-} from '../../db/adminInvites.js';
-import {
-  signAdminAccessToken, issueRefreshToken, rotateRefreshToken,
-  revokeRefreshToken, lookupRefresh, revokeAllForAccount,
-} from '../../services/token.js';
-import { requireAdmin, requireRole, audit } from '../../middleware/adminAuth.js';
-import { validate } from '../../middleware/validate.js';
-import { loginLimiter } from '../../middleware/rateLimit.js';
-import { asyncHandler } from '../../utils/asyncHandler.js';
-import { badRequest, unauthorized, forbidden, notFound, conflict } from '../../utils/httpError.js';
+import { requireAdmin, audit } from '../../middleware/adminAuth.js';
+import { signAdminAccessToken, issueRefreshToken, rotateRefreshToken, revokeRefreshToken, revokeAllForAccount } from '../../services/token.js';
+import { getAdminByEmail, getAdminById, verifyAdminPassword, recordAdminLogin } from '../../db/adminAccounts.js';
 import { createStore } from '../../db/store.js';
-import { log } from '../../utils/logger.js';
+import { emitAdmin } from '../../services/realtime.js';
+import { badRequest, unauthorized, forbidden } from '../../utils/httpError.js';
 
 const router = Router();
-
-// Brute-force tracker — { 'email': { attempts, lockedUntil, lockoutCount } }
+const sessionStore = createStore('admin_sessions', {});
 const bruteStore = createStore('admin_brute', {});
-const LOCKOUT_AFTER = 5;
-const LOCKOUT_MS = 15 * 60 * 1000;
-const MAX_LOCKOUTS = 3; // after 3 lockout cycles the admin is permanently suspended
+
+/* ---------- shared exports for routes/auth.js ---------- */
+
+export function publicAdmin(admin) {
+  return { id: admin.id, name: admin.name, email: admin.email, role: admin.adminRole, avatar: admin.avatar };
+}
+
+export function bruteCheck(email) {
+  const entry = bruteStore.get(email);
+  if (!entry) return;
+  const windowMs = 15 * 60 * 1000;
+  if (Date.now() - entry.timestamp > windowMs) {
+    bruteStore.set(email, { count: 0, timestamp: Date.now() });
+    return;
+  }
+  if (entry.count >= 5) throw unauthorized('Account temporarily locked. Try again later.');
+}
+
+export function bumpBrute(email) {
+  const entry = bruteStore.get(email) || { count: 0, timestamp: Date.now() };
+  entry.count += 1;
+  entry.timestamp = Date.now();
+  bruteStore.set(email, entry);
+}
+
+export function clearBrute(email) {
+  bruteStore.set(email, { count: 0, timestamp: Date.now() });
+}
+
+export function issueAdminSession(user, req) {
+  const accessToken = signAdminAccessToken(user);
+  const refreshToken = issueRefreshToken(user.id, { ip: req.ip, userAgent: req.get('user-agent') });
+  return { accessToken, refreshToken: refreshToken.token };
+}
 
 const loginSchema = z.object({
-  email: z.string().trim().toLowerCase().email(),
+  email: z.string().email(),
   password: z.string().min(1),
-  captchaToken: z.string().optional(), // accepted but not enforced in dev
 });
 
-function clearBrute(email) { bruteStore.delete(email); }
-function bumpBrute(email) {
-  const rec = bruteStore.get(email) || { attempts: 0, lockedUntil: 0, lockoutCount: 0 };
-  rec.attempts = (rec.attempts || 0) + 1;
-  if (rec.attempts >= LOCKOUT_AFTER) {
-    rec.lockoutCount = (rec.lockoutCount || 0) + 1;
-    rec.lockedUntil = Date.now() + LOCKOUT_MS;
-    rec.attempts = 0;
+router.post('/login', (req, res, next) => {
+  try {
+    const { email, password } = loginSchema.parse(req.body);
+    const admin = getAdminByEmail(email);
+    if (!admin || !verifyAdminPassword(admin, password)) {
+      return next(unauthorized('Invalid email or password'));
+    }
+    if (admin.suspended) return next(forbidden('Account suspended. Contact super admin.'));
+
+    recordAdminLogin(admin.id, req.ip, req.get('user-agent'));
+
+    if (admin.twoFactorEnabled) {
+      const tempToken = signAdminAccessToken({ ...admin, pending2FA: true });
+      return res.json({ requires2FA: true, tempToken, admin: { id: admin.id, name: admin.name, email: admin.email } });
+    }
+
+    const accessToken = signAdminAccessToken(admin);
+    const refreshToken = issueRefreshToken(admin.id, {
+      ip: req.ip, userAgent: req.get('user-agent'),
+    });
+
+    const session = {
+      id: refreshToken.id,
+      adminId: admin.id,
+      createdAt: new Date().toISOString(),
+      lastActivity: new Date().toISOString(),
+      ip: req.ip,
+      userAgent: req.get('user-agent'),
+      active: true,
+    };
+    sessionStore.set(session.id, session);
+
+    audit(req, { action: 'auth.login', severity: 'info', target: admin.id, targetType: 'admin' });
+
+    res.json({
+      accessToken,
+      refreshToken: refreshToken.token,
+      admin: { id: admin.id, name: admin.name, email: admin.email, adminRole: admin.adminRole, avatar: admin.avatar },
+      session: { id: session.id },
+    });
+  } catch (e) {
+    if (e instanceof z.ZodError) return next(badRequest('Invalid input', e.errors));
+    next(e);
   }
-  bruteStore.set(email, rec);
-  return rec;
-}
-function bruteCheck(email) {
-  const rec = bruteStore.get(email);
-  if (rec?.lockedUntil && rec.lockedUntil > Date.now()) {
-    const wait = Math.ceil((rec.lockedUntil - Date.now()) / 1000);
-    throw forbidden(`Too many attempts. Try again in ${wait}s.`, { lockedFor: wait });
+});
+
+const verify2faSchema = z.object({
+  tempToken: z.string().min(1),
+  code: z.string().length(6),
+});
+
+router.post('/verify-2fa', (req, res, next) => {
+  try {
+    const { tempToken, code } = verify2faSchema.parse(req.body);
+    let claims;
+    try {
+      const { verifyAccessToken } = require('../../services/token.js');
+      claims = verifyAccessToken(tempToken);
+    } catch {
+      return next(unauthorized('Temporary token expired or invalid'));
+    }
+    if (!claims.pending2FA) return next(forbidden('Invalid token scope'));
+
+    const admin = getAdminById(claims.sub);
+    if (!admin || !admin.twoFactorSecret) return next(unauthorized('2FA not configured'));
+
+    const verified = speakeasy.totp.verify({
+      secret: admin.twoFactorSecret,
+      encoding: 'base32',
+      token: code,
+      window: 1,
+    });
+    if (!verified) return next(unauthorized('Invalid verification code'));
+
+    const accessToken = signAdminAccessToken(admin);
+    const refreshToken = issueRefreshToken(admin.id, {
+      ip: req.ip, userAgent: req.get('user-agent'),
+    });
+
+    const session = {
+      id: refreshToken.id,
+      adminId: admin.id,
+      createdAt: new Date().toISOString(),
+      lastActivity: new Date().toISOString(),
+      ip: req.ip,
+      userAgent: req.get('user-agent'),
+      active: true,
+    };
+    sessionStore.set(session.id, session);
+
+    audit(req, { action: 'auth.login_2fa', severity: 'info', target: admin.id, targetType: 'admin' });
+
+    res.json({
+      accessToken,
+      refreshToken: refreshToken.token,
+      admin: { id: admin.id, name: admin.name, email: admin.email, adminRole: admin.adminRole, avatar: admin.avatar },
+      session: { id: session.id },
+    });
+  } catch (e) {
+    if (e instanceof z.ZodError) return next(badRequest('Invalid input', e.errors));
+    next(e);
   }
-}
+});
 
-function publicAdmin(u) {
-  if (!u) return null;
-  const safe = publicUser(u);
-  return {
-    ...safe,
-    adminRole: u.adminRole || 'support',
-    twoFactorEnabled: !!u.twoFactorEnabled,
-  };
-}
+router.post('/refresh', (req, res, next) => {
+  try {
+    const { refreshToken } = req.body;
+    if (!refreshToken) return next(badRequest('Refresh token required'));
+    const result = rotateRefreshToken(refreshToken, {
+      ip: req.ip, userAgent: req.get('user-agent'),
+    });
+    if (!result) return next(unauthorized('Invalid or expired refresh token'));
+    const admin = getAdminById(result.accountId);
+    if (!admin || admin.suspended) return next(forbidden('Account unavailable'));
 
-function issueAdminSession(admin, req) {
-  const access  = signAdminAccessToken(admin);
-  const refresh = issueRefreshToken(admin.id, {
-    ip: req.ip,
-    userAgent: req.get('user-agent') || '',
-    scope: 'admin',
-  });
-  return { accessToken: access, refreshToken: refresh.token, expiresAt: refresh.expiresAt };
-}
-
-/* ---------- routes ---------- */
-
-router.post('/login',
-  loginLimiter,
-  validate(loginSchema),
-  asyncHandler(async (req, res) => {
-    const { email, password } = req.body;
-    bruteCheck(email);
-
-    const user = findByEmail(email);
-    if (!user || user.role !== 'admin' || !user.passwordHash) {
-      const rec = bumpBrute(email);
-      // Permanently suspend after MAX_LOCKOUTS lockout cycles.
-      if (rec.lockoutCount >= MAX_LOCKOUTS && user && user.role === 'admin') {
-        await updateUser(user.id, { suspended: true, suspendedAt: new Date().toISOString(), suspendedBy: 'system:brute-force', suspendReason: `Permanent lock after ${MAX_LOCKOUTS} lockout cycles` });
-        audit(req, { actorId: user.id, action: 'admin.login.permanent_lock', severity: 'critical', meta: { email, lockoutCount: rec.lockoutCount } });
-      }
-      throw unauthorized('Invalid admin credentials.');
-    }
-    if (user.suspended) {
-      audit(req, { actorId: user.id, action: 'admin.login.suspended', severity: 'warning', meta: { email } });
-      throw forbidden('Admin account suspended.');
-    }
-    const ok = await verifyPassword(password, user.passwordHash);
-    if (!ok) {
-      const rec = bumpBrute(email);
-      audit(req, { actorId: user.id, action: 'admin.login.failed', severity: 'warning', meta: { email } });
-      logActivity(user.id, { kind: 'admin_login_failed', ip: req.ip });
-      // Permanently suspend after MAX_LOCKOUTS lockout cycles.
-      if (rec.lockoutCount >= MAX_LOCKOUTS) {
-        await updateUser(user.id, { suspended: true, suspendedAt: new Date().toISOString(), suspendedBy: 'system:brute-force', suspendReason: `Permanent lock after ${MAX_LOCKOUTS} lockout cycles` });
-        audit(req, { actorId: user.id, action: 'admin.login.permanent_lock', severity: 'critical', meta: { email, lockoutCount: rec.lockoutCount } });
-      }
-      throw unauthorized('Invalid admin credentials.');
+    const session = sessionStore.get(result.id);
+    if (session) {
+      session.lastActivity = new Date().toISOString();
+      sessionStore.set(session.id, session);
     }
 
-    clearBrute(email);
+    res.json({
+      accessToken: signAdminAccessToken(admin),
+      refreshToken: result.token,
+    });
+  } catch (e) {
+    next(e);
+  }
+});
 
-    const session = issueAdminSession(user, req);
-    logActivity(user.id, { kind: 'admin_login_success', ip: req.ip, userAgent: req.get('user-agent') });
-    audit(req, { actorId: user.id, action: 'admin.login.success', meta: { email } });
-    res.json({ ok: true, admin: publicAdmin(user), ...session });
-  })
-);
-
-router.post('/refresh', asyncHandler(async (req, res) => {
-  const token = req.body?.refreshToken;
-  const record = lookupRefresh(token);
-  if (!record) throw unauthorized('Invalid or expired refresh token.');
-  if (record.scope !== 'admin') throw forbidden('Not an admin refresh token.');
-  const user = getUserById(record.accountId);
-  if (!user || user.role !== 'admin' || user.suspended) throw unauthorized('Admin no longer available.');
-  const next = rotateRefreshToken(token, { ip: req.ip, userAgent: req.get('user-agent'), scope: 'admin' });
-  const access = signAdminAccessToken(user);
-  res.json({ ok: true, accessToken: access, refreshToken: next.token, expiresAt: next.expiresAt });
-}));
-
-router.post('/logout', asyncHandler(async (req, res) => {
-  const token = req.body?.refreshToken;
-  if (token) revokeRefreshToken(token);
+router.post('/logout', requireAdmin, (req, res) => {
+  const { refreshToken } = req.body;
+  if (refreshToken) revokeRefreshToken(refreshToken);
+  const sessionId = req.body.sessionId;
+  if (sessionId) {
+    const session = sessionStore.get(sessionId);
+    if (session && session.adminId === req.admin.id) {
+      session.active = false;
+      sessionStore.set(sessionId, session);
+    }
+  }
+  audit(req, { action: 'auth.logout', severity: 'info', target: req.admin.id, targetType: 'admin' });
   res.json({ ok: true });
-}));
+});
+
+router.post('/logout-all', requireAdmin, (req, res) => {
+  revokeAllForAccount(req.admin.id);
+  const sessions = sessionStore.list().filter((s) => s.adminId === req.admin.id && s.active);
+  for (const s of sessions) {
+    s.active = false;
+    sessionStore.set(s.id, s);
+  }
+  audit(req, { action: 'auth.logout_all', severity: 'warning', target: req.admin.id, targetType: 'admin' });
+  emitAdmin('admin:logout', { adminId: req.admin.id });
+  res.json({ ok: true });
+});
 
 router.get('/me', requireAdmin, (req, res) => {
-  res.json({ admin: publicAdmin(req.admin) });
-});
-
-router.get('/sessions', requireAdmin, (req, res) => {
-  const refreshStore = createStore('refresh_tokens', {});
-  const sessions = refreshStore.list()
-    .filter((r) => r.accountId === req.admin.id && r.scope === 'admin' && !r.revokedAt)
-    .map((r) => ({
-      id: r.id,
-      createdAt: r.createdAt,
-      expiresAt: r.expiresAt,
-      ip: r.ip,
-      userAgent: r.userAgent,
-      current: r.id === (req.adminClaims?.jti || ''), // best-effort
-    }));
-  res.json({ sessions });
-});
-
-router.delete('/sessions/:id', requireAdmin, (req, res, next) => {
-  const refreshStore = createStore('refresh_tokens', {});
-  const rec = refreshStore.get(req.params.id);
-  if (!rec || rec.accountId !== req.admin.id) return next(notFound('Session not found.'));
-  refreshStore.update(rec.id, (r) => ({ ...r, revokedAt: new Date().toISOString() }));
-  audit(req, { action: 'admin.session.revoked', target: rec.id, targetType: 'session' });
-  res.json({ ok: true });
-});
-
-router.post('/sessions/revoke-all', requireAdmin, (req, res) => {
-  revokeAllForAccount(req.admin.id);
-  audit(req, { action: 'admin.session.revoked_all' });
-  res.json({ ok: true });
-});
-
-router.post('/change-password', requireAdmin, asyncHandler(async (req, res) => {
-  const { currentPassword, newPassword } = req.body || {};
-  if (!currentPassword || !newPassword) throw badRequest('Both passwords are required.');
-  const ok = await verifyPassword(currentPassword, req.admin.passwordHash);
-  if (!ok) throw unauthorized('Current password incorrect.');
-  const passwordHash = await hashPassword(newPassword);
-  await updateUser(req.admin.id, { passwordHash });
-  revokeAllForAccount(req.admin.id);
-  audit(req, { action: 'admin.password.changed', severity: 'warning' });
-  res.json({ ok: true });
-}));
-
-/* ----------------------- invite-based admin signup ----------------------- */
-
-const inviteSchema = z.object({
-  email: z.string().trim().toLowerCase().email(),
-  adminRole: z.enum(ADMIN_INVITE_ROLES),
-  displayName: z.string().trim().max(60).optional(),
-  ttlDays: z.number().int().min(1).max(30).optional(),
-});
-
-const signupSchema = z.object({
-  token: z.string().min(20),
-  displayName: z.string().trim().min(2).max(60),
-  password: z.string().min(8),
-});
-
-router.get('/invites', requireAdmin, requireRole(), (_req, res) => {
-  res.json({ invites: listAdminInvites() });
-});
-
-router.post('/invites',
-  requireAdmin, requireRole(),
-  validate(inviteSchema),
-  asyncHandler(async (req, res) => {
-    const { email, adminRole, displayName, ttlDays } = req.body;
-    const existing = findByEmail(email);
-    if (existing && existing.role === 'admin') {
-      throw conflict('An admin already exists with that email.');
-    }
-    const ttlMs = ttlDays ? ttlDays * 24 * 60 * 60 * 1000 : undefined;
-    const { invite, token } = createAdminInvite({
-      email, adminRole, createdBy: req.admin.id, displayName, ttlMs,
-    });
-    audit(req, { action: 'admin.invite.created', target: invite.id, targetType: 'admin_invite', meta: { email, adminRole } });
-    res.status(201).json({
-      invite,
-      token,
-      signupUrl: `${req.protocol}://${req.get('host')}/admin/signup?token=${token}`,
-    });
-  })
-);
-
-router.delete('/invites/:id', requireAdmin, requireRole(), (req, res, next) => {
-  const ok = revokeAdminInvite(req.params.id, req.admin.id);
-  if (!ok) return next(notFound('Invite not found or already consumed.'));
-  audit(req, { action: 'admin.invite.revoked', target: req.params.id, targetType: 'admin_invite', severity: 'warning' });
-  res.json({ invite: ok });
-});
-
-/** Public: validate a signup token, return the email + role the invitee will assume. */
-router.get('/signup/:token', (req, res, next) => {
-  const inv = findInviteByToken(req.params.token);
-  if (!inv) return next(unauthorized('Invite is invalid, expired or already used.'));
+  const perms = req.admin.permissionOverrides || require('../../lib/permissions.js').ROLE_PERMISSIONS[req.admin.adminRole] || [];
   res.json({
-    email: inv.email,
-    adminRole: inv.adminRole,
-    displayName: inv.displayName,
-    expiresAt: inv.expiresAt,
+    admin: {
+      id: req.admin.id,
+      name: req.admin.name,
+      email: req.admin.email,
+      adminRole: req.admin.adminRole,
+      avatar: req.admin.avatar,
+      twoFactorEnabled: !!req.admin.twoFactorEnabled,
+      createdAt: req.admin.createdAt,
+      permissions: perms,
+    },
+    session: {
+      id: req.adminClaims?.jti || null,
+      ip: req.ip,
+      userAgent: req.get('user-agent'),
+    },
   });
 });
 
-router.post('/signup',
-  validate(signupSchema),
-  asyncHandler(async (req, res) => {
-    const { token, displayName, password } = req.body;
-    const inv = findInviteByToken(token);
-    if (!inv) throw unauthorized('Invite is invalid, expired or already used.');
-
-    const issues = passwordIssues(password);
-    if (issues.length) throw badRequest(issues[0], { issues });
-
-    if (findByEmail(inv.email)) {
-      throw conflict('An account with that email already exists. Ask the super admin to grant admin rights instead.');
+router.post('/change-password', requireAdmin, (req, res, next) => {
+  try {
+    const { currentPassword, newPassword } = z.object({
+      currentPassword: z.string().min(1),
+      newPassword: z.string().min(8).max(128),
+    }).parse(req.body);
+    if (!verifyAdminPassword(req.admin, currentPassword)) {
+      return next(unauthorized('Current password is incorrect'));
     }
-
-    const passwordHash = await hashPassword(password);
-    const created = createUser({
-      email: inv.email,
-      displayName,
-      passwordHash,
-      emailVerified: true,
-      role: 'admin',
-      balance: 0,
-    });
-    const updated = updateUser(created.id, {
-      adminRole: inv.adminRole,
-      kycStatus: 'verified',
-      twoFactorEnabled: false,
-    });
-    consumeInvite(token, created.id);
-
-    logActivity(created.id, { kind: 'admin_signup', via: 'invite', invitedBy: inv.createdBy });
-
-    const session = issueAdminSession(updated, req);
-    // audit using a synthetic actor since they were anonymous before this call
-    try {
-      const { recordAudit } = await import('../../db/audit.js');
-      recordAudit({
-        actorId: created.id,
-        actorRole: inv.adminRole,
-        action: 'admin.invite.consumed',
-        target: created.id,
-        targetType: 'admin',
-        ip: req.ip,
-        userAgent: req.get('user-agent') || '',
-        meta: { email: inv.email, role: inv.adminRole },
-      });
-    } catch { /* ignore */ }
-
-    res.status(201).json({ ok: true, admin: publicAdmin(updated), ...session });
-  })
-);
+    const { setAdminPassword } = require('../../db/adminAccounts.js');
+    setAdminPassword(req.admin.id, newPassword, req.admin.id);
+    audit(req, { action: 'auth.password_changed', severity: 'warning', target: req.admin.id, targetType: 'admin' });
+    revokeAllForAccount(req.admin.id);
+    emitAdmin('admin:logout', { adminId: req.admin.id });
+    res.json({ ok: true, message: 'Password changed. Please sign in again.' });
+  } catch (e) {
+    if (e instanceof z.ZodError) return next(badRequest('Invalid input', e.errors));
+    next(e);
+  }
+});
 
 export default router;
-export {
-  publicAdmin,
-  bruteCheck, bumpBrute, clearBrute,
-  issueAdminSession,
-};

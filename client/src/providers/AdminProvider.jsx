@@ -1,7 +1,3 @@
-/**
- * Top-level state for the admin app: identity, theme, toast, route guard.
- * Boots on mount by trying to hydrate /auth/me with the saved token.
- */
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
@@ -21,7 +17,7 @@ export function useAdmin() {
 export function AdminProvider({ children }) {
   const navigate = useNavigate();
   const loc = useLocation();
-  const [admin, setAdmin]     = useState(null);
+  const [admin, setAdmin] = useState(null);
   const [loading, setLoading] = useState(!!getAdminAccess());
   const { theme, setTheme, toggleTheme } = useTheme();
   const [collapsed, setCollapsed] = useState(false);
@@ -56,7 +52,7 @@ export function AdminProvider({ children }) {
   }, []);
 
   const signOut = useCallback(async () => {
-    try { await adminLogout(); } catch { /* ignore */ }
+    try { await adminLogout(); } catch { }
     clearAdminTokens();
     setAdmin(null);
     showToast('Logged out');
@@ -69,7 +65,12 @@ export function AdminProvider({ children }) {
     return allowed.includes(admin.adminRole);
   }, [admin]);
 
-  // Auto-close mobile sidebar on route change
+  const can = useCallback((permission) => {
+    if (!admin) return false;
+    if (admin.adminRole === 'super_admin') return true;
+    return admin.permissions?.includes(permission) ?? false;
+  }, [admin]);
+
   useEffect(() => { setMobileOpen(false); }, [loc.pathname]);
 
   const value = useMemo(() => ({
@@ -78,13 +79,12 @@ export function AdminProvider({ children }) {
     collapsed, setCollapsed,
     mobileOpen, setMobileOpen,
     toast, showToast,
-    hasRole,
-  }), [admin, loading, signIn, signOut, refresh, theme, setTheme, toggleTheme, collapsed, mobileOpen, toast, showToast, hasRole]);
+    hasRole, can,
+  }), [admin, loading, signIn, signOut, refresh, theme, setTheme, toggleTheme, collapsed, mobileOpen, toast, showToast, hasRole, can]);
 
   return <AdminCtx.Provider value={value}>{children}</AdminCtx.Provider>;
 }
 
-/** Guard component to be used around protected routes. */
 export function AdminGuard({ children }) {
   const { admin, loading } = useAdmin();
   const navigate = useNavigate();
@@ -106,7 +106,7 @@ export function AdminGuard({ children }) {
         fontFamily: 'Inter, system-ui, sans-serif',
       }}>
         <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10 }}>
-          <span className="adm-spinner" /> Establishing secure session…
+          <span className="adm-spinner" /> Establishing secure session...
         </div>
       </div>
     );

@@ -27,7 +27,7 @@ import { AdminProvider, AdminGuard } from './providers/AdminProvider.jsx';
 import AdminShell from './layout/AdminShell.jsx';
 import AdminLogin from './pages/admin/AdminLogin.jsx';
 import AdminSignup from './pages/admin/AdminSignup.jsx';
-import AdminDashboard from './pages/admin/Dashboard.jsx';
+import DashboardPage from './pages/admin/DashboardPage.jsx';
 import AdminUsers from './pages/admin/Users.jsx';
 import AdminStages from './pages/admin/Stages.jsx';
 import AdminBets from './pages/admin/Bets.jsx';
@@ -37,9 +37,19 @@ import AdminStats from './pages/admin/Stats.jsx';
 import AdminProviders from './pages/admin/Providers.jsx';
 import AdminHealth from './pages/admin/Health.jsx';
 import AdminDeposits from './pages/admin/Deposits.jsx';
+import ManagementPage from './pages/admin/ManagementPage.jsx';
+import LeaguesPage from './pages/admin/LeaguesPage.jsx';
+import TeamsPage from './pages/admin/TeamsPage.jsx';
+import WithdrawalsPage from './pages/admin/WithdrawalsPage.jsx';
+import MarketsPage from './pages/admin/MarketsPage.jsx';
+import TradingDeskPage from './pages/admin/TradingDeskPage.jsx';
+import ResultsPage from './pages/admin/ResultsPage.jsx';
 import {
   LiveBettingPage, AuditLogsPage, SettingsPage,
   FinancePage, NotificationsPage, SupportPage, FraudPage,
+  BonusesPage, KYCSPage, ReferralsPage,
+  CodesPage, CashoutPage, CMSPage, ReportsPage,
+  SecurityPage,
 } from './pages/admin/Stubs.jsx';
 
 function AdminApp() {
@@ -49,25 +59,40 @@ function AdminApp() {
         {/* /admin/login redirects to the unified login (preserves bookmarks + AdminGuard back-compat) */}
         <Route path="login"  element={<Navigate to="/login?next=/admin" replace />} />
         <Route path="signup" element={<AdminSignup />} />
-        <Route element={<AdminGuard><AdminShell /></AdminGuard>}>
-          <Route index               element={<AdminDashboard />} />
-          <Route path="users"        element={<AdminUsers />} />
-          <Route path="stages"       element={<AdminStages />} />
-          <Route path="bets"         element={<AdminBets />} />
-          <Route path="live"         element={<LiveBettingPage />} />
-          <Route path="sports"       element={<AdminSports />} />
-          <Route path="promotions"   element={<AdminPromotions />} />
-          <Route path="finance"      element={<FinancePage />} />
-          <Route path="deposits"     element={<AdminDeposits />} />
-          <Route path="notifications" element={<NotificationsPage />} />
-          <Route path="support"      element={<SupportPage />} />
-          <Route path="analytics"    element={<AdminStats />} />
-          <Route path="fraud"        element={<FraudPage />} />
-          <Route path="audit"        element={<AuditLogsPage />} />
-          <Route path="providers"    element={<AdminProviders />} />
-          <Route path="health"       element={<AdminHealth />} />
-          <Route path="settings"     element={<SettingsPage />} />
-        </Route>
+          <Route element={<AdminGuard><AdminShell /></AdminGuard>}>
+            <Route index                element={<DashboardPage />} />
+            <Route path="users"         element={<AdminUsers />} />
+            <Route path="stages"        element={<AdminStages />} />
+            <Route path="bets"          element={<AdminBets />} />
+            <Route path="live"          element={<LiveBettingPage />} />
+            <Route path="sports"        element={<AdminSports />} />
+            <Route path="leagues"       element={<LeaguesPage />} />
+            <Route path="teams"         element={<TeamsPage />} />
+            <Route path="markets"       element={<MarketsPage />} />
+            <Route path="trading"       element={<TradingDeskPage />} />
+            <Route path="results"       element={<ResultsPage />} />
+            <Route path="promotions"    element={<AdminPromotions />} />
+            <Route path="finance"       element={<FinancePage />} />
+            <Route path="deposits"      element={<AdminDeposits />} />
+            <Route path="withdrawals"   element={<WithdrawalsPage />} />
+            <Route path="bonuses"       element={<BonusesPage />} />
+            <Route path="kyc"           element={<KYCSPage />} />
+            <Route path="referrals"     element={<ReferralsPage />} />
+            <Route path="codes"         element={<CodesPage />} />
+            <Route path="cashout"       element={<CashoutPage />} />
+            <Route path="notifications" element={<NotificationsPage />} />
+            <Route path="support"       element={<SupportPage />} />
+            <Route path="cms"           element={<CMSPage />} />
+            <Route path="reports"       element={<ReportsPage />} />
+            <Route path="analytics"     element={<AdminStats />} />
+            <Route path="fraud"         element={<FraudPage />} />
+            <Route path="audit"         element={<AuditLogsPage />} />
+            <Route path="security"      element={<SecurityPage />} />
+            <Route path="management"    element={<ManagementPage />} />
+            <Route path="providers"     element={<AdminProviders />} />
+            <Route path="health"        element={<AdminHealth />} />
+            <Route path="settings"      element={<SettingsPage />} />
+          </Route>
       </Routes>
     </AdminProvider>
   );

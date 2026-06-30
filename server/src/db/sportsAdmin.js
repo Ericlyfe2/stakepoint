@@ -184,6 +184,13 @@ export function addCustomLeague(lg) {
   const cur = store.get('customLeagues') || {};
   store.set('customLeagues', { ...cur, [lg.id]: lg });
 }
+export function updateCustomLeague(id, patch) {
+  const cur = store.get('customLeagues') || {};
+  const existing = cur[id];
+  if (!existing) return null;
+  store.set('customLeagues', { ...cur, [id]: { ...existing, ...patch } });
+  return { ...existing, ...patch };
+}
 export function deleteCustomLeague(id) {
   const cur = store.get('customLeagues') || {};
   if (cur[id]) {
