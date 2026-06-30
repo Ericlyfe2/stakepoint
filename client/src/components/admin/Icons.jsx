@@ -56,6 +56,7 @@ export const IconSun = wrap(<><circle cx="12" cy="12" r="4" /><path d="M12 2v2M1
 export const IconMoon = wrap(<><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z" /></>);
 export const IconMenu = wrap(<><path d="M3 6h18M3 12h18M3 18h18" /></>);
 export const IconClose = wrap(<><path d="M6 6l12 12M6 18 18 6" /></>);
+export const IconX = IconClose;
 export const IconChevronRight = wrap(<><path d="m9 6 6 6-6 6" /></>);
 export const IconLogout = wrap(<><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" /></>);
 export const IconCheck = wrap(<><path d="m20 6-11 11-5-5" /></>);
