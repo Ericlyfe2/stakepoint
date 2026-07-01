@@ -1454,6 +1454,26 @@ footer {
 .md-market-grid.compact-cols {
   grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
 }
+.md-cs-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px 8px;
+}
+.md-cs-col-head {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--text-dim);
+  text-align: center;
+  padding-bottom: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.md-cs-empty { min-height: 1px; }
+.md-cs-other-row {
+  margin-top: 8px;
+}
+.md-cs-other-row .odd-btn { width: 100%; }
 main.main-filter-live .match:not(.live) { display: none; }
 main.main-filter-soon .match.live { display: none; }
 main.main-region-africa .league-section:not([data-region="africa"]) { display: none; }

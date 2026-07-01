@@ -1568,6 +1568,54 @@ export default function Home({ initialChip }) {
               {match_.isLive && <span className="md-live-badge">LIVE {match_.minute || ''}</span>}
             </div>
             {marketEntries.map(([mkey, mkt]) => {
+              const renderOddBtn = (s) => {
+                const sel = selections.find((x) => x.matchId === match_.id && x.market === mkey && x.outcome === s.key);
+                const trendClass = sel?.trend === 'up' ? ' up' : sel?.trend === 'down' ? ' down' : '';
+                return (
+                  <button
+                    key={s.key}
+                    type="button"
+                    className={`odd-btn${sel ? ' selected' : ''}${trendClass}${s.suspended ? ' suspended' : ''}`}
+                    onClick={() => toggleSelection(match_, mkey, s.key, s.odds)}
+                    disabled={s.suspended}
+                  >
+                    <span className="ol">{s.label}</span>
+                    <span className="ov">{s.odds.toFixed(2)}</span>
+                  </button>
+                );
+              };
+
+              if (mkey === 'CS') {
+                const homeSels = [], drawSels = [], awaySels = [];
+                let otherSel = null;
+                mkt.selections.forEach((s) => {
+                  if (s.key === 'OTHER') { otherSel = s; return; }
+                  const [a, b] = s.key.split('-').map(Number);
+                  if (a > b) homeSels.push(s);
+                  else if (a < b) awaySels.push(s);
+                  else drawSels.push(s);
+                });
+                const rows = Math.max(homeSels.length, drawSels.length, awaySels.length);
+                return (
+                  <div key={mkey} className="md-market-section">
+                    <div className="md-market-name">{marketName(mkey)}</div>
+                    <div className="md-cs-grid">
+                      <span className="md-cs-col-head">{match_.home}</span>
+                      <span className="md-cs-col-head">Draw</span>
+                      <span className="md-cs-col-head">{match_.away}</span>
+                      {Array.from({ length: rows }).map((_, i) => (
+                        [homeSels[i], drawSels[i], awaySels[i]].map((s, ci) => (
+                          s ? renderOddBtn(s) : <span key={`cs-empty-${i}-${ci}`} className="md-cs-empty" />
+                        ))
+                      ))}
+                    </div>
+                    {otherSel && (
+                      <div className="md-cs-other-row">{renderOddBtn(otherSel)}</div>
+                    )}
+                  </div>
+                );
+              }
+
               const selCount = mkt.selections?.length || 0;
               let gridClass = '';
               if (selCount >= 9) gridClass = 'compact-cols';
@@ -1576,22 +1624,7 @@ export default function Home({ initialChip }) {
               <div key={mkey} className="md-market-section">
                 <div className="md-market-name">{marketName(mkey)}</div>
                 <div className={`md-market-grid ${gridClass}`}>
-                  {mkt.selections.map((s) => {
-                    const sel = selections.find((x) => x.matchId === match_.id && x.market === mkey && x.outcome === s.key);
-                    const trendClass = sel?.trend === 'up' ? ' up' : sel?.trend === 'down' ? ' down' : '';
-                    return (
-                      <button
-                        key={s.key}
-                        type="button"
-                        className={`odd-btn${sel ? ' selected' : ''}${trendClass}${s.suspended ? ' suspended' : ''}`}
-                        onClick={() => toggleSelection(match_, mkey, s.key, s.odds)}
-                        disabled={s.suspended}
-                      >
-                        <span className="ol">{s.label}</span>
-                        <span className="ov">{s.odds.toFixed(2)}</span>
-                      </button>
-                    );
-                  })}
+                  {mkt.selections.map(renderOddBtn)}
                 </div>
               </div>
             )})}

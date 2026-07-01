@@ -96,20 +96,40 @@ export function buildMarkets({ odds, ou = [1.85, 1.95], btts = [1.72, 2.05], dc 
     '2/2': pA * 0.62,
   };
 
-  // Correct Score (popular 8). Scaled around match expectation.
+  // Correct Score — full grid (home/away scores 0-4) plus a catch-all "Other"
+  // bucket for any wider margin. Scaled around match expectation.
   const homeStrong = pH > pA;
   const goalRich = pO > 0.55;
   const csBase = {
-    '1-0': homeStrong ? 0.13 : 0.08,
-    '2-0': homeStrong ? 0.10 : 0.05,
-    '2-1': homeStrong ? 0.12 : 0.09,
-    '1-1': 0.13,
-    '0-0': goalRich ? 0.06 : 0.10,
-    '0-1': homeStrong ? 0.05 : 0.10,
-    '0-2': homeStrong ? 0.03 : 0.07,
-    '1-2': homeStrong ? 0.05 : 0.10,
-    '2-2': goalRich ? 0.07 : 0.04,
-    'OTHER': 0.26,
+    // Home wins
+    '1-0': homeStrong ? 0.130 : 0.080,
+    '2-0': homeStrong ? 0.095 : 0.050,
+    '2-1': homeStrong ? 0.115 : 0.085,
+    '3-0': homeStrong ? 0.038 : 0.018,
+    '3-1': homeStrong ? 0.045 : 0.022,
+    '3-2': homeStrong ? 0.022 : 0.011,
+    '4-0': homeStrong ? 0.014 : 0.006,
+    '4-1': homeStrong ? 0.017 : 0.008,
+    '4-2': homeStrong ? 0.009 : 0.004,
+    '4-3': homeStrong ? 0.005 : 0.002,
+    // Draws
+    '0-0': goalRich ? 0.055 : 0.095,
+    '1-1': 0.125,
+    '2-2': goalRich ? 0.065 : 0.038,
+    '3-3': 0.012,
+    '4-4': 0.003,
+    // Away wins
+    '0-1': homeStrong ? 0.050 : 0.100,
+    '0-2': homeStrong ? 0.028 : 0.068,
+    '1-2': homeStrong ? 0.048 : 0.095,
+    '0-3': homeStrong ? 0.012 : 0.030,
+    '1-3': homeStrong ? 0.016 : 0.036,
+    '2-3': homeStrong ? 0.020 : 0.042,
+    '0-4': homeStrong ? 0.005 : 0.012,
+    '1-4': homeStrong ? 0.006 : 0.014,
+    '2-4': homeStrong ? 0.008 : 0.017,
+    '3-4': homeStrong ? 0.004 : 0.009,
+    'OTHER': 0.030,
   };
 
   return {
@@ -181,17 +201,12 @@ export function buildMarkets({ odds, ou = [1.85, 1.95], btts = [1.72, 2.05], dc 
       { key: '2/2', label: 'Away / Away', odds: priceFromProb(htft['2/2'], 0.10) },
     ]},
     'CS': { name: 'Correct Score', selections: [
-      { key: '1-0', label: '1 - 0', odds: priceFromProb(csBase['1-0'], 0.10) },
-      { key: '2-0', label: '2 - 0', odds: priceFromProb(csBase['2-0'], 0.10) },
-      { key: '2-1', label: '2 - 1', odds: priceFromProb(csBase['2-1'], 0.10) },
-      { key: '1-1', label: '1 - 1', odds: priceFromProb(csBase['1-1'], 0.10) },
-      { key: '0-0', label: '0 - 0', odds: priceFromProb(csBase['0-0'], 0.10) },
-      { key: '0-1', label: '0 - 1', odds: priceFromProb(csBase['0-1'], 0.10) },
-      { key: '0-2', label: '0 - 2', odds: priceFromProb(csBase['0-2'], 0.10) },
-      { key: '1-2', label: '1 - 2', odds: priceFromProb(csBase['1-2'], 0.10) },
-      { key: '2-2', label: '2 - 2', odds: priceFromProb(csBase['2-2'], 0.10) },
-      { key: 'OTHER', label: 'Any Other Score', odds: priceFromProb(csBase['OTHER'], 0.10) },
-    ]},
+      '1-0', '2-0', '2-1', '3-0', '3-1', '3-2', '4-0', '4-1', '4-2', '4-3',
+      '0-0', '1-1', '2-2', '3-3', '4-4',
+      '0-1', '0-2', '1-2', '0-3', '1-3', '2-3', '0-4', '1-4', '2-4', '3-4',
+    ].map((key) => ({ key, label: key.replace('-', ' - '), odds: priceFromProb(csBase[key], 0.10) }))
+      .concat([{ key: 'OTHER', label: 'Any Other Score', odds: priceFromProb(csBase['OTHER'], 0.10) }]),
+    },
     '1H1X2': { name: '1st Half Result', selections: [
       { key: '1', label: 'Home', odds: priceFromProb(p1hH, 0.07) },
       { key: 'X', label: 'Draw', odds: priceFromProb(p1hD, 0.07) },

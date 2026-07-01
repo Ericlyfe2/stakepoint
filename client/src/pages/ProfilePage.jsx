@@ -85,27 +85,6 @@ export default function ProfilePage() {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
     >
-      {/* Brand + balance pill */}
-      <motion.header
-        className="acct-top"
-        initial={{ opacity: 0, y: -15 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4, delay: 0.1, ease: 'easeOut' }}
-      >
-        <div className="acct-brand">
-          <svg width="28" height="28" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" style={{display:'inline-block',verticalAlign:'middle',marginRight:8,borderRadius:7}}>
-            <rect width="64" height="64" rx="14" fill="#0a0d0c"/>
-            <path d="M32 6L54 16L54 36C54 50 32 60 32 60C32 60 10 50 10 36L10 16Z" fill="#007A45"/>
-            <path d="M22 22L22 43L33 43C38 43 42 40 42 35.5C42 33 40.5 31 38.5 30C40 29 41 27.5 41 25.5C41 23 38 22 34 22ZM26.5 26L33 26C35.5 26 37 27 37 29C37 31 35.5 32 33 32L26.5 32ZM26.5 35.5L33.5 35.5C36.5 35.5 37.5 37 37.5 39C37.5 41 35.5 39.5 33.5 39.5L26.5 39.5Z" fill="white"/>
-          </svg>
-          Bet<em>Xentra</em>
-        </div>
-        <button type="button" className="acct-balance-pill" onClick={() => navigate('/wallet')}>
-          <span className="acct-balance-icon" aria-hidden><I.user width="14" height="14" /></span>
-          <span className="acct-balance-amt">₵&nbsp;{fmtMoney(account.balance)}</span>
-        </button>
-      </motion.header>
-
       {/* Identity row with animated status badge */}
       <motion.button
         type="button"
