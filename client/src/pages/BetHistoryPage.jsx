@@ -361,7 +361,8 @@ function BetCardView({ bet, onCashout, onRemix, onDetails, copiedCode, onCopy, a
   const green = '#22c66e';
   const gray = '#8a98a3';
   const isWon = bet.status === 'won';
-  const barBg = '#092925';
+  const isLost = !isWon && bet.status !== 'cashed_out' && bet.status !== 'void';
+  const barBg = isLost ? '#A9A9A9' : '#1B5E20';
   const returnColor = isWon ? green : bet.status === 'cashed_out' ? '#14b8a6' : gray;
   const pillIcon = isWon ? '🏆' : bet.status === 'cashed_out' ? '⟳' : bet.status === 'void' ? '⚪' : '✕';
   const statusLabel = isWon ? 'Won' : bet.status === 'cashed_out' ? 'Cashed Out' : bet.status === 'void' ? 'Void' : 'Lost';

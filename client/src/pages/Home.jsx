@@ -1625,6 +1625,27 @@ export default function Home({ initialChip }) {
           setPayslip(code);
           setSlipOpen(true);
         }}
+        onRebet={() => {
+          const legs = successBet?.legs;
+          if (!legs?.length) { setSuccessBet(null); return; }
+          const hydrated = legs.map((l, i) => ({
+            id: `sel-${Date.now()}-${i}`,
+            matchId: l.matchId,
+            market: l.market,
+            outcome: l.outcome,
+            odds: l.odds,
+            pickLabel: pickLabel(l.market, l.outcome, { home: l.home, away: l.away }),
+            marketLabel: l.marketName || `${l.market} · ${l.outcome}`,
+            meta: `${l.home || ''} vs ${l.away || ''}`,
+            home: l.home,
+            away: l.away,
+            trend: null,
+          }));
+          loadSelections(hydrated, pickMode(hydrated));
+          setSuccessBet(null);
+          setSlipOpen(true);
+          setSlipErr('');
+        }}
         totalStake={successBet?.stake ?? totalStake}
         potentialWin={successBet?.potentialWin ?? payout}
         bookingCode={successBet?.bookingCode || (successBet?.id ? toBookingCode(successBet.id) : 'XX00000')}

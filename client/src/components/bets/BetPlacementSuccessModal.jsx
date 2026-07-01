@@ -8,6 +8,7 @@ export default function BetPlacementSuccessModal({
   onShare,
   onViewOpenBets,
   onAddToBetslip,
+  onRebet,
   totalStake = 0,
   potentialWin = 0,
   currency = 'GHS',
@@ -356,6 +357,12 @@ export default function BetPlacementSuccessModal({
                 </div>
               </motion.div>
             )}
+
+            {/* Rebet / OK actions */}
+            <motion.div className="bpsm-actions-row" variants={fadeUp}>
+              <button type="button" className="bpsm-action-btn bpsm-rebet-btn" onClick={() => onRebet?.()}>Rebet</button>
+              <button type="button" className="bpsm-action-btn bpsm-ok-btn" onClick={onClose}>OK</button>
+            </motion.div>
 
             {/* Footer */}
             <motion.div className="bpsm-footer" variants={fadeUp}>
@@ -737,6 +744,34 @@ const BPSM_CSS = `
   padding: 2px 6px;
   border-radius: 4px;
   pointer-events: none;
+}
+
+/* Rebet / OK actions */
+.bpsm-actions-row {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.bpsm-action-btn {
+  flex: 1;
+  border: none;
+  border-radius: 999px;
+  padding: 14px 0;
+  font-size: 15px;
+  font-weight: 800;
+  cursor: pointer;
+  font-family: inherit;
+  transition: filter 0.15s, transform 0.15s;
+}
+.bpsm-action-btn:hover { filter: brightness(1.05); }
+.bpsm-action-btn:active { transform: scale(0.97); }
+.bpsm-rebet-btn {
+  background: rgba(27,94,32,0.1);
+  color: #1B5E20;
+}
+.bpsm-ok-btn {
+  background: #1B5E20;
+  color: #fff;
 }
 
 /* Carousel */
