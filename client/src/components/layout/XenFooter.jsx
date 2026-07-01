@@ -5,7 +5,7 @@ export default function XenFooter({ className = '' }) {
   const { pathname } = useLocation();
 
   const isSportsRoute = useMemo(() => {
-    return pathname === '/';
+    return pathname === '/' || pathname === '/profile';
   }, [pathname]);
 
   if (!isSportsRoute) return null;
