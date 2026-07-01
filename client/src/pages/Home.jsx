@@ -31,6 +31,15 @@ import {
   validateBetSlip,
 } from '../lib/betslipEngine.js';
 
+const LIVE_SPORT_ICONS = {
+  football: '⚽', soccer: '⚽', futsal: '⚽',
+  basketball: '🏀', basketball3x3: '🏀',
+  tennis: '🎾', tabletennis: '🏓',
+  volleyball: '🏐', icehockey: '🏒', hockey: '🏒',
+  boxing: '🥊', esports: '🎮', cricket: '🏏',
+  handball: '🤾', rugby: '🏉', baseball: '⚾',
+};
+
 function systemTypeHint(count) {
   if (count < 3) return `${3 - count} more selection${count === 2 ? '' : 's'}`;
   if (count > 8) return 'fewer selections (max 8 for system bets)';
@@ -164,6 +173,7 @@ export default function Home({ initialChip }) {
   const [isPlacing, setIsPlacing] = useState(false);
   const [showKeypad, setShowKeypad] = useState(false);
   const [betRealMode, setBetRealMode] = useState('REAL');
+  const [liveWidgetLeague, setLiveWidgetLeague] = useState('all');
 
   const {
     selections,
@@ -359,6 +369,11 @@ export default function Home({ initialChip }) {
   useEffect(() => {
     syncOdds(snapshot);
   }, [snapshot, syncOdds]);
+
+  // Reset the Live Matches widget's league filter when the sport changes.
+  useEffect(() => {
+    setLiveWidgetLeague('all');
+  }, [sportId]);
 
   const eligibleSystems = useMemo(
     () => eligibleSystemTypes(selectionCount),
@@ -871,6 +886,19 @@ export default function Home({ initialChip }) {
 
   // Grand Prize Winners state (replaced by animated GrandPrizeWinners component)
 
+  // ─── Live Matches widget data (real snapshot data, current sport) ───
+  const liveLeagues = snapshot.leagues
+    .map((lg) => ({ ...lg, matches: lg.matches.filter((m) => m.isLive) }))
+    .filter((lg) => lg.matches.length > 0);
+  const liveMatchTotal = liveLeagues.reduce((n, lg) => n + lg.matches.length, 0);
+  const liveWidgetLeagues = liveWidgetLeague === 'all'
+    ? liveLeagues
+    : liveLeagues.filter((lg) => lg.id === liveWidgetLeague);
+  const liveWidgetCards = liveWidgetLeagues
+    .flatMap((lg) => lg.matches.map((m) => ({ league: lg, match: m })))
+    .slice(0, 10);
+  const liveSportIcon = LIVE_SPORT_ICONS[sportId] || '🏆';
+
   const marketChips = MARKET_CHIP_DEFS;
 
   return (
@@ -978,6 +1006,125 @@ export default function Home({ initialChip }) {
             </div>
           ))}
         </div>
+      </div>
+
+      {/* ─── Live Matches widget ─── */}
+      <div className="xb-live-widget">
+        <div className="xb-live-head">
+          <div>
+            <h3 className="xb-live-title">Live Matches</h3>
+            <span className="xb-live-subtitle"><span className="xb-live-reddot" /> Real-time odds &amp; scores</span>
+          </div>
+          <button type="button" className="xb-live-viewall" onClick={() => setSubTab('live')}>View All</button>
+        </div>
+
+        <div className="xb-live-catrow">
+          <span className="xb-live-catlabel">Live categories</span>
+          <span className="xb-live-captag">Top {Math.min(liveMatchTotal, 10)} live only</span>
+        </div>
+
+        <div className="xb-live-pillrow">
+          <button
+            type="button"
+            className="xb-live-pill active"
+            title={sportTabs.find((s) => s.id === sportId)?.name || 'All'}
+          >
+            <span>{liveSportIcon}</span> {sportTabs.find((s) => s.id === sportId)?.name || 'All'}
+          </button>
+          {sportTabs.filter((s) => s.id !== sportId).map((s) => (
+            <button
+              key={s.id}
+              type="button"
+              className="xb-live-pill"
+              onClick={() => { window.history.replaceState({}, '', `?sport=${s.id}`); setSportId(s.id); setActiveLeague(null); }}
+            >
+              <span>{LIVE_SPORT_ICONS[s.id] || '🏆'}</span> {s.name}
+            </button>
+          ))}
+        </div>
+
+        {liveLeagues.length > 0 && (
+          <div className="xb-live-chiprow">
+            <button
+              type="button"
+              className={`xb-live-chip${liveWidgetLeague === 'all' ? ' active' : ''}`}
+              onClick={() => setLiveWidgetLeague('all')}
+            >
+              All Leagues
+            </button>
+            {liveLeagues.map((lg) => (
+              <button
+                key={lg.id}
+                type="button"
+                className={`xb-live-chip${liveWidgetLeague === lg.id ? ' active' : ''}`}
+                onClick={() => setLiveWidgetLeague(lg.id)}
+              >
+                {lg.name}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {liveWidgetCards.length === 0 ? (
+          <div className="xb-live-empty">No live matches right now — check back soon.</div>
+        ) : (
+          <div className="xb-live-cards">
+            {liveWidgetCards.map(({ league: lg, match }) => {
+              const cols = columnsFor('1X2', match);
+              const myPicks = selections.filter((s) => s.matchId === match.id && s.market === (cols?.market || '1X2'));
+              return (
+                <div className="xb-live-card" key={match.id}>
+                  <div className="xb-live-card-top">
+                    <span className="xb-live-league">
+                      <span className="xb-live-league-icon">{LIVE_SPORT_ICONS[sportId] || '🏆'}</span>
+                      {lg.name}
+                    </span>
+                    <span className="xb-live-badge"><span className="xb-live-dot" />LIVE</span>
+                  </div>
+
+                  <div className="xb-live-teams">
+                    <span className="xb-live-team">{match.home}</span>
+                    <span className="xb-live-team">{match.away}</span>
+                  </div>
+
+                  {(match.scoreHome != null || match.minute) && (
+                    <div className="xb-live-score">
+                      <span>{match.scoreHome ?? 0}-{match.scoreAway ?? 0}</span>
+                      {match.minute && <span className="xb-live-minute">{match.minute}</span>}
+                    </div>
+                  )}
+
+                  <div className="xb-live-links">
+                    <button type="button" className="xb-live-link" onClick={() => openMarkets(lg, match)}>Live Match</button>
+                    <button type="button" className="xb-live-link" onClick={() => openMarkets(lg, match)}>More Markets</button>
+                  </div>
+
+                  <div className="xb-live-odds">
+                    {cols ? cols.selections.map((s) => {
+                      const isSel = myPicks.some((p) => p.outcome === s.key);
+                      return (
+                        <button
+                          key={s.key}
+                          type="button"
+                          className={`xb-live-odd${isSel ? ' selected' : ''}`}
+                          onClick={() => toggleSelection(match, cols.market, s.key, s.odds)}
+                        >
+                          <span className="xb-live-odd-label">{s.key}</span>
+                          <span className="xb-live-odd-val">{s.odds?.toFixed(2)}</span>
+                        </button>
+                      );
+                    }) : ['HOME', 'DRAW', 'AWAY'].map((k) => (
+                      <span key={k} className="xb-live-odd locked">
+                        <span className="xb-live-odd-label">{k}</span>
+                        <span className="xb-live-odd-val">Locked</span>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* ─── Sport tabs ─── */}

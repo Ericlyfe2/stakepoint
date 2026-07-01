@@ -3298,6 +3298,286 @@ nav a:active { transform: scale(.96); }
   letter-spacing: .03em;
 }
 
+/* ===== Live Matches Widget ===== */
+.xb-live-widget {
+  margin: 0 12px 16px;
+  padding: 14px 14px 16px;
+  border-radius: 16px;
+  background: linear-gradient(165deg, #0f221a 0%, #0a1712 55%, #081210 100%);
+  border: 1px solid rgba(74, 222, 128, 0.14);
+  box-shadow: 0 0 0 1px rgba(0,0,0,.2), 0 12px 28px -14px rgba(0, 122, 69, .45);
+  position: relative;
+  overflow: hidden;
+}
+.xb-live-widget::before {
+  content: '';
+  position: absolute;
+  top: -60px; right: -60px;
+  width: 180px; height: 180px;
+  background: radial-gradient(circle, rgba(255,77,61,.14) 0%, transparent 70%);
+  pointer-events: none;
+}
+.xb-live-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+  position: relative;
+}
+.xb-live-title {
+  margin: 0 0 3px;
+  font-size: 16px;
+  font-weight: 800;
+  color: #fff;
+  letter-spacing: .01em;
+}
+.xb-live-subtitle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--accent-hot, #ff4d3d);
+}
+.xb-live-reddot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--accent-hot, #ff4d3d);
+  box-shadow: 0 0 0 0 rgba(255,77,61,.6);
+  animation: xb-live-pulse 1.6s infinite;
+  flex-shrink: 0;
+}
+@keyframes xb-live-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(255,77,61,.55); }
+  70% { box-shadow: 0 0 0 6px rgba(255,77,61,0); }
+  100% { box-shadow: 0 0 0 0 rgba(255,77,61,0); }
+}
+.xb-live-viewall {
+  flex-shrink: 0;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #dff5e8;
+  background: rgba(255,255,255,.06);
+  border: 1px solid rgba(255,255,255,.1);
+  border-radius: 20px;
+  padding: 6px 13px;
+  transition: background .15s, border-color .15s;
+}
+.xb-live-viewall:hover { background: rgba(255,255,255,.12); border-color: rgba(255,255,255,.2); }
+
+.xb-live-catrow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.xb-live-catlabel {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,.4);
+}
+.xb-live-captag {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--accent-warm, #ffb547);
+  background: rgba(255,181,71,.1);
+  border: 1px solid rgba(255,181,71,.22);
+  padding: 3px 8px;
+  border-radius: 20px;
+}
+
+.xb-live-pillrow, .xb-live-chiprow {
+  display: flex;
+  gap: 7px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding-bottom: 2px;
+}
+.xb-live-pillrow::-webkit-scrollbar, .xb-live-chiprow::-webkit-scrollbar { display: none; }
+.xb-live-pillrow { margin-bottom: 8px; }
+.xb-live-chiprow { margin-bottom: 12px; }
+
+.xb-live-pill {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 700;
+  color: rgba(255,255,255,.7);
+  background: rgba(255,255,255,.05);
+  border: 1px solid rgba(255,255,255,.08);
+  border-radius: 20px;
+  padding: 7px 13px;
+  white-space: nowrap;
+  transition: background .15s, color .15s, border-color .15s;
+}
+.xb-live-pill:hover { background: rgba(255,255,255,.09); }
+.xb-live-pill.active {
+  background: linear-gradient(135deg, #0E8A4A, #007A45);
+  border-color: transparent;
+  color: #fff;
+}
+
+.xb-live-chip {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 600;
+  color: rgba(255,255,255,.55);
+  background: rgba(255,255,255,.04);
+  border: 1px solid rgba(255,255,255,.06);
+  border-radius: 8px;
+  padding: 6px 11px;
+  white-space: nowrap;
+  transition: background .15s, color .15s, border-color .15s;
+}
+.xb-live-chip:hover { background: rgba(255,255,255,.08); }
+.xb-live-chip.active {
+  color: #fff;
+  background: rgba(0,122,69,.35);
+  border-color: rgba(74,222,128,.4);
+}
+
+.xb-live-empty {
+  padding: 22px 10px;
+  text-align: center;
+  font-size: 12.5px;
+  color: rgba(255,255,255,.35);
+}
+
+.xb-live-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.xb-live-card {
+  background: linear-gradient(155deg, #132a20 0%, #0d1f18 100%);
+  border: 1px solid rgba(255,255,255,.07);
+  border-radius: 14px;
+  padding: 12px 13px 13px;
+  transition: border-color .15s, transform .15s;
+}
+.xb-live-card:hover {
+  border-color: rgba(74,222,128,.3);
+  transform: translateY(-1px);
+}
+.xb-live-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 9px;
+}
+.xb-live-league {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  color: rgba(255,255,255,.55);
+  letter-spacing: .01em;
+}
+.xb-live-league-icon { font-size: 13px; }
+.xb-live-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .06em;
+  color: #fff;
+  background: linear-gradient(135deg, #ff4d3d, #c22a1d);
+  padding: 4px 9px 4px 7px;
+  border-radius: 20px;
+}
+.xb-live-dot {
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  background: #fff;
+  animation: xb-live-pulse 1.6s infinite;
+}
+.xb-live-teams {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-bottom: 8px;
+}
+.xb-live-team {
+  font-size: 14px;
+  font-weight: 700;
+  color: #fff;
+}
+.xb-live-score {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin: -4px 0 8px;
+  font-size: 12.5px;
+  font-weight: 800;
+  color: var(--accent-warm, #ffb547);
+}
+.xb-live-minute {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: rgba(255,255,255,.4);
+}
+.xb-live-links {
+  display: flex;
+  gap: 14px;
+  margin-bottom: 10px;
+}
+.xb-live-link {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--accent-cool, #6ad0ff);
+  padding: 0;
+}
+.xb-live-link:hover { text-decoration: underline; }
+.xb-live-odds {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 7px;
+}
+.xb-live-odd {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 7px 4px;
+  border-radius: 9px;
+  background: rgba(255,255,255,.04);
+  border: 1px solid rgba(255,255,255,.07);
+  font-family: inherit;
+}
+.xb-live-odd-label {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  color: rgba(255,255,255,.4);
+  text-transform: uppercase;
+}
+.xb-live-odd-val {
+  font-size: 13px;
+  font-weight: 800;
+  color: #fff;
+}
+button.xb-live-odd { cursor: pointer; transition: background .15s, border-color .15s, transform .1s; }
+button.xb-live-odd:hover { background: rgba(0,122,69,.22); border-color: rgba(74,222,128,.35); transform: translateY(-1px); }
+button.xb-live-odd.selected {
+  background: linear-gradient(135deg, #0E8A4A, #007A45);
+  border-color: transparent;
+}
+button.xb-live-odd.selected .xb-live-odd-label,
+button.xb-live-odd.selected .xb-live-odd-val { color: #fff; }
+.xb-live-odd.locked {
+  opacity: .55;
+}
+.xb-live-odd.locked .xb-live-odd-val { color: rgba(255,255,255,.4); font-size: 11px; }
+
 /* ===== BetXentra Bet Slip (xb-*) ===== */
 .xb-sheet-header {
   display: flex;
