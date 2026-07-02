@@ -531,32 +531,28 @@ export default function Home({ initialChip }) {
   const onBookBet = useCallback(async () => {
     setSlipErr('');
 
-    const errors = validateBetSlip({
-      selections, betMode, stakes,
-      account, minStake: 400,
-    });
-    if (errors.length) { setSlipErr(errors[0]); return; }
-
-    if (!account) {
-      setSlipOpen(false);
-      navigate('/login?next=/');
-      toast('Sign in to book a bet.');
+    // Booking only reserves selections and returns a shareable code —
+    // no stake, balance, or sign-in required.
+    if (!selections.length) {
+      setSlipErr('Add at least one selection to your bet slip.');
       return;
     }
+    // A lone selection in Multiple mode books as a single ticket.
+    const bookMode = betMode === 'multiple' && selections.length < 2 ? 'single' : betMode;
 
     setIsBooking(true);
     try {
-      if (betMode === 'single') {
+      if (bookMode === 'single') {
         const results = [];
         for (const sel of selections) {
           const selStake = parseStake(stakes[sel.id] || 0);
-          if (selStake <= 0) continue;
           const payload = {
             mode: 'single',
-            stake: selStake,
+            ...(selStake > 0 ? { stake: selStake } : {}),
             selections: [{ matchId: sel.matchId, market: sel.market, outcome: sel.outcome, odds: sel.odds }],
           };
           const res = await bookBet(payload);
+          if (!res?.bet) throw new Error(res?.error || 'Could not book bet.');
           results.push(res.bet);
         }
         clearSlip();
@@ -565,18 +561,19 @@ export default function Home({ initialChip }) {
         setSuccessBet(results[0]);
         toast(`${results.length} bet${results.length > 1 ? 's' : ''} booked.`);
       } else {
-        const linePrice = betMode === 'multiple'
+        const linePrice = bookMode === 'multiple'
           ? parseStake(stakes.multiple || 0)
           : totalStake;
         const payload = {
-          mode: betMode,
-          stake: linePrice,
-          ...(betMode === 'system' ? { systemType } : {}),
+          mode: bookMode,
+          ...(linePrice > 0 ? { stake: linePrice } : {}),
+          ...(bookMode === 'system' ? { systemType } : {}),
           selections: selections.map((s) => ({
             matchId: s.matchId, market: s.market, outcome: s.outcome, odds: s.odds,
           })),
         };
         const res = await bookBet(payload);
+        if (!res?.bet) throw new Error(res?.error || 'Could not book bet.');
         clearSlip();
         setSlipOpen(false);
         setSuccessType('booked');
@@ -594,7 +591,7 @@ export default function Home({ initialChip }) {
     } finally {
       setIsBooking(false);
     }
-  }, [selections, betMode, stakes, totalStake, systemDef, systemType, toast, sportId, account, navigate, clearSlip]);
+  }, [selections, betMode, stakes, totalStake, systemType, toast, sportId, clearSlip]);
 
   const onPlaceBet = useCallback(async () => {
     setSlipErr('');
@@ -1610,10 +1607,10 @@ export default function Home({ initialChip }) {
 
             {/* Warnings */}
             {betMode === 'multiple' && totalStake < 400 && totalStake > 0 && (
-              <div className="xb-warn">Minimum stake is GHS 400.00.</div>
+              <div className="xb-warn">Minimum stake to place a bet is GHS 400.00 — booking needs no stake.</div>
             )}
             {betMode === 'single' && selections.some(s => (stakes[s.id] || 0) > 0 && (stakes[s.id] || 0) < 400) && (
-              <div className="xb-warn">Minimum stake per bet is GHS 400.00.</div>
+              <div className="xb-warn">Minimum stake per placed bet is GHS 400.00 — booking needs no stake.</div>
             )}
             {totalStake > (account?.balance || 0) && betRealMode === 'REAL' && (
               <div className="xb-warn" style={{ color: '#d32f2f' }}>

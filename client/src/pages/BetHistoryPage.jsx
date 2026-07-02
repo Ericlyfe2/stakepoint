@@ -674,8 +674,10 @@ export default function BetHistoryPage() {
   }, [account, refresh]);
 
   // ── Derived Data ──
+  // Booked tickets are only reservations (no stake taken) — they live in the
+  // Code Hub, not in bet history, and must never render as settled/lost here.
   const openBets = useMemo(() => bets.filter(b => b.status === 'open'), [bets]);
-  const settledBets = useMemo(() => bets.filter(b => b.status !== 'open'), [bets]);
+  const settledBets = useMemo(() => bets.filter(b => b.status !== 'open' && b.status !== 'booked'), [bets]);
   const cashoutableBets = useMemo(() => openBets.filter(b => computeOffer(b) > 0), [openBets]);
 
   const filteredBets = useMemo(() => {
@@ -685,7 +687,7 @@ export default function BetHistoryPage() {
     } else {
       if (historyFilter === 'settled') result = settledBets;
       else if (historyFilter === 'unsettled') result = openBets;
-      else result = bets;
+      else result = bets.filter(b => b.status !== 'booked');
     }
 
     if (searchQuery.trim()) {
