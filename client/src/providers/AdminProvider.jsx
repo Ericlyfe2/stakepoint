@@ -1,5 +1,5 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import {
   setAdminTokens, clearAdminTokens, getAdminAccess,
   adminMe, adminLogout,
@@ -87,14 +87,7 @@ export function AdminProvider({ children }) {
 
 export function AdminGuard({ children }) {
   const { admin, loading } = useAdmin();
-  const navigate = useNavigate();
   const loc = useLocation();
-
-  useEffect(() => {
-    if (!loading && !admin) {
-      navigate(`/login?next=${encodeURIComponent(loc.pathname)}`, { replace: true });
-    }
-  }, [admin, loading, navigate, loc.pathname]);
 
   if (loading) {
     return (
@@ -111,6 +104,8 @@ export function AdminGuard({ children }) {
       </div>
     );
   }
-  if (!admin) return null;
+  if (!admin) {
+    return <Navigate to={`/login?next=${encodeURIComponent(loc.pathname)}`} replace />;
+  }
   return children;
 }
