@@ -22,7 +22,7 @@ export function getAdminById(id) {
 export function getAdminByEmail(email) {
   if (!email) return null;
   const lower = email.toLowerCase().trim();
-  const admin = adminStore.find((a) => a.email === lower);
+  const admin = adminStore.list().find((a) => a.email === lower);
   return sanitize(admin);
 }
 
@@ -40,7 +40,7 @@ export function listAdmins({ role, status, search } = {}) {
 
 export function createAdmin({ email, password, name, adminRole = 'support', permissionOverrides, createdBy } = {}) {
   const lower = email.toLowerCase().trim();
-  if (adminStore.find((a) => a.email === lower)) {
+  if (adminStore.list().find((a) => a.email === lower)) {
     throw Object.assign(new Error('Admin with this email already exists'), { status: 409 });
   }
   const passwordHash = bcrypt.hashSync(password, 12);

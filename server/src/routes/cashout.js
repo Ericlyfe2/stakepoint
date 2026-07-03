@@ -11,7 +11,7 @@ import { emitToUser, emitAdmin } from '../services/realtime.js';
 import * as cashOutEngine from '../services/cashOutEngine.js';
 import { LIVE_BETTING, CASHOUT } from '../config/env.js';
 import { uniqueBookingCode, pushBet } from './bet.js';
-import { BONUS_RATE } from '../matchesData.js';
+import { BONUS_RATE, getMatchById } from '../matchesData.js';
 
 const router = Router();
 const betsStore = createStore('bets', {});
@@ -36,7 +36,6 @@ const autoSchema = z.object({
 });
 
 function getOddsLookup() {
-  const { getMatchById } = require('../matchesData.js');
   return (matchId, market, outcome) => {
     try {
       const match = getMatchById(matchId);

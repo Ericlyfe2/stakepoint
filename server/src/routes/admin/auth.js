@@ -4,11 +4,12 @@ import speakeasy from 'speakeasy';
 import qrcode from 'qrcode';
 import { z } from 'zod';
 import { requireAdmin, audit } from '../../middleware/adminAuth.js';
-import { signAdminAccessToken, issueRefreshToken, rotateRefreshToken, revokeRefreshToken, revokeAllForAccount } from '../../services/token.js';
-import { getAdminByEmail, getAdminById, verifyAdminPassword, recordAdminLogin } from '../../db/adminAccounts.js';
+import { signAdminAccessToken, issueRefreshToken, rotateRefreshToken, revokeRefreshToken, revokeAllForAccount, verifyAccessToken } from '../../services/token.js';
+import { getAdminByEmail, getAdminById, verifyAdminPassword, recordAdminLogin, setAdminPassword } from '../../db/adminAccounts.js';
 import { createStore } from '../../db/store.js';
 import { emitAdmin } from '../../services/realtime.js';
 import { badRequest, unauthorized, forbidden } from '../../utils/httpError.js';
+import { ROLE_PERMISSIONS } from '../../lib/permissions.js';
 
 const router = Router();
 const sessionStore = createStore('admin_sessions', {});
@@ -109,7 +110,6 @@ router.post('/verify-2fa', (req, res, next) => {
     const { tempToken, code } = verify2faSchema.parse(req.body);
     let claims;
     try {
-      const { verifyAccessToken } = require('../../services/token.js');
       claims = verifyAccessToken(tempToken);
     } catch {
       return next(unauthorized('Temporary token expired or invalid'));
@@ -211,7 +211,7 @@ router.post('/logout-all', requireAdmin, (req, res) => {
 });
 
 router.get('/me', requireAdmin, (req, res) => {
-  const perms = req.admin.permissionOverrides || require('../../lib/permissions.js').ROLE_PERMISSIONS[req.admin.adminRole] || [];
+  const perms = req.admin.permissionOverrides || ROLE_PERMISSIONS[req.admin.adminRole] || [];
   res.json({
     admin: {
       id: req.admin.id,
@@ -240,7 +240,6 @@ router.post('/change-password', requireAdmin, (req, res, next) => {
     if (!verifyAdminPassword(req.admin, currentPassword)) {
       return next(unauthorized('Current password is incorrect'));
     }
-    const { setAdminPassword } = require('../../db/adminAccounts.js');
     setAdminPassword(req.admin.id, newPassword, req.admin.id);
     audit(req, { action: 'auth.password_changed', severity: 'warning', target: req.admin.id, targetType: 'admin' });
     revokeAllForAccount(req.admin.id);
