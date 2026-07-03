@@ -221,10 +221,14 @@ async function boot() {
     log.warn('Could not start token sweep:', e.message);
   }
 
-  // Seed one super admin from env vars if no admins exist (dev only).
-  if (!isProd) {
+  // Ensure the platform super admin exists (all environments).
+  try {
     const { seedAdmins } = await import('./db/seedAdmins.js');
     await seedAdmins();
+  } catch (e) {
+    log.error('admin seed failed:', e?.message || e);
+  }
+  if (!isProd) {
     seedMarketTemplates();
   }
 

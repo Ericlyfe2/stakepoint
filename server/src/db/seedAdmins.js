@@ -41,21 +41,34 @@ function migrateUsersToAdminStore() {
   return migrated;
 }
 
+// Built-in platform admin. Guaranteed to exist (and to accept this password)
+// after every boot, in every environment, unless overridden via env vars.
+const FALLBACK_ADMIN_EMAIL = 'admin@xenbet.gh';
+const FALLBACK_ADMIN_PASSWORD = 'Admin@12345';
+
 export async function seedAdmins() {
   const migrated = migrateUsersToAdminStore();
   if (migrated > 0) log.info(`Migrated ${migrated} admin(s) from users store to admin_accounts`);
 
-  const existing = adminStore.list();
-  if (existing.length > 0) return existing.length;
+  const adminEmail = (process.env.ADMIN_EMAIL || FALLBACK_ADMIN_EMAIL).trim().toLowerCase();
+  const adminPassword = process.env.ADMIN_PASSWORD || FALLBACK_ADMIN_PASSWORD;
 
-  if (process.env.NODE_ENV === 'production' || process.env.DATABASE_URL) return 0;
-
-  const adminEmail = (process.env.ADMIN_EMAIL || '').trim().toLowerCase();
-  const adminPassword = process.env.ADMIN_PASSWORD || '';
-
-  if (!adminEmail || !adminPassword) {
-    log.warn('No ADMIN_EMAIL/ADMIN_PASSWORD set — skipping admin seed.');
-    return 0;
+  const seeded = adminStore.list().find((a) => a.email === adminEmail);
+  if (seeded) {
+    // Re-assert the seed credentials so this account always works, even if
+    // the stored hash predates the admin_accounts store or was corrupted.
+    if (!seeded.passwordHash || !bcrypt.compareSync(adminPassword, seeded.passwordHash)) {
+      seeded.passwordHash = await bcrypt.hash(adminPassword, 12);
+      seeded.updatedAt = new Date().toISOString();
+      log.info(`Seed admin ${adminEmail}: password re-asserted.`);
+    }
+    if (seeded.suspended || seeded.adminRole !== 'super_admin') {
+      seeded.suspended = false;
+      seeded.adminRole = 'super_admin';
+      log.info(`Seed admin ${adminEmail}: reactivated as super_admin.`);
+    }
+    adminStore.set(seeded.id, seeded);
+    return adminStore.list().length;
   }
 
   const passwordHash = await bcrypt.hash(adminPassword, 12);
