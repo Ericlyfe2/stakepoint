@@ -14,7 +14,7 @@
  * set of admin roles (super_admin always passes).
  */
 import { verifyAccessToken } from '../services/token.js';
-import { getUserById } from '../db/users.js';
+import { getAdminById } from '../db/adminAccounts.js';
 import { unauthorized, forbidden } from '../utils/httpError.js';
 import { recordAudit } from '../db/audit.js';
 
@@ -29,7 +29,7 @@ export function requireAdmin(req, _res, next) {
   try {
     const claims = verifyAccessToken(token);
     if (claims.scope !== 'admin') return next(forbidden('Not an admin token.'));
-    const user = getUserById(claims.sub);
+    const user = getAdminById(claims.sub);
     if (!user)                   return next(unauthorized('Admin account no longer exists.'));
     if (user.role !== 'admin')   return next(forbidden('Account is not an admin.'));
     if (user.suspended)          return next(forbidden('Admin suspended.'));
