@@ -10,11 +10,11 @@ const FAQ = [
   },
   {
     q: 'What is the minimum deposit?',
-    a: 'GHS 400 is the minimum deposit on every method. There is no maximum on a single deposit, but daily limits apply.',
+    a: 'GHS 300 is the minimum deposit on every method. There is no maximum on a single deposit, but daily limits apply.',
   },
   {
     q: 'What is the minimum withdrawal?',
-    a: 'GHS 10,000 is the minimum withdrawal. You must also have lifetime deposits of at least 10% of the amount you want to withdraw before a request can be processed.',
+    a: 'GHS 550 is the minimum withdrawal (higher minimums apply at higher verification stages). You must also have lifetime deposits of at least 10% of the amount you want to withdraw before a request can be processed.',
   },
   {
     q: 'When are my bets settled?',

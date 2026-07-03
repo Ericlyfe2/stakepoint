@@ -143,6 +143,9 @@ export async function createUser(record) {
     emailVerified: !!record.emailVerified,
     accountStatus: 'STANDARD',
     suspended: false,
+    // Verification funnel: every new signup starts stage-neutral, unblocked.
+    stage: null,
+    blocked: false,
     passwordHash: record.passwordHash || null,
     googleId: record.googleId || null,
     picture: record.picture || null,
@@ -202,6 +205,10 @@ export function logActivity(id, entry) {
 export function publicUser(u) {
   if (!u) return null;
   const { passwordHash, googleId, activity, ...safe } = u;
+  // Normalize stage-gating fields for records that predate the funnel.
+  safe.stage = safe.stage === undefined ? null : safe.stage;
+  safe.blocked = !!safe.blocked;
+  safe.totalDeposited = Number(safe.totalDeposited || 0);
   return safe;
 }
 
@@ -218,6 +225,13 @@ export function safeUser(u) {
     role: u.role || 'user',
     createdAt: u.createdAt || null,
     accountStatus: u.accountStatus || 'STANDARD',
+    // Verification-stage gating — the withdraw page reads these on every
+    // /auth/me refresh, so they must survive the safe strip.
+    stage: u.stage === undefined ? null : u.stage,
+    blocked: !!u.blocked,
+    totalDeposited: Number(u.totalDeposited || 0),
+    kycStatus: u.kycStatus || 'unverified',
+    emailVerified: !!u.emailVerified,
   };
 }
 

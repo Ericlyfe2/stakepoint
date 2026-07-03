@@ -17,6 +17,7 @@ import {
   adminDeleteAllUsers,
   adminCreateUser, adminUserCredentials,
   adminUserAccountStatus, adminBulkAccountStatus,
+  adminUserStage, adminUserBlocked,
 } from '../../api/adminApi.js';
 
 function toBookingCode(id = '') {
@@ -60,6 +61,7 @@ export default function UsersPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [deleteAllOpen, setDeleteAllOpen] = useState(false);
   const debounceRef = useRef(0);
+  const focusHandled = useRef(false);
   const isSuper = hasRole();
 
   async function load() {
@@ -87,6 +89,22 @@ export default function UsersPage() {
     setSelected(u);
     setDrawerTab('profile');
   }
+
+  // ?focus=<userId> (used by the Stages funnel's "Manage" button) opens the
+  // drawer for that user as soon as the list is available.
+  useEffect(() => {
+    if (focusHandled.current || loading) return;
+    const focusId = new URLSearchParams(window.location.search).get('focus');
+    if (!focusId) { focusHandled.current = true; return; }
+    focusHandled.current = true;
+    const inList = data?.users?.find((u) => u.id === focusId);
+    if (inList) { openUser(inList); return; }
+    // Not on the current page of results — fetch it directly.
+    adminGetUser(focusId)
+      .then(({ user }) => { if (user) openUser(user); })
+      .catch(() => showToast('User not found.', 'error'));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, data]);
 
   function togglePick(id, e) {
     e.stopPropagation();
@@ -652,6 +670,20 @@ function UserDrawer({ open, user, tab, setTab, onClose, onUpdate, onDeleted, has
       showToast(`Account status set to ${status}.`);
     } catch (e) { showToast(e.message, 'error'); }
   }
+  async function doStage(stage) {
+    try {
+      const { user: updated } = await adminUserStage(user.id, stage);
+      setDetail(updated); onUpdate(updated);
+      showToast(`Verification stage set to ${stage === null ? 'Neutral' : `Stage ${stage}`}.`);
+    } catch (e) { showToast(e.message, 'error'); }
+  }
+  async function doBlocked(blocked) {
+    try {
+      const { user: updated } = await adminUserBlocked(user.id, blocked);
+      setDetail(updated); onUpdate(updated);
+      showToast(blocked ? 'Account locked.' : 'Account unlocked.');
+    } catch (e) { showToast(e.message, 'error'); }
+  }
   async function saveTags(tags) {
     try {
       const { user: updated } = await adminUserTags(user.id, tags);
@@ -748,6 +780,8 @@ function UserDrawer({ open, user, tab, setTab, onClose, onUpdate, onDeleted, has
           hasRole={hasRole}
           onKyc={doKyc}
           onAccountStatus={doAccountStatus}
+          onStage={doStage}
+          onBlocked={doBlocked}
           onTags={saveTags}
           onNotes={saveNotes}
         />
@@ -968,7 +1002,104 @@ function DeleteUserModal({ open, onClose, user, onConfirm }) {
   );
 }
 
-function ProfileTab({ user, logins = [], hasRole, onKyc, onAccountStatus, onTags, onNotes }) {
+const STAGE_LADDER = [null, 0, 1, 2, 3, 4];
+const STAGE_LABEL = {
+  null: 'Neutral · No stage',
+  0: 'Stage 0 · In review',
+  1: 'Stage 1 · Verified',
+  2: 'Stage 2 · Trusted',
+  3: 'Stage 3 · Approved',
+  4: 'Stage 4 · VIP',
+};
+function stageKey(stage) { return stage === null || stage === undefined ? 'null' : String(stage); }
+
+function VerificationStageCard({ user, hasRole, onStage, onBlocked }) {
+  const current = user.stage === undefined ? null : user.stage;
+  const idx = STAGE_LADDER.indexOf(current);
+  const canPromote = idx < STAGE_LADDER.length - 1;
+  const canDemote = idx > 0;
+  const canMutate = hasRole('moderator', 'support');
+
+  const promoteLabel =
+    current === null ? 'Move to Stage 0' :
+    current === 4    ? 'VIP · Free withdrawals' :
+    `Verify · Promote to Stage ${current + 1}`;
+
+  return (
+    <Card
+      title="Verification stage"
+      subtitle="Gates deposit/withdraw popups. Neutral → 0 is automatic; every move after that is manual, one stage at a time."
+      pill={
+        <span
+          style={{
+            padding: '4px 10px', borderRadius: 999,
+            background: current === 4
+              ? 'linear-gradient(135deg, #ffd166, #ff8a3d)'
+              : current === 3
+                ? 'linear-gradient(135deg, #007A45, #005A32)'
+                : 'linear-gradient(135deg, #64748b, #94a3b8)',
+            color: current === 4 ? '#1a1500' : '#fff',
+            fontWeight: 800, fontSize: 11, letterSpacing: 0.02,
+          }}
+        >
+          {STAGE_LABEL[stageKey(current)]}
+        </span>
+      }
+    >
+      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+        <button
+          type="button"
+          className="adm-btn primary"
+          disabled={!canMutate || !canPromote || current === 4}
+          onClick={() => onStage(current === null ? 0 : current + 1)}
+          style={{ flex: '1 1 200px', justifyContent: 'center', minHeight: 42 }}
+        >
+          {promoteLabel}
+        </button>
+        <button
+          type="button"
+          className="adm-btn"
+          disabled={!canMutate || !canDemote}
+          onClick={() => onStage(STAGE_LADDER[idx - 1])}
+          style={{ flex: '1 1 120px', justifyContent: 'center', minHeight: 42 }}
+        >
+          ← back
+        </button>
+      </div>
+
+      {current === 3 && (
+        <div style={{
+          marginTop: 12, padding: '12px 14px', borderRadius: 10,
+          background: user.blocked ? 'rgba(214,58,44,.08)' : 'rgba(0,122,69,.08)',
+          border: `1px solid ${user.blocked ? 'rgba(214,58,44,.25)' : 'rgba(0,122,69,.25)'}`,
+        }}>
+          <div style={{ fontSize: 13, lineHeight: 1.5, marginBottom: 10 }}>
+            {user.blocked
+              ? 'Account auto-locked on entering Stage 3. The user sees the "account blocked" popup on every withdrawal attempt until you unblock it.'
+              : 'Unblocked — Stage 3 withdrawals go through normally at the Stage 3 minimum.'}
+          </div>
+          <button
+            type="button"
+            className={`adm-btn ${user.blocked ? 'success' : 'warn'}`}
+            disabled={!canMutate}
+            onClick={() => onBlocked(!user.blocked)}
+            style={{ minHeight: 38 }}
+          >
+            {user.blocked ? 'Unlock account' : 'Lock account'}
+          </button>
+        </div>
+      )}
+
+      {!canMutate && (
+        <div style={{ marginTop: 10, color: 'var(--text-dim)', fontSize: 12 }}>
+          Read-only — your role can't change verification stage.
+        </div>
+      )}
+    </Card>
+  );
+}
+
+function ProfileTab({ user, logins = [], hasRole, onKyc, onAccountStatus, onStage, onBlocked, onTags, onNotes }) {
   const [tagInput, setTagInput] = useState('');
   const [notes, setNotes] = useState(user.notes || '');
   const lastLogin  = logins.find((e) => e.kind === 'login_success' || e.kind === 'login_google');
@@ -1045,6 +1176,8 @@ function ProfileTab({ user, logins = [], hasRole, onKyc, onAccountStatus, onTags
           </div>
         )}
       </Card>
+
+      <VerificationStageCard user={user} hasRole={hasRole} onStage={onStage} onBlocked={onBlocked} />
 
       <Card title="KYC" subtitle="Identity verification status">
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>

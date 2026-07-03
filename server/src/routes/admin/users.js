@@ -18,6 +18,7 @@ import { asyncHandler } from '../../utils/asyncHandler.js';
 import { badRequest, conflict, notFound } from '../../utils/httpError.js';
 import { hashPassword, passwordIssues } from '../../services/password.js';
 import { revokeAllForAccount } from '../../services/token.js';
+import { emitToUser, emitAdmin } from '../../services/realtime.js';
 
 const router = Router();
 
@@ -33,7 +34,7 @@ function expandUser(u) {
     ...safe,
     accountStatus: u.accountStatus || 'STANDARD',
     kycStatus: u.kycStatus || 'unverified',
-    stage: u.stage ?? 0,
+    stage: u.stage === undefined ? null : u.stage,
     stageUpdatedAt: u.stageUpdatedAt || null,
     stageUpdatedBy: u.stageUpdatedBy || null,
     blocked: !!u.blocked,
@@ -201,19 +202,24 @@ router.post('/bulk-account-status',
   })
 );
 
+// Ladder order for adjacency checks: Neutral (null) sits below Stage 0.
+const STAGE_LADDER = [null, 0, 1, 2, 3, 4];
+
 router.patch('/:id/stage',
   requireAdmin, requireRole('moderator', 'support'),
   validate(z.object({
-    stage: z.union([z.literal(0), z.literal(1), z.literal(2), z.literal(3), z.literal(4)]),
+    stage: z.union([z.null(), z.literal(0), z.literal(1), z.literal(2), z.literal(3), z.literal(4)]),
     note: z.string().max(500).optional(),
   })),
-  (req, res, next) => {
+  asyncHandler(async (req, res, next) => {
     const u = getUserById(req.params.id);
     if (!u) return next(notFound('User not found'));
-    const prev = u.stage ?? 0;
+    const prev = u.stage === undefined ? null : u.stage;
     const { stage, note } = req.body;
-    if (Math.abs(stage - prev) > 1) {
-      return next(badRequest(`Cannot jump from stage ${prev} to ${stage}. Move one stage at a time.`));
+    const prevIdx = STAGE_LADDER.indexOf(prev);
+    const nextIdx = STAGE_LADDER.indexOf(stage);
+    if (Math.abs(nextIdx - prevIdx) > 1) {
+      return next(badRequest(`Cannot jump from stage ${prev === null ? 'Neutral' : prev} to ${stage === null ? 'Neutral' : stage}. Move one stage at a time.`));
     }
     if (stage === prev) {
       return res.json({ user: expandUser(u) });
@@ -242,17 +248,29 @@ router.patch('/:id/stage',
       patch.blockedAt = null;
       patch.blockedBy = null;
     }
-    const next_ = updateUser(u.id, patch);
+    // A stage move that satisfies a pending self-serve promotion request
+    // clears the request flag (reserved for the future request-verification flow).
+    if (u.stagePromotionRequested && u.stagePromotionRequestedTo === stage) {
+      patch.stagePromotionRequested = false;
+      patch.stagePromotionRequestedTo = null;
+    }
+    const next_ = await updateUser(u.id, patch);
+    // Blocking (entering Stage 3) also kills every active session.
+    if (patch.blocked === true) revokeAllForAccount(u.id);
+    const promoted = nextIdx > prevIdx;
     audit(req, {
-      action: stage > prev ? 'user.stage.promote' : 'user.stage.demote',
+      action: promoted ? 'user.stage.promote' : 'user.stage.demote',
       target: u.id,
       targetType: 'user',
       severity: 'info',
       meta: { from: prev, to: stage, note },
     });
-    logActivity(u.id, { kind: `stage_${stage > prev ? 'promoted' : 'demoted'}_to_${stage}`, by: req.admin?.email, note });
+    logActivity(u.id, { kind: `stage_${promoted ? 'promoted' : 'demoted'}_to_${stage === null ? 'neutral' : stage}`, by: req.admin?.email, note });
+    // Push the change to the user's open tabs and to other admin dashboards.
+    emitToUser(u.id, 'account:stage-changed', { stage, blocked: !!next_.blocked });
+    emitAdmin('user:stage_changed', { userId: u.id, from: prev, to: stage, blocked: !!next_.blocked, by: req.admin?.email });
     res.json({ user: expandUser(next_) });
-  }
+  })
 );
 
 router.patch('/:id/blocked',
@@ -261,11 +279,11 @@ router.patch('/:id/blocked',
     blocked: z.boolean(),
     note: z.string().max(500).optional(),
   })),
-  (req, res, next) => {
+  asyncHandler(async (req, res, next) => {
     const u = getUserById(req.params.id);
     if (!u) return next(notFound('User not found'));
     const { blocked, note } = req.body;
-    const next_ = updateUser(u.id, {
+    const next_ = await updateUser(u.id, {
       blocked,
       blockedAt: blocked ? new Date().toISOString() : null,
       blockedBy: blocked ? (req.admin?.email || req.admin?.id || 'admin') : null,
@@ -278,8 +296,9 @@ router.patch('/:id/blocked',
       meta: { note },
     });
     logActivity(u.id, { kind: blocked ? 'admin_blocked' : 'admin_unblocked', by: req.admin?.email, note });
+    emitToUser(u.id, 'account:stage-changed', { stage: next_.stage === undefined ? null : next_.stage, blocked: !!next_.blocked });
     res.json({ user: expandUser(next_) });
-  }
+  })
 );
 
 router.patch('/:id/kyc',
@@ -288,13 +307,13 @@ router.patch('/:id/kyc',
     status: z.enum(['unverified', 'pending', 'verified', 'rejected']),
     note: z.string().max(500).optional(),
   })),
-  (req, res, next) => {
+  asyncHandler(async (req, res, next) => {
     const u = getUserById(req.params.id);
     if (!u) return next(notFound('User not found'));
-    const next_ = updateUser(u.id, { kycStatus: req.body.status });
+    const next_ = await updateUser(u.id, { kycStatus: req.body.status });
     audit(req, { action: 'user.kyc', target: u.id, targetType: 'user', meta: { status: req.body.status, note: req.body.note } });
     res.json({ user: expandUser(next_) });
-  }
+  })
 );
 
 router.patch('/:id/wallet',
@@ -319,25 +338,25 @@ router.patch('/:id/wallet',
 router.patch('/:id/tags',
   requireAdmin, requireRole('moderator', 'support'),
   validate(z.object({ tags: z.array(z.string().trim().min(1).max(40)).max(20) })),
-  (req, res, next) => {
+  asyncHandler(async (req, res, next) => {
     const u = getUserById(req.params.id);
     if (!u) return next(notFound('User not found'));
-    const next_ = updateUser(u.id, { tags: req.body.tags });
+    const next_ = await updateUser(u.id, { tags: req.body.tags });
     audit(req, { action: 'user.tags', target: u.id, targetType: 'user', meta: { tags: req.body.tags } });
     res.json({ user: expandUser(next_) });
-  }
+  })
 );
 
 router.patch('/:id/notes',
   requireAdmin, requireRole('moderator', 'support'),
   validate(z.object({ notes: z.string().max(2000) })),
-  (req, res, next) => {
+  asyncHandler(async (req, res, next) => {
     const u = getUserById(req.params.id);
     if (!u) return next(notFound('User not found'));
-    const next_ = updateUser(u.id, { notes: req.body.notes });
+    const next_ = await updateUser(u.id, { notes: req.body.notes });
     audit(req, { action: 'user.notes', target: u.id, targetType: 'user' });
     res.json({ user: expandUser(next_) });
-  }
+  })
 );
 
 router.post('/:id/reset-password',

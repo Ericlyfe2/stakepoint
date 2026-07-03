@@ -109,7 +109,7 @@ export default function WalletPage() {
               </header>
               <p className="wallet-split-desc">Add money to your wallet and start betting instantly.</p>
               <ul className="wallet-list">
-                <li><span>Minimum deposit</span><strong>GHS 400</strong></li>
+                <li><span>Minimum deposit</span><strong>GHS 300</strong></li>
                 <li><span>Methods</span><strong>MoMo · Vodafone · AirtelTigo · Card</strong></li>
                 <li><span>Fees</span><strong>0%</strong></li>
                 <li><span>Processing</span><strong>Instant</strong></li>

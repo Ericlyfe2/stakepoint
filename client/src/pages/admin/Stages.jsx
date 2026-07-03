@@ -22,26 +22,34 @@ import { useAdmin } from '../../providers/AdminProvider.jsx';
 
 const STAGES = [
   {
+    id: 'neutral',
+    title: 'Neutral',
+    name: 'No stage',
+    description: 'Default for every new signup. Any withdrawal attempt shows the "Deposit requirement" popup (needs GHS 1,000 deposited). Auto-promotes to Stage 0 the moment a single approved deposit hits GHS 1,000.',
+    accent: '#64748b',
+    gradient: 'linear-gradient(135deg, #334155 0%, #64748b 100%)',
+  },
+  {
     id: 0,
     title: 'Stage 0',
-    name: 'New',
-    description: 'Brand-new account · "Account not verified" banner is shown. Auto-promotes to Stage 1 the moment lifetime deposits hit GHS 1,000.',
+    name: 'In review',
+    description: 'Automatic — reached via a qualifying approved deposit while Neutral. Still shows the "Deposit requirement" popup. Min withdrawal GHS 550.',
     accent: '#94a3b8',
     gradient: 'linear-gradient(135deg, #475569 0%, #94a3b8 100%)',
   },
   {
     id: 1,
     title: 'Stage 1',
-    name: 'Registered',
-    description: 'Deposit-verified by the system. Verify the user manually to promote them to Stage 2.',
+    name: 'Verified',
+    description: 'Manual — admin promotes from Stage 0. Still gated behind the "Deposit requirement" popup (GHS 1,000). Min withdrawal GHS 550.',
     accent: '#7c5cff',
     gradient: 'linear-gradient(135deg, #7c5cff 0%, #22d3ee 100%)',
   },
   {
     id: 2,
     title: 'Stage 2',
-    name: 'Verified',
-    description: 'Manually verified by an admin. Verify again to approve them for Stage 3.',
+    name: 'Trusted',
+    description: '"Additional deposit required" popup — must have approved deposits ≥ 10% of the withdrawal amount. Min withdrawal GHS 10,000.',
     accent: '#f5a623',
     gradient: 'linear-gradient(135deg, #f5a623 0%, #ff6b1a 100%)',
   },
@@ -49,7 +57,7 @@ const STAGES = [
     id: 3,
     title: 'Stage 3',
     name: 'Approved',
-    description: 'Approved but auto-locked. The withdrawal popup keeps appearing until you unblock them or promote to Stage 4.',
+    description: 'Auto-locks the account the moment it enters this stage. Withdrawal shows the "account blocked" popup until an admin unblocks. Once unblocked, min withdrawal GHS 40,000.',
     accent: '#0E8A4A',
     gradient: 'linear-gradient(135deg, #007A45 0%, #005A32 100%)',
   },
@@ -57,15 +65,16 @@ const STAGES = [
     id: 4,
     title: 'Stage 4',
     name: 'VIP',
-    description: 'Full clearance. No popups, no blocks — withdrawals process straight through.',
+    description: 'Full clearance — no popups, no blocks, withdrawals go straight through. Min withdrawal GHS 50,000.',
     accent: '#ffd166',
     gradient: 'linear-gradient(135deg, #ffd166 0%, #ff8a3d 100%)',
   },
 ];
 
 const stageOf = (u) => {
-  const n = Number(u?.stage);
-  if (!Number.isFinite(n)) return 0;
+  if (u?.stage === null || u?.stage === undefined) return 'neutral';
+  const n = Number(u.stage);
+  if (!Number.isFinite(n)) return 'neutral';
   return Math.min(4, Math.max(0, n));
 };
 
@@ -76,7 +85,7 @@ const isDemoUser = (u) => /@example\.gh$/i.test(u?.email || '');
 export default function StagesPage() {
   const navigate = useNavigate();
   const { showToast } = useAdmin();
-  const [stageId, setStageId] = useState(0);
+  const [stageId, setStageId] = useState('neutral');
   const [q, setQ] = useState('');
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -101,7 +110,7 @@ export default function StagesPage() {
 
   // Counts per exact stage — each user lives in exactly one bucket.
   const counts = useMemo(() => {
-    const out = { 0: 0, 1: 0, 2: 0, 3: 0, 4: 0 };
+    const out = { neutral: 0, 0: 0, 1: 0, 2: 0, 3: 0, 4: 0 };
     for (const u of realUsers) out[stageOf(u)]++;
     return out;
   }, [realUsers]);
@@ -150,7 +159,7 @@ export default function StagesPage() {
       <header className="adm-page-head">
         <div>
           <h1>Player stages</h1>
-          <p>Every new account starts in <strong>Stage 1</strong>. Verify them to move up — one stage at a time.</p>
+          <p>Every new account starts <strong>Neutral</strong>. A qualifying deposit auto-promotes to Stage 0 — every move after that is manual, one stage at a time.</p>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           <button className="adm-btn" onClick={load}><IconRefresh size={14} /> Refresh</button>
@@ -162,7 +171,7 @@ export default function StagesPage() {
       <div className="stage-funnel">
         {STAGES.map((s) => {
           const active = stageId === s.id;
-          const totalReal = (counts[0] || 0) + (counts[1] || 0) + (counts[2] || 0) + (counts[3] || 0) + (counts[4] || 0);
+          const totalReal = (counts.neutral || 0) + (counts[0] || 0) + (counts[1] || 0) + (counts[2] || 0) + (counts[3] || 0) + (counts[4] || 0);
           const pct = totalReal ? Math.round((counts[s.id] / totalReal) * 100) : 0;
           return (
             <button
@@ -173,7 +182,7 @@ export default function StagesPage() {
               style={{ '--accent': s.accent, '--grad': s.gradient }}
             >
               <div className="stage-tile-head">
-                <span className="stage-tile-num">{s.id}</span>
+                <span className="stage-tile-num">{s.id === 'neutral' ? '—' : s.id}</span>
                 <span className="stage-tile-meta">
                   <strong>{s.title}</strong>
                   <em>{s.name}</em>
@@ -200,7 +209,7 @@ export default function StagesPage() {
           </Fragment>
         ))}
         <span className="stage-progress-label">
-          {loading ? 'Loading…' : `${numFmt(counts[0])} → ${numFmt(counts[1])} → ${numFmt(counts[2])} → ${numFmt(counts[3])} → ${numFmt(counts[4])}`}
+          {loading ? 'Loading…' : `${numFmt(counts.neutral)} → ${numFmt(counts[0])} → ${numFmt(counts[1])} → ${numFmt(counts[2])} → ${numFmt(counts[3])} → ${numFmt(counts[4])}`}
         </span>
       </div>
 
@@ -317,10 +326,11 @@ export default function StagesPage() {
 
               <div className="stage-card-badges">
                 {(() => {
-                  const meta = STAGES.find((s) => s.id === stageOf(u)) || STAGES[0];
+                  const sOf = stageOf(u);
+                  const meta = STAGES.find((s) => s.id === sOf) || STAGES[0];
                   return (
                     <span className="stage-pill" style={{ background: meta.gradient }}>
-                      Stage {stageOf(u)} · {meta.name}
+                      {sOf === 'neutral' ? 'Neutral' : `Stage ${sOf}`} · {meta.name}
                     </span>
                   );
                 })()}

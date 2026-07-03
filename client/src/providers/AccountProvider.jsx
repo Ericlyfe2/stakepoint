@@ -73,7 +73,7 @@ export default function AppProviders({ children }) {
   const [toasts, setToasts] = useState([]);
 
   const depositDlg  = useRef(null);
-  const MIN_DEPOSIT  = 400;
+  const MIN_DEPOSIT  = 300;
   const MAX_DEPOSIT  = 50000;
   const [depositAmt,  setDepositAmt]   = useState(String(MIN_DEPOSIT));
   const [depositMethod, setDepositMethod] = useState('momo');
@@ -322,6 +322,11 @@ export default function AppProviders({ children }) {
     const offStatus = onLive('account:status-changed', ({ accountStatus }) => {
       setAccount((prev) => prev ? { ...prev, accountStatus } : prev);
     });
+    // Verification-stage move or block/unblock from the admin panel — the
+    // withdraw page reads account.stage / account.blocked live.
+    const offStage = onLive('account:stage-changed', ({ stage, blocked }) => {
+      setAccount((prev) => prev ? { ...prev, stage: stage === undefined ? prev.stage : stage, blocked: !!blocked } : prev);
+    });
     const offAutoCashout = onLive('cashout:auto-triggered', ({ betId, amount, bet }) => {
       toast(`Auto cash-out triggered! GHS ${formatAmt(amount)} credited.`, 'success');
       if (bet) showWin({ ...bet, cashOut: amount, status: 'cashed_out' });
@@ -334,7 +339,7 @@ export default function AppProviders({ children }) {
     return () => {
       alive = false;
       clearInterval(id);
-      offWallet?.(); offPending?.(); offApproved?.(); offRejected?.(); offNotif?.(); offWin?.(); offSettled?.(); offStatus?.(); offAutoCashout?.(); offSuspended?.();
+      offWallet?.(); offPending?.(); offApproved?.(); offRejected?.(); offNotif?.(); offWin?.(); offSettled?.(); offStatus?.(); offStage?.(); offAutoCashout?.(); offSuspended?.();
     };
   }, [accountId]);
 

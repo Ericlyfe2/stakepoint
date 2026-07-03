@@ -3,19 +3,24 @@ import { z } from 'zod';
 import { requireAuth, requireEmailVerified } from '../middleware/auth.js';
 import { validate } from '../middleware/validate.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
-import { badRequest } from '../utils/httpError.js';
+import { badRequest, forbidden } from '../utils/httpError.js';
 import { updateUser, adjustBalance, logActivity } from '../db/users.js';
 import { createStore } from '../db/store.js';
 import { emitToUser, emitAdmin } from '../services/realtime.js';
 
-// Account progression is controlled exclusively by admins via the admin panel.
-// No automatic promotion or demotion based on deposits.
+// Every account starts stage-neutral (stage: null). The only automatic
+// stage transition is Neutral -> Stage 0, triggered when an admin approves
+// a deposit >= STAGE_PROMOTE_THRESHOLD while the user is still neutral
+// (see admin/deposits.js). Every other stage move (0 -> 1 -> 2 -> 3 -> 4)
+// is a manual admin action via PATCH /api/admin/users/:id/stage.
 
 const txStore = createStore('transactions', {});
 
-export const MIN_DEPOSIT = 400;
+export const MIN_DEPOSIT = 300;
 export const MIN_WITHDRAW = 550;
 export const WITHDRAW_DEPOSIT_RATIO = 0.10; // user must have deposited ≥ 10% of the requested withdrawal
+export const STAGE_PROMOTE_THRESHOLD = 1000;   // GHS — single approved deposit that trips Neutral -> Stage 0
+export const STAGE3_UNBLOCK_THRESHOLD = 2000;  // GHS — referenced deposit amount shown in the "blocked" popup
 
 const depositSchema = z.object({
   amount: z.number().min(MIN_DEPOSIT, `Minimum deposit is GHS ${MIN_DEPOSIT}.`).max(100000),
@@ -71,6 +76,15 @@ router.post('/deposit', requireAuth, validate(depositSchema), asyncHandler(async
 router.post('/withdraw', requireAuth, requireEmailVerified, validate(withdrawSchema), asyncHandler(async (req, res) => {
   const { amount, method = 'momo' } = req.body;
   const user = req.user;
+
+  // Stage 3 auto-blocks the account — no money leaves until an admin
+  // unblocks. The client shows the "account blocked" popup for this.
+  if (user.blocked) {
+    throw forbidden(
+      `Your account is blocked. Deposit GHS ${STAGE3_UNBLOCK_THRESHOLD.toLocaleString('en-US')} and contact support for review.`,
+      { code: 'ACCOUNT_BLOCKED' }
+    );
+  }
 
   const required = Number((amount * WITHDRAW_DEPOSIT_RATIO).toFixed(2));
   const totalDeposited = Number(user.totalDeposited || 0);

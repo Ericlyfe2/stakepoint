@@ -137,17 +137,17 @@ router.post('/login',
   asyncHandler(async (req, res) => {
     const { email, password, country: submittedCountry } = req.body;
 
-    /* ---- admin path (admin_accounts store) ---- */
+    /* ---- admin path (dedicated admin_accounts store) ---- */
     const adminAcct = getAdminByEmail(email);
     if (adminAcct) {
       bruteCheck(email);
       if (!verifyAdminPassword(adminAcct, password)) {
         bumpBrute(email);
-        recordAudit({ actorId: adminAcct.id, action: 'admin.login.failed', severity: 'warning', ip: req.ip, meta: { email } });
+        recordAudit({ actorId: adminAcct.id, action: 'admin.login.failed', severity: 'warning', ip: req.ip, meta: { email, via: 'unified' } });
         throw unauthorized('Incorrect email or password.');
       }
       if (adminAcct.suspended) {
-        recordAudit({ actorId: adminAcct.id, action: 'admin.login.suspended', severity: 'warning', ip: req.ip, meta: { email } });
+        recordAudit({ actorId: adminAcct.id, action: 'admin.login.suspended', severity: 'warning', ip: req.ip, meta: { email, via: 'unified' } });
         throw forbidden('Admin account suspended.');
       }
       clearBrute(email);
@@ -160,7 +160,7 @@ router.post('/login',
     const user = findByEmail(email);
     if (!user || !user.passwordHash) throw unauthorized('Incorrect email or password.');
 
-    /* ---- legacy admin path (users store) ---- */
+    /* ---- legacy admin path (admins still living in the users store) ---- */
     if (user.role === 'admin') {
       bruteCheck(email);
       const ok = await verifyPassword(password, user.passwordHash);

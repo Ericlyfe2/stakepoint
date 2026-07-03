@@ -36,6 +36,7 @@
 import { Server as IOServer } from 'socket.io';
 import { verifyAccessToken } from './token.js';
 import { getUserById } from '../db/users.js';
+import { getAdminById } from '../db/adminAccounts.js';
 import { isProd, CORS_ORIGINS, CORS_ALLOW_VERCEL } from '../config/env.js';
 import { buildOriginAllowlist } from '../utils/corsOrigin.js';
 import { log } from '../utils/logger.js';
@@ -146,7 +147,8 @@ export function attachRealtime(httpServer) {
     try {
       const claims = verifyAccessToken(token);
       if (claims.scope !== 'admin') return next(new Error('not an admin token'));
-      const u = getUserById(claims.sub);
+      // Admins live in admin_accounts; legacy admins may still be in users.
+      const u = getAdminById(claims.sub) || getUserById(claims.sub);
       if (!u || u.role !== 'admin' || u.suspended) return next(new Error('admin not active'));
       socket.data.admin = u;
       socket.data.adminClaims = claims;

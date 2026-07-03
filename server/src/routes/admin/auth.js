@@ -4,7 +4,7 @@ import speakeasy from 'speakeasy';
 import qrcode from 'qrcode';
 import { z } from 'zod';
 import { requireAdmin, audit } from '../../middleware/adminAuth.js';
-import { signAdminAccessToken, issueRefreshToken, rotateRefreshToken, revokeRefreshToken, revokeAllForAccount, verifyAccessToken } from '../../services/token.js';
+import { signAdminAccessToken, verifyAccessToken, issueRefreshToken, rotateRefreshToken, revokeRefreshToken, revokeAllForAccount } from '../../services/token.js';
 import { getAdminByEmail, getAdminById, verifyAdminPassword, recordAdminLogin, setAdminPassword } from '../../db/adminAccounts.js';
 import { createStore } from '../../db/store.js';
 import { emitAdmin } from '../../services/realtime.js';

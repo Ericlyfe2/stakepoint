@@ -7,6 +7,7 @@ import { badRequest, notFound } from '../../utils/httpError.js';
 import { getUserById, updateUser, adjustBalance, withUserLock, logActivity } from '../../db/users.js';
 import { createStore } from '../../db/store.js';
 import { emitToUser, emitAdmin } from '../../services/realtime.js';
+import { STAGE_PROMOTE_THRESHOLD } from '../wallet.js';
 
 const txStore = createStore('transactions', {});
 const router = Router();
@@ -66,7 +67,24 @@ router.post('/:id/approve',
       totalDeposited: newTotal,
     };
 
+    // The only automatic stage transition: Neutral -> Stage 0, triggered by
+    // a single approved deposit >= STAGE_PROMOTE_THRESHOLD while the user is
+    // still stage-neutral. Every later stage move is manual (admin/users.js).
+    const wasNeutral = user.stage === null || user.stage === undefined;
+    const autoPromoted = wasNeutral && amount >= STAGE_PROMOTE_THRESHOLD;
+    if (autoPromoted) {
+      patch.stage = 0;
+      patch.stageUpdatedAt = new Date().toISOString();
+      patch.stageUpdatedBy = 'system';
+    }
+
     const updated = await withUserLock(foundUserId, () => updateUser(foundUserId, patch));
+
+    if (autoPromoted) {
+      logActivity(foundUserId, { kind: 'stage_promoted_to_0', by: 'system', reason: 'auto_deposit_threshold', amount });
+      audit(req, { action: 'user.stage.promote', target: foundUserId, targetType: 'user', severity: 'info', meta: { from: null, to: 0, auto: true, amount } });
+      emitAdmin('user:stage_in_review', { userId: foundUserId, amount });
+    }
 
     const userTxs = txStore.get(foundUserId) || [];
     const updatedTxs = userTxs.map((t) =>
