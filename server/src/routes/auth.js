@@ -14,6 +14,7 @@ import { requireAuth } from '../middleware/auth.js';
 import {
   publicAdmin, bruteCheck, bumpBrute, clearBrute, issueAdminSession,
 } from './admin/auth.js';
+import { getAdminByEmail, verifyAdminPassword, recordAdminLogin } from '../db/adminAccounts.js';
 import { recordAudit } from '../db/audit.js';
 import { loginLimiter, registerLimiter } from '../middleware/rateLimit.js';
 import { validate } from '../middleware/validate.js';
@@ -135,10 +136,31 @@ router.post('/login',
   validate(loginSchema),
   asyncHandler(async (req, res) => {
     const { email, password, country: submittedCountry } = req.body;
+
+    /* ---- admin path (admin_accounts store) ---- */
+    const adminAcct = getAdminByEmail(email);
+    if (adminAcct) {
+      bruteCheck(email);
+      if (!verifyAdminPassword(adminAcct, password)) {
+        bumpBrute(email);
+        recordAudit({ actorId: adminAcct.id, action: 'admin.login.failed', severity: 'warning', ip: req.ip, meta: { email } });
+        throw unauthorized('Incorrect email or password.');
+      }
+      if (adminAcct.suspended) {
+        recordAudit({ actorId: adminAcct.id, action: 'admin.login.suspended', severity: 'warning', ip: req.ip, meta: { email } });
+        throw forbidden('Admin account suspended.');
+      }
+      clearBrute(email);
+      recordAdminLogin(adminAcct.id, req.ip, req.get('user-agent'));
+      const session = issueAdminSession(adminAcct, req);
+      recordAudit({ actorId: adminAcct.id, action: 'admin.login.success', ip: req.ip, meta: { email, via: 'unified' } });
+      return res.json({ ok: true, kind: 'admin', admin: publicAdmin(adminAcct), ...session });
+    }
+
     const user = findByEmail(email);
     if (!user || !user.passwordHash) throw unauthorized('Incorrect email or password.');
 
-    /* ---- admin path ---- */
+    /* ---- legacy admin path (users store) ---- */
     if (user.role === 'admin') {
       bruteCheck(email);
       const ok = await verifyPassword(password, user.passwordHash);
