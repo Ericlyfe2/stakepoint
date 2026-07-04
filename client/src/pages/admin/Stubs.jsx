@@ -4,7 +4,7 @@
  * and health endpoints where applicable so the dashboard never feels broken.
  */
 import { useEffect, useMemo, useState } from 'react';
-import { Card, Badge, Empty, Modal, moneyFmt, numFmt, ago, dateShort, Spinner } from '../../components/admin/primitives.jsx';
+import { Card, Badge, Drawer, Empty, Modal, moneyFmt, numFmt, ago, dateShort, Spinner } from '../../components/admin/primitives.jsx';
 import {
   adminAudit, adminHealth, adminLiveBets,
   adminListInvites, adminCreateInvite, adminRevokeInvite,
@@ -28,6 +28,19 @@ import {
   IconLock, IconRefresh, IconCheck, IconX, IconSearch, IconDownload, IconPlus, IconTrash,
   IconBan, IconFlag, IconSend, IconBarChart, IconAward, IconTrending,
 } from '../../components/admin/Icons.jsx';
+
+function Mini({ label, v }) {
+  return (
+    <div style={{
+      padding: 12, borderRadius: 12,
+      background: 'var(--surface-soft)',
+      border: '1px solid var(--border)',
+    }}>
+      <div style={{ fontSize: 11, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '.12em' }}>{label}</div>
+      <div style={{ fontSize: 18, fontWeight: 700, marginTop: 4, fontVariantNumeric: 'tabular-nums' }}>{v}</div>
+    </div>
+  );
+}
 
 function StatTile({ label, value }) {
   return (
