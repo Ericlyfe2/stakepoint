@@ -29,6 +29,15 @@ import {
   IconBan, IconFlag, IconSend, IconBarChart, IconAward, IconTrending,
 } from '../../components/admin/Icons.jsx';
 
+function StatTile({ label, value }) {
+  return (
+    <div className="adm-stat" style={{ '--accentGrad': 'linear-gradient(135deg,#7c5cff,#22d3ee)' }}>
+      <div className="lbl">{label}</div>
+      <div className="val">{value}</div>
+    </div>
+  );
+}
+
 function ComingSoon({ title, intro, items, icon }) {
   return (
     <>

@@ -132,6 +132,33 @@ function SvgShare({ size = 14 }) { return (<svg width={size} height={size} viewB
 function SvgSearch({ size = 16 }) { return (<svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>); }
 function SvgTrendUp({ size = 12 }) { return (<svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>); }
 function SvgTrendDown({ size = 12 }) { return (<svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"/><polyline points="17 18 23 18 23 12"/></svg>); }
+function SvgArrowUp({ size = 13 }) { return (<svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>); }
+function SvgArrowDown({ size = 13 }) { return (<svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg>); }
+function SvgPlayCircle({ size = 20 }) { return (<svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8" fill="currentColor" stroke="none"/></svg>); }
+function SvgCheckCircle({ size = 20 }) { return (<svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden><circle cx="12" cy="12" r="10" fill="#22c66e"/><polyline points="8 12.5 11 15.5 16 9.5" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>); }
+function SvgBall({ size = 13 }) { return (<svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden><circle cx="12" cy="12" r="10"/><path d="M12 7l4.2 3-1.6 5h-5.2l-1.6-5z" fill="currentColor" stroke="none"/><path d="M12 2v5M4.5 6.5l3.3 3.5M19.5 6.5l-3.3 3.5M6 20l2.6-4.5M18 20l-2.6-4.5"/></svg>); }
+
+/* ── Live leg helpers ── */
+function legLive(l) { return l?.live || null; }
+
+// "73'" → "73' H2"; 40 → "40' H1"; missing → "LIVE"
+function liveMinuteLabel(live) {
+  const raw = String(live?.minute ?? '').replace(/[^0-9]/g, '');
+  if (!raw) return 'LIVE';
+  const m = Number(raw);
+  const half = m <= 45 ? 'H1' : 'H2';
+  return `${m}' ${half}`;
+}
+
+function liveScoreLabel(live) {
+  if (live?.scoreHome == null || live?.scoreAway == null) return null;
+  return `${live.scoreHome}:${live.scoreAway}`;
+}
+
+function betHasLiveLeg(bet) {
+  if (bet?.anyLive) return true;
+  return (bet?.legs || []).some((l) => l?.live?.isLive);
+}
 
 /* ─────────── Ticket Details Overlay (SportyBet-style) ─────────── */
 function TicketDetails({ bet, onClose, onRemix, onShare }) {
@@ -348,7 +375,8 @@ function TicketDetails({ bet, onClose, onRemix, onShare }) {
 }
 
 /* ─────────── BetCard (design-handoff: colored header bar) ─────────── */
-function BetCardView({ bet, onCashout, onRemix, onDetails, copiedCode, onCopy, autoTarget, onAutoTargetChange, onAutoClear, cashoutBusy }) {
+// Exported for component tests (live-ticket rendering).
+export function BetCardView({ bet, onCashout, onRemix, onDetails, copiedCode, onCopy, autoTarget, onAutoTargetChange, onAutoClear, cashoutBusy }) {
   const [expanded, setExpanded] = useState(false);
   const isOpen = bet.status === 'open';
   const cashOutAmount = isOpen ? computeOffer(bet) : 0;
@@ -403,7 +431,10 @@ function BetCardView({ bet, onCashout, onRemix, onDetails, copiedCode, onCopy, a
 
         {/* Mode header with actions */}
         <div className="xh-open-mode-row" onClick={() => setExpanded(!expanded)}>
-          <span className="xh-open-mode">{modeLabel}</span>
+          <span className="xh-open-mode-wrap">
+            <span className="xh-open-mode">{modeLabel}</span>
+            {betHasLiveLeg(bet) && <span className="xh-live-badge">Live</span>}
+          </span>
           <div className="xh-open-actions">
             <button type="button" className="xh-open-action" onClick={e => { e.stopPropagation(); onRemix?.(bet); }}>
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg>
@@ -434,21 +465,63 @@ function BetCardView({ bet, onCashout, onRemix, onDetails, copiedCode, onCopy, a
               <div className="xh-open-expanded">
                 {legs.map((leg, i) => {
                   const pick = leg.outcome || leg.pick || leg.selection || '—';
-                  const odds = leg.odds ? `@ ${Number(leg.odds).toFixed(2)}` : '';
+                  const odds = leg.odds ? `@${Number(leg.odds).toFixed(2)}` : '';
                   const lgName = leg.league || leg.competition || '';
                   const matchLabel = leg.home && leg.away ? `${leg.home} vs ${leg.away}` : leg.match || leg.event || 'Match';
+                  const live = legLive(leg);
+                  const isLegLive = !!live?.isLive;
+                  const isFT = !!live?.finished;
+                  const score = liveScoreLabel(live);
+                  const suspended = !!live?.suspended;
+                  const dir = live?.direction;
+                  const curOdds = live?.currentOdds;
                   return (
-                    <div key={i} className="xh-open-leg">
-                      <div className="xh-open-leg-pick">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
-                        <span><strong>{getPickName(pick)} {odds}</strong> <span className="xh-open-leg-mkt">{getMarketName(leg.market)}</span></span>
+                    <div key={i} className={`xh-open-leg${isLegLive ? ' is-live' : ''}`}>
+                      <div className="xh-open-leg-flex">
+                        <span className={`xh-leg-status-icon${isFT ? ' ft' : ''}`}>
+                          {isFT ? <SvgCheckCircle /> : <SvgPlayCircle />}
+                        </span>
+                        <div className="xh-open-leg-main">
+                          <div className="xh-open-leg-pick">
+                            <SvgBall />
+                            <span><strong>{getPickName(pick)} {odds}</strong> <span className="xh-open-leg-mkt">{getMarketName(leg.market)}</span></span>
+                          </div>
+                          {isLegLive && (
+                            <div className="xh-leg-live-odds-row">
+                              {suspended ? (
+                                <span className="xh-live-chip suspended">Live Odds Suspended</span>
+                              ) : (
+                                <>
+                                  <span className="xh-live-chip">Live Odds</span>
+                                  {curOdds != null && (
+                                    <span className={`xh-live-odds-val${dir === 'up' ? ' up' : dir === 'down' ? ' down' : ''}`}>
+                                      {Number(curOdds).toFixed(2)}
+                                      {dir === 'up' && <SvgArrowUp />}
+                                      {dir === 'down' && <SvgArrowDown />}
+                                    </span>
+                                  )}
+                                </>
+                              )}
+                            </div>
+                          )}
+                          <div className="xh-open-leg-match"><u>{leg.home || matchLabel}</u> <span className="xh-leg-vs">vs</span> <u>{leg.away || ''}</u></div>
+                          {isLegLive ? (
+                            <div className="xh-leg-live-status">{liveMinuteLabel(live)}{score ? <> | <strong>{score}</strong></> : null}</div>
+                          ) : isFT ? (
+                            <div className="xh-leg-ft-status">FT{score ? ` | ${score}` : ''}</div>
+                          ) : (
+                            <div className="xh-open-leg-date">{legDate}</div>
+                          )}
+                        </div>
                       </div>
-                      <div className="xh-open-leg-match">{matchLabel}</div>
-                      <div className="xh-open-leg-date">{legDate}</div>
                       {lgName && <div className="xh-open-leg-league-row">
                         <span className="xh-open-league-badge">{lgName}</span>
-                        <button type="button" className="xh-open-hide-details" onClick={e => { e.stopPropagation(); setExpanded(false); }}>Hide Match Details</button>
                       </div>}
+                      {i === legs.length - 1 && (
+                        <div className="xh-open-leg-league-row" style={{ justifyContent: 'flex-end', marginTop: 6 }}>
+                          <button type="button" className="xh-open-hide-details" onClick={e => { e.stopPropagation(); setExpanded(false); }}>Hide Match Details ▲</button>
+                        </div>
+                      )}
                     </div>
                   );
                 })}
@@ -485,6 +558,12 @@ function BetCardView({ bet, onCashout, onRemix, onDetails, copiedCode, onCopy, a
               <div className="xh-open-compact" onClick={() => setExpanded(true)}>
                 <div className="xh-open-compact-info">
                   <span className="xh-open-match">{matchName}</span>
+                  {legLive(firstLeg)?.isLive && (
+                    <span className="xh-leg-live-status">
+                      {liveMinuteLabel(legLive(firstLeg))}
+                      {liveScoreLabel(legLive(firstLeg)) ? <> | <strong>{liveScoreLabel(legLive(firstLeg))}</strong></> : null}
+                    </span>
+                  )}
                   <span className="xh-open-stake">Stake: {fmt(bet.stake)}</span>
                   {league && <span className="xh-open-league-badge">{league}</span>}
                 </div>
@@ -553,7 +632,9 @@ export default function BetHistoryPage() {
 
   // Data
   const [bets, setBets] = useState([]);
-  const [busy, setBusy] = useState(false);
+  // Start busy: the first paint must show the skeleton, not the empty state,
+  // or AnimatePresence(mode="wait") can wedge on the empty→loading→list swap.
+  const [busy, setBusy] = useState(true);
   const [error, setError] = useState(null);
 
   // Tab
@@ -1086,6 +1167,27 @@ const XH_CSS = `
 
 /* League badge */
 .xh-open-league-badge { display: inline-block; padding: 3px 10px; border-radius: 5px; border: 1px solid var(--accent); color: var(--accent); font-size: 10.5px; font-weight: 700; margin-top: 2px; }
+
+/* ── Live ticket elements ── */
+.xh-open-mode-wrap { display: inline-flex; align-items: center; gap: 8px; }
+.xh-live-badge { display: inline-flex; align-items: center; background: #0E8A4A; color: #fff; font-size: 10px; font-weight: 800; letter-spacing: .4px; padding: 2px 8px; border-radius: 4px; text-transform: uppercase; animation: xhLivePulse 2s ease-in-out infinite; }
+@keyframes xhLivePulse { 0%, 100% { opacity: 1; } 50% { opacity: .65; } }
+.xh-open-leg-flex { display: flex; align-items: flex-start; gap: 10px; }
+.xh-leg-status-icon { flex-shrink: 0; color: var(--text-dim); display: grid; place-items: center; margin-top: 2px; }
+.xh-leg-status-icon.ft { color: #22c66e; }
+.xh-open-leg-main { flex: 1; min-width: 0; }
+.xh-leg-live-odds-row { display: flex; align-items: center; gap: 8px; margin: 3px 0 5px; }
+.xh-live-chip { display: inline-flex; align-items: center; background: var(--surface-2); border: 1px solid var(--line); color: var(--text-soft); font-size: 10.5px; font-weight: 700; padding: 2px 8px; border-radius: 4px; }
+.xh-live-chip.suspended { color: var(--text-dim); font-style: normal; }
+.xh-live-odds-val { display: inline-flex; align-items: center; gap: 2px; font-size: 13px; font-weight: 800; color: var(--text); font-variant-numeric: tabular-nums; }
+.xh-live-odds-val.up { color: #22c66e; }
+.xh-live-odds-val.down { color: #e53935; }
+.xh-leg-vs { color: var(--text-dim); font-size: 11px; font-weight: 500; }
+.xh-open-leg-match u { text-decoration-color: var(--text-dim); text-underline-offset: 2px; }
+.xh-leg-live-status { color: #0E8A4A; font-size: 12.5px; font-weight: 700; margin-top: 2px; font-variant-numeric: tabular-nums; }
+.xh-leg-live-status strong { color: #0E8A4A; font-weight: 800; }
+.xh-leg-ft-status { color: var(--text-dim); font-size: 12px; font-weight: 600; margin-top: 2px; font-variant-numeric: tabular-nums; }
+.xh-open-leg.is-live { border-left: 2px solid #0E8A4A; padding-left: 8px; margin-left: -10px; }
 
 /* Expanded view */
 .xh-open-expanded { padding: 0 13px 12px; }

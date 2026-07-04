@@ -1318,3 +1318,36 @@
   .stage-card-stats dd { font-size: 13.5px; }
   .stage-card-id .name { font-size: 13.5px; }
 }
+
+/* ═════════ Live Control ═════════ */
+.adm-live-card { padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 14px; }
+.adm-live-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.adm-live-title { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.adm-live-title strong { font-size: 15px; }
+.adm-live-league { color: var(--text-dim); font-size: 12px; }
+.adm-live-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.adm-live-score-row { display: grid; grid-template-columns: 1fr auto 1fr; gap: 14px; align-items: center;
+  background: var(--surface-2); border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; }
+.adm-live-scorebox { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.adm-live-scorebox-team { font-weight: 700; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.adm-live-scorebox-ctl { display: flex; align-items: center; gap: 8px; }
+.adm-live-scorebox-val { font-size: 22px; font-weight: 800; min-width: 26px; text-align: center; font-variant-numeric: tabular-nums; }
+.adm-live-clock { text-align: center; display: flex; flex-direction: column; gap: 8px; align-items: center; }
+.adm-live-clock-val { font-size: 26px; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: 1px; }
+.adm-live-clock-ctl { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; justify-content: center; }
+.adm-live-min { font-weight: 800; color: var(--danger); min-width: 34px; text-align: center; font-variant-numeric: tabular-nums; }
+.adm-live-markets { display: flex; flex-direction: column; gap: 10px; }
+.adm-live-market { border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; }
+.adm-live-market-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
+.adm-live-market-name { font-weight: 700; font-size: 13px; display: inline-flex; align-items: center; gap: 8px; }
+.adm-live-sels { display: flex; flex-wrap: wrap; gap: 8px; }
+.adm-live-sel { display: flex; align-items: center; gap: 8px; background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: 8px; padding: 6px 10px; }
+.adm-live-sel.locked { opacity: .75; }
+.adm-live-sel-key { font-size: 12px; font-weight: 700; color: var(--text-soft); max-width: 110px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.adm-live-sel-ctl { display: inline-flex; align-items: center; gap: 4px; }
+.adm-live-odds-input { height: 30px !important; width: 74px; text-align: right; font-variant-numeric: tabular-nums; }
+@media (max-width: 720px) {
+  .adm-live-score-row { grid-template-columns: 1fr; }
+  .adm-live-clock { order: -1; }
+}

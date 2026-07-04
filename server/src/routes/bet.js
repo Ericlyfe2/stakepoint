@@ -112,7 +112,8 @@ function listUserBets(userId) {
   return Object.values(betsStore.all())
     .filter((b) => b.userId === userId)
     .sort((a, b) => (a.placedAt < b.placedAt ? 1 : -1))
-    .map(attachCashoutOffer);
+    .map(attachCashoutOffer)
+    .map(attachLiveState);
 }
 
 function computeCashoutEstimate(bet) {
@@ -126,6 +127,44 @@ function attachCashoutOffer(bet) {
   if (bet.lastCashOutOffer?.amount != null) return bet;
   const cashoutOffer = computeCashoutEstimate(bet);
   return { ...bet, cashoutOffer };
+}
+
+/**
+ * Decorate each leg of an open ticket with the current fixture state so the
+ * client can render live tickets: score, minute, suspension, and the current
+ * (possibly admin-overridden) odds for the exact selection that was taken.
+ * Never persisted — computed fresh on every history read.
+ */
+function attachLiveState(bet) {
+  if (bet.status !== 'open') return bet;
+  let anyLive = false;
+  const legs = (bet.legs || []).map((l) => {
+    const view = adminLookupFixture(l.matchId);
+    const fx = view?.match || view;
+    if (!fx || !fx.home) return l;
+    const mk = fx.markets?.[l.market];
+    const sel = mk?.selections?.find((s) => s.key === l.outcome);
+    const currentOdds = sel?.odds != null ? Number(sel.odds) : null;
+    const placed = l.odds != null ? Number(l.odds) : null;
+    const isLive = !!fx.isLive && !fx.finished;
+    if (isLive) anyLive = true;
+    return {
+      ...l,
+      live: {
+        isLive,
+        finished: !!fx.finished,
+        minute: fx.minute || null,
+        scoreHome: fx.scoreHome ?? null,
+        scoreAway: fx.scoreAway ?? null,
+        suspended: !!(fx.suspended || mk?.suspended || sel?.suspended),
+        currentOdds,
+        direction: currentOdds != null && placed != null
+          ? (currentOdds > placed + 1e-9 ? 'up' : currentOdds < placed - 1e-9 ? 'down' : 'same')
+          : null,
+      },
+    };
+  });
+  return { ...bet, legs, anyLive };
 }
 
 function hasConflictingPicks(selections) {

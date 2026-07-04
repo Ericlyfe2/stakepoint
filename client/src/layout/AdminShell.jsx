@@ -15,6 +15,7 @@ const NAV = [
   { section: 'Overview', items: [
     { to: '/admin', label: 'Dashboard', icon: <IconDashboard />, exact: true, perm: null },
     { to: '/admin/live', label: 'Live betting', icon: <IconLive />, badge: 'LIVE', perm: 'live.manage' },
+    { to: '/admin/live-control', label: 'Live Control', icon: <IconTarget />, badge: 'LIVE', perm: 'live.manage' },
     { to: '/admin/analytics', label: 'Analytics', icon: <IconChart />, perm: null },
   ]},
   { section: 'Sportsbook', items: [

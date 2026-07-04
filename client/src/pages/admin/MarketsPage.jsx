@@ -64,16 +64,6 @@ export default function MarketsPage() {
     } catch (e) { show(e.message, 'error'); }
   };
 
-  const stats = [
-    ...SPORTS.map((s) => ({
-      label: s.label,
-      value: (r.markets || []).filter((m) => m.sport === s.id).length,
-    })),
-    { label: 'Total Markets', value: (r?.markets || []).length },
-  ];
-
-  const r = { markets }; // for stats
-
   return (
     <div className="adm-page">
       <div className="adm-page-head">

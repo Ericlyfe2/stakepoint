@@ -78,7 +78,11 @@ export function LineChart({
       y: padT + innerH - (Number(p.y) || 0) / max * innerH,
       raw: p,
     }));
-    return { ...s, points, linePath: pathSmooth(points), areaPath: `${pathSmooth(points)} L${padL + (points.length - 1) * xStep},${padT + innerH} L${padL},${padT + innerH} Z` };
+    const linePath = pathSmooth(points);
+    const areaPath = points.length
+      ? `${linePath} L${padL + (points.length - 1) * xStep},${padT + innerH} L${padL},${padT + innerH} Z`
+      : '';
+    return { ...s, points, linePath, areaPath };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }), [series, max, xStep, innerH, innerW]);
 

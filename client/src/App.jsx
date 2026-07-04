@@ -44,6 +44,7 @@ import WithdrawalsPage from './pages/admin/WithdrawalsPage.jsx';
 import MarketsPage from './pages/admin/MarketsPage.jsx';
 import TradingDeskPage from './pages/admin/TradingDeskPage.jsx';
 import ResultsPage from './pages/admin/ResultsPage.jsx';
+import LiveControlPage from './pages/admin/LiveControl.jsx';
 import {
   LiveBettingPage, AuditLogsPage, SettingsPage,
   FinancePage, NotificationsPage, SupportPage, FraudPage,
@@ -65,7 +66,10 @@ function AdminApp() {
             <Route path="stages"        element={<AdminStages />} />
             <Route path="bets"          element={<AdminBets />} />
             <Route path="live"          element={<LiveBettingPage />} />
+            <Route path="live-control"  element={<LiveControlPage />} />
             <Route path="sports"        element={<AdminSports />} />
+            <Route path="fixtures"      element={<AdminSports />} />
+            <Route path="fixtures/:id"  element={<AdminSports />} />
             <Route path="leagues"       element={<LeaguesPage />} />
             <Route path="teams"         element={<TeamsPage />} />
             <Route path="markets"       element={<MarketsPage />} />
