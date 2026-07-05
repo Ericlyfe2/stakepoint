@@ -22,6 +22,21 @@ export const WITHDRAW_DEPOSIT_RATIO = 0.10; // user must have deposited ≥ 10% 
 export const STAGE_PROMOTE_THRESHOLD = 1000;   // GHS — single approved deposit that trips Neutral -> Stage 0
 export const STAGE3_UNBLOCK_THRESHOLD = 2000;  // GHS — referenced deposit amount shown in the "blocked" popup
 
+// Minimum withdrawal scales with stage — mirrors client/src/pages/WithdrawPage.jsx
+// and the admin funnel copy in client/src/pages/admin/Stages.jsx. Stage 0/1 have
+// no entry here on purpose: those stages can never withdraw (see the STAGE_GATE
+// check below), matching the client, which never lets them submit for real.
+export const STAGE_MIN_WITHDRAW = { 2: 10_000, 3: 40_000, 4: 50_000 };
+
+// Normalizes user.stage (null/undefined = "Neutral") to null or a 0-4 int,
+// same convention used by admin/users.js's STAGE_LADDER and Stages.jsx's stageOf().
+function normalizedStage(user) {
+  if (user.stage === null || user.stage === undefined) return null;
+  const n = Number(user.stage);
+  if (!Number.isFinite(n)) return null;
+  return Math.min(4, Math.max(0, n));
+}
+
 const depositSchema = z.object({
   amount: z.number().min(MIN_DEPOSIT, `Minimum deposit is GHS ${MIN_DEPOSIT}.`).max(100000),
   method: z.string().trim().max(40).optional(),
@@ -83,6 +98,26 @@ router.post('/withdraw', requireAuth, requireEmailVerified, validate(withdrawSch
     throw forbidden(
       `Your account is blocked. Deposit GHS ${STAGE3_UNBLOCK_THRESHOLD.toLocaleString('en-US')} and contact support for review.`,
       { code: 'ACCOUNT_BLOCKED' }
+    );
+  }
+
+  // Neutral / Stage 0 / Stage 1 are gated behind manual admin verification —
+  // the client never lets these stages submit a real withdrawal (it always
+  // shows the "Deposit requirement" popup instead), so the server must
+  // refuse them too or the gate is a client-side-only illusion.
+  const stage = normalizedStage(user);
+  if (stage === null || stage === 0 || stage === 1) {
+    throw forbidden(
+      `You need to deposit GHS ${STAGE_PROMOTE_THRESHOLD.toLocaleString('en-US')} and be verified by an admin before withdrawing.`,
+      { code: 'STAGE_GATE', stage }
+    );
+  }
+
+  const stageMinWithdraw = STAGE_MIN_WITHDRAW[stage] ?? MIN_WITHDRAW;
+  if (amount < stageMinWithdraw) {
+    throw badRequest(
+      `Minimum withdrawal for your account stage is GHS ${stageMinWithdraw.toLocaleString('en-US')}.`,
+      { code: 'STAGE_MIN_WITHDRAW', stageMinWithdraw }
     );
   }
 

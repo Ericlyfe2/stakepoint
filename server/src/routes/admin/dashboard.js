@@ -28,7 +28,9 @@ function startOfDay(d) {
   return x;
 }
 function dayKey(d) {
-  return startOfDay(d).toISOString().slice(0, 10);
+  const x = startOfDay(d);
+  if (Number.isNaN(x.getTime())) return null;
+  return x.toISOString().slice(0, 10);
 }
 function lastNDays(n) {
   const out = [];
