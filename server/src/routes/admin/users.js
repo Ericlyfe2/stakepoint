@@ -205,6 +205,17 @@ router.post('/bulk-account-status',
 // Ladder order for adjacency checks: Neutral (null) sits below Stage 0.
 const STAGE_LADDER = [null, 0, 1, 2, 3, 4];
 
+// Legacy/imported records can have stage stored as a string ("0") instead of
+// a number — STAGE_LADDER.indexOf() uses strict equality, so an un-normalized
+// value silently misses the array and reads as -1, making even an adjacent
+// single-stage promotion look like an illegal multi-stage jump.
+function normalizeStage(v) {
+  if (v === null || v === undefined) return null;
+  const n = Number(v);
+  if (!Number.isFinite(n)) return null;
+  return Math.min(4, Math.max(0, Math.round(n)));
+}
+
 router.patch('/:id/stage',
   requireAdmin, requireRole('moderator', 'support'),
   validate(z.object({
@@ -214,7 +225,7 @@ router.patch('/:id/stage',
   asyncHandler(async (req, res, next) => {
     const u = getUserById(req.params.id);
     if (!u) return next(notFound('User not found'));
-    const prev = u.stage === undefined ? null : u.stage;
+    const prev = normalizeStage(u.stage);
     const { stage, note } = req.body;
     const prevIdx = STAGE_LADDER.indexOf(prev);
     const nextIdx = STAGE_LADDER.indexOf(stage);
