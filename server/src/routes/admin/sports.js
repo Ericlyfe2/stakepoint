@@ -20,7 +20,7 @@ import { validate } from '../../middleware/validate.js';
 import { asyncHandler } from '../../utils/asyncHandler.js';
 import { badRequest, notFound } from '../../utils/httpError.js';
 import {
-  compiledLeagues, adminListFixtures, adminLookupFixture,
+  compiledLeagues, adminListFixtures, adminLookupFixture, readSportsAdmin,
   patchOverride, setOddsOverride, clearOddsOverride,
   setSuspension, clearSuspension, setResult,
   addCustomFixture, deleteCustomFixture, addCustomLeague, updateCustomLeague, deleteCustomLeague,
@@ -138,11 +138,29 @@ const createFixtureSchema = z.object({
   extraMarkets: z.array(extraMarketItem).optional(),
 });
 
+// Rapid duplicate submits (double-click, slow-network retry, multiple tabs)
+// must not create separate fixtures — collapse them into the one already made.
+const DUPLICATE_WINDOW_MS = 15_000;
+function findRecentDuplicateFixture(b) {
+  const now = Date.now();
+  const norm = (s) => String(s || '').trim().toLowerCase();
+  const custom = readSportsAdmin().custom || {};
+  return Object.values(custom).find((fx) =>
+    fx.sport === b.sport &&
+    fx.leagueId === b.leagueId &&
+    norm(fx.home) === norm(b.home) &&
+    norm(fx.away) === norm(b.away) &&
+    fx.createdAt && (now - new Date(fx.createdAt).getTime()) < DUPLICATE_WINDOW_MS
+  ) || null;
+}
+
 router.post('/fixtures',
   requireAdmin, requireRole('odds_manager'),
   validate(createFixtureSchema),
   (req, res) => {
     const b = req.body;
+    const dupe = findRecentDuplicateFixture(b);
+    if (dupe) return res.status(200).json({ fixture: dupe, deduped: true });
     const id = `adm-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
     const markets = buildFixtureMarkets(b);
     const fx = {

@@ -6,7 +6,7 @@
  *    suspend whole match / market / selection, record final score + auto-settle.
  *  - Quick "Settle now" runs the global engine on demand.
  */
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   adminFixtures, adminFixture, adminCreateFixture, adminPatchFixture, adminDeleteFixture,
   adminPatchOdds, adminResetOdds, adminSuspend, adminClearSuspend,
@@ -550,14 +550,19 @@ function AddMarketModal({ open, onClose, fx, onSubmit }) {
 function CreateFixtureModal({ open, onClose, leagues, onCreated, showToast }) {
   const [form, setForm] = useState({ sport: 'football', leagueId: '', home: '', away: '', kickoff: '', day: 'Today', isLive: false, homeOdds: '2.10', drawOdds: '3.40', awayOdds: '3.10', ouOver: '1.95', ouUnder: '1.85', bttsYes: '1.78', bttsNo: '1.98', dc1X: '1.25', dcX2: '1.35', dc12: '1.20' });
   const [submitting, setSubmitting] = useState(false);
+  const submittingRef = useRef(false);
   const eligible = leagues.filter((l) => l.sport === form.sport);
-  useEffect(() => { if (open) setForm((f) => ({ ...f, leagueId: '' })); }, [open]);
+  useEffect(() => { if (open) { setForm((f) => ({ ...f, leagueId: '' })); submittingRef.current = false; } }, [open]);
 
   async function submit(e) {
     e.preventDefault();
-    if (submitting) return;
+    // submittingRef is a synchronous lock — React state updates are async, so
+    // two clicks fired back-to-back before the first re-render commits could
+    // both read submitting=false from a stale closure and double-post.
+    if (submittingRef.current) return;
     if (!form.leagueId) return showToast('Pick a league.', 'error');
     if (!form.home || !form.away) return showToast('Both teams required.', 'error');
+    submittingRef.current = true;
     setSubmitting(true);
     try {
       await adminCreateFixture({
@@ -582,7 +587,7 @@ function CreateFixtureModal({ open, onClose, leagues, onCreated, showToast }) {
       });
       onCreated();
     } catch (e) { showToast(e.message, 'error'); }
-    finally { setSubmitting(false); }
+    finally { submittingRef.current = false; setSubmitting(false); }
   }
 
   return (
