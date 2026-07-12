@@ -484,7 +484,19 @@ function AddMarketModal({ open, onClose, fx, onSubmit }) {
       'ML': { name: 'Money Line', selections: [{ key: '1', label: 'Home', odds: '2.10' }, { key: '2', label: 'Away', odds: '1.70' }] },
       'TP': { name: 'Total Points', selections: [{ key: 'Over', label: 'Over', odds: '1.90' }, { key: 'Under', label: 'Under', odds: '1.90' }] },
       'HCAP': { name: 'Handicap', selections: [{ key: '1H', label: 'Home', odds: '1.90' }, { key: '2H', label: 'Away', odds: '1.90' }] },
-      'CS': { name: 'Correct Score', selections: [{ key: '1-0', label: '1-0', odds: '7.00' }, { key: '2-0', label: '2-0', odds: '9.00' }, { key: '2-1', label: '2-1', odds: '8.00' }, { key: '0-0', label: '0-0', odds: '6.00' }, { key: '1-1', label: '1-1', odds: '6.50' }, { key: '0-1', label: '0-1', odds: '7.50' }, { key: '0-2', label: '0-2', odds: '10.00' }, { key: '1-2', label: '1-2', odds: '9.00' }] },
+      'CS': { name: 'Correct Score', selections: [
+        // Home wins
+        { key: '1-0', label: '1-0', odds: '8.80' }, { key: '2-0', label: '2-0', odds: '9.00' }, { key: '2-1', label: '2-1', odds: '8.40' },
+        { key: '3-0', label: '3-0', odds: '14.00' }, { key: '3-1', label: '3-1', odds: '13.00' }, { key: '3-2', label: '3-2', odds: '24.00' },
+        { key: '4-0', label: '4-0', odds: '28.00' }, { key: '4-1', label: '4-1', odds: '26.00' }, { key: '4-2', label: '4-2', odds: '49.00' }, { key: '4-3', label: '4-3', odds: '135.00' },
+        // Draws
+        { key: '0-0', label: '0-0', odds: '14.00' }, { key: '1-1', label: '1-1', odds: '7.20' }, { key: '2-2', label: '2-2', odds: '13.50' }, { key: '3-3', label: '3-3', odds: '58.00' }, { key: '4-4', label: '4-4', odds: '250.00' },
+        // Away wins
+        { key: '0-1', label: '0-1', odds: '15.50' }, { key: '0-2', label: '0-2', odds: '29.00' }, { key: '1-2', label: '1-2', odds: '15.00' },
+        { key: '0-3', label: '0-3', odds: '81.00' }, { key: '1-3', label: '1-3', odds: '41.00' }, { key: '2-3', label: '2-3', odds: '44.00' },
+        { key: '0-4', label: '0-4', odds: '250.00' }, { key: '1-4', label: '1-4', odds: '155.00' }, { key: '2-4', label: '2-4', odds: '160.00' }, { key: '3-4', label: '3-4', odds: '250.00' },
+        { key: 'OTHER', label: 'Other', odds: '15.50' },
+      ] },
     };
     const p = presets[mk];
     if (p) { setName(p.name); setSelections(p.selections); }
@@ -535,13 +547,16 @@ function AddMarketModal({ open, onClose, fx, onSubmit }) {
 
 function CreateFixtureModal({ open, onClose, leagues, onCreated, showToast }) {
   const [form, setForm] = useState({ sport: 'football', leagueId: '', home: '', away: '', kickoff: '', day: 'Today', isLive: false, homeOdds: '2.10', drawOdds: '3.40', awayOdds: '3.10', ouOver: '1.95', ouUnder: '1.85', bttsYes: '1.78', bttsNo: '1.98', dc1X: '1.25', dcX2: '1.35', dc12: '1.20' });
+  const [submitting, setSubmitting] = useState(false);
   const eligible = leagues.filter((l) => l.sport === form.sport);
   useEffect(() => { if (open) setForm((f) => ({ ...f, leagueId: '' })); }, [open]);
 
   async function submit(e) {
     e.preventDefault();
+    if (submitting) return;
     if (!form.leagueId) return showToast('Pick a league.', 'error');
     if (!form.home || !form.away) return showToast('Both teams required.', 'error');
+    setSubmitting(true);
     try {
       await adminCreateFixture({
         sport: form.sport,
@@ -565,6 +580,7 @@ function CreateFixtureModal({ open, onClose, leagues, onCreated, showToast }) {
       });
       onCreated();
     } catch (e) { showToast(e.message, 'error'); }
+    finally { setSubmitting(false); }
   }
 
   return (
@@ -623,8 +639,8 @@ function CreateFixtureModal({ open, onClose, leagues, onCreated, showToast }) {
           <label><input type="checkbox" checked={form.isLive} onChange={(e) => setForm((f) => ({ ...f, isLive: e.target.checked }))} /> Mark as live now</label>
         </div>
         <div className="adm-modal-actions" style={{ gridColumn: '1 / -1' }}>
-          <button type="button" className="adm-btn ghost" onClick={onClose}>Cancel</button>
-          <button type="submit" className="adm-btn primary">Create fixture</button>
+          <button type="button" className="adm-btn ghost" onClick={onClose} disabled={submitting}>Cancel</button>
+          <button type="submit" className="adm-btn primary" disabled={submitting}>{submitting ? 'Creating…' : 'Create fixture'}</button>
         </div>
       </form>
     </Modal>

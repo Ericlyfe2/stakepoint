@@ -89,14 +89,14 @@ function applyOverride(match, patch, oddsPatch, suspendPatch, result) {
           ),
         };
       }
-      if (suspendPatch?.markets?.includes(mKey)) {
+      if (suspendPatch?.all || suspendPatch?.markets?.includes(mKey)) {
         nextMarket = { ...nextMarket, suspended: true };
       }
-      if (suspendPatch?.selections?.length) {
+      if (suspendPatch?.all || suspendPatch?.selections?.length) {
         nextMarket = {
           ...nextMarket,
           selections: (nextMarket.selections || []).map((sel) =>
-            suspendPatch.selections.includes(`${mKey}:${sel.key}`) ? { ...sel, suspended: true } : sel
+            suspendPatch.all || suspendPatch.selections.includes(`${mKey}:${sel.key}`) ? { ...sel, suspended: true } : sel
           ),
         };
       }

@@ -1345,17 +1345,20 @@ export default function Home({ initialChip }) {
                             </button>
 
                             <div className="sb-odds-group">
-                              {cols ? (
+                              {match.suspended ? (
+                                <span className="sb-odd disabled sb-odd-suspended">SUSP</span>
+                              ) : cols ? (
                                 cols.selections.map((s) => {
                                   const isSel = myPicks.some((p) => p.outcome === s.key);
                                   return (
                                     <button
                                       key={s.key}
                                       type="button"
-                                      className={`sb-odd${isSel ? ' selected' : ''}`}
-                                      onClick={() => toggleSelection(match, market, s.key, s.odds)}
+                                      className={`sb-odd${isSel ? ' selected' : ''}${s.suspended ? ' disabled sb-odd-suspended' : ''}`}
+                                      onClick={() => { if (!s.suspended) toggleSelection(match, market, s.key, s.odds); }}
+                                      disabled={s.suspended}
                                     >
-                                      {s.odds?.toFixed(2)}
+                                      {s.suspended ? 'SUSP' : s.odds?.toFixed(2)}
                                     </button>
                                   );
                                 })
