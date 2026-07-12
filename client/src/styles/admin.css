@@ -606,12 +606,26 @@
 }
 .adm-modal {
   width: min(480px, 100%);
+  max-height: calc(100vh - 40px);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
   background: var(--bg-2);
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-lg);
   padding: 22px;
   box-shadow: var(--shadow-2);
   animation: popIn .22s ease;
+  box-sizing: border-box;
+}
+@media (max-width: 640px) {
+  .adm-modal-overlay { padding: 0; align-items: flex-end; }
+  .adm-modal {
+    width: 100%;
+    max-height: 92vh;
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    padding: 18px 16px calc(18px + env(safe-area-inset-bottom, 0px));
+  }
 }
 @keyframes popIn { from { transform: scale(.96); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 .adm-modal h3 { margin: 0 0 6px; font-size: 18px; font-weight: 700; }
