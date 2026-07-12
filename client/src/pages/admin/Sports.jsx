@@ -351,16 +351,18 @@ function FixtureDrawer({ open, fixtureId, onClose, hasRole, showToast, onChange 
                     </div>
                   )}
                   pill={market.suspended ? <Badge tone="warn">Suspended</Badge> : null}>
-              <table className="adm-table">
-                <thead><tr><th>Selection</th><th className="num">Odds</th><th></th></tr></thead>
-                <tbody>
-                  {(market.selections || []).map((sel) => (
-                    <SelectionRow key={sel.key} mk={mk} sel={sel} disabled={!hasRole('odds_manager') || fx.finished}
-                                  onChange={(odds) => changeOdds(mk, sel.key, odds)}
-                                  onSuspend={() => suspendSelection(mk, sel.key)} />
-                  ))}
-                </tbody>
-              </table>
+              <div className="adm-table-scroll" style={{ maxHeight: 'none' }}>
+                <table className="adm-table">
+                  <thead><tr><th>Selection</th><th className="num">Odds</th><th></th></tr></thead>
+                  <tbody>
+                    {(market.selections || []).map((sel) => (
+                      <SelectionRow key={sel.key} mk={mk} sel={sel} disabled={!hasRole('odds_manager') || fx.finished}
+                                    onChange={(odds) => changeOdds(mk, sel.key, odds)}
+                                    onSuspend={() => suspendSelection(mk, sel.key)} />
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </Card>
           ))}
 
@@ -634,6 +636,12 @@ function CreateFixtureModal({ open, onClose, leagues, onCreated, showToast }) {
               )}
             </div>
           </details>
+        )}
+        {form.sport === 'football' && (
+          <p style={{ gridColumn: '1 / -1', margin: 0, fontSize: 12.5, color: 'var(--text-dim)' }}>
+            A full Correct Score grid is generated automatically from the odds above — open the fixture after
+            creating it to view or fine-tune individual scorelines.
+          </p>
         )}
         <div className="adm-field" style={{ gridColumn: '1 / -1' }}>
           <label><input type="checkbox" checked={form.isLive} onChange={(e) => setForm((f) => ({ ...f, isLive: e.target.checked }))} /> Mark as live now</label>

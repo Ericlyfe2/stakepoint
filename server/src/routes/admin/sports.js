@@ -27,6 +27,7 @@ import {
   addMarketToFixture, removeMarketFromFixture,
 } from '../../db/sportsAdmin.js';
 import { settleNow } from '../../services/settlement.js';
+import { buildCorrectScoreMarket } from '../../matchesData.js';
 
 const router = Router();
 
@@ -197,6 +198,7 @@ function buildFixtureMarkets(b) {
   }
 
   if (b.sport === 'football') {
+    const ou25 = extra.find((em) => em.market === 'OU25');
     return {
       '1X2': { name: 'Match Result', selections: [
         { key: '1', label: `${b.home} to win`, odds: b.odds.home },
@@ -204,6 +206,10 @@ function buildFixtureMarkets(b) {
         { key: '2', label: `${b.away} to win`, odds: b.odds.away },
       ]},
       ...fromExtra,
+      'CS': buildCorrectScoreMarket({
+        home: b.odds.home, draw: b.odds.draw ?? 3.2, away: b.odds.away,
+        over: ou25?.over, under: ou25?.under,
+      }),
     };
   }
   if (b.sport === 'basketball') {
