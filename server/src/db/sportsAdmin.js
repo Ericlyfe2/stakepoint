@@ -42,7 +42,12 @@ export function compiledLeagues() {
         .map((m) => applyOverride(m, overrides[m.id], oddsOverrides[m.id], suspensions[m.id], results[m.id]))
         .filter(Boolean),
     }));
-    const extraLeagues = Object.values(customLeagues || {}).filter((cl) => cl.sport === sp.id);
+    // Clone every field, including matches, so nothing below can mutate the
+    // persisted store object — customLeagues entries are direct references
+    // into state.data, and this function runs on every request.
+    const extraLeagues = Object.values(customLeagues || {})
+      .filter((cl) => cl.sport === sp.id)
+      .map((cl) => ({ ...cl, matches: [] }));
     // attach any custom fixtures created on existing leagues
     for (const fx of Object.values(custom || {})) {
       if (fx.sport !== sp.id) continue;
