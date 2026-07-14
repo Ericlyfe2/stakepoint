@@ -460,7 +460,7 @@ describe('useBetslip', () => {
       });
       expect(hook.result.current.selectionCount).toBe(2);
       expect(hook.result.current.betMode).toBe('single');
-      expect(hook.result.current.stakes.multiple).toBe(400);
+      expect(hook.result.current.stakes.multiple).toBe(300);
     });
   });
 });

@@ -300,7 +300,7 @@ describe('validateBetSlip', () => {
   const account = { balance: 1000 };
 
   test('empty selections', () => {
-    const errors = validateBetSlip({ selections: [], betMode: 'multiple', stakes: {}, account, minStake: 400 });
+    const errors = validateBetSlip({ selections: [], betMode: 'multiple', stakes: {}, account, minStake: 300 });
     assert.equal(errors.length, 1);
     assert.ok(errors[0].includes('Add at least one'));
   });
@@ -311,7 +311,7 @@ describe('validateBetSlip', () => {
       betMode: 'multiple',
       stakes: { multiple: 400 },
       account,
-      minStake: 400,
+      minStake: 300,
     });
     assert.ok(errors.some((e) => e.includes('at least 2 selections')));
   });
@@ -322,7 +322,7 @@ describe('validateBetSlip', () => {
       betMode: 'multiple',
       stakes: { multiple: 0 },
       account,
-      minStake: 400,
+      minStake: 300,
     });
     assert.ok(errors.some((e) => e.includes('stake amount')));
   });
@@ -333,7 +333,7 @@ describe('validateBetSlip', () => {
       betMode: 'multiple',
       stakes: { multiple: 100 },
       account,
-      minStake: 400,
+      minStake: 300,
     });
     assert.ok(errors.some((e) => e.includes('Minimum stake')));
   });
@@ -344,7 +344,7 @@ describe('validateBetSlip', () => {
       betMode: 'multiple',
       stakes: { multiple: 400 },
       account,
-      minStake: 400,
+      minStake: 300,
     });
     assert.equal(errors.length, 0);
   });
@@ -355,7 +355,7 @@ describe('validateBetSlip', () => {
       betMode: 'single',
       stakes: { s1: 0 },
       account,
-      minStake: 400,
+      minStake: 300,
     });
     assert.ok(errors.some((e) => e.includes('Enter a stake')));
   });
@@ -366,7 +366,7 @@ describe('validateBetSlip', () => {
       betMode: 'single',
       stakes: { s1: 100 },
       account,
-      minStake: 400,
+      minStake: 300,
     });
     assert.ok(errors.some((e) => e.includes('Minimum total stake')));
   });
@@ -377,7 +377,7 @@ describe('validateBetSlip', () => {
       betMode: 'single',
       stakes: { s1: 400 },
       account,
-      minStake: 400,
+      minStake: 300,
     });
     assert.equal(errors.length, 0);
   });
@@ -391,7 +391,7 @@ describe('validateBetSlip', () => {
       betMode: 'multiple',
       stakes: { multiple: 400 },
       account,
-      minStake: 400,
+      minStake: 300,
     });
     assert.ok(errors.some((e) => e.includes('stale odds')));
   });

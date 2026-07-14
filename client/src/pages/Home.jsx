@@ -598,7 +598,7 @@ export default function Home({ initialChip }) {
 
     const errors = validateBetSlip({
       selections, betMode, stakes,
-      account, minStake: 400,
+      account, minStake: 300,
     });
     if (errors.length) { setSlipErr(errors[0]); return; }
 
@@ -1510,7 +1510,7 @@ export default function Home({ initialChip }) {
                               setSelectionStake(s.id, raw);
                             }}
                             inputMode="decimal"
-                            placeholder="Min. 400"
+                            placeholder="Min. 300"
                           />
                         </div>
                         <div className="xb-sel-win">
@@ -1609,11 +1609,11 @@ export default function Home({ initialChip }) {
             )}
 
             {/* Warnings */}
-            {betMode === 'multiple' && totalStake < 400 && totalStake > 0 && (
-              <div className="xb-warn">Minimum stake to place a bet is GHS 400.00 — booking needs no stake.</div>
+            {betMode === 'multiple' && totalStake < 300 && totalStake > 0 && (
+              <div className="xb-warn">Minimum stake to place a bet is GHS 300.00 — booking needs no stake.</div>
             )}
-            {betMode === 'single' && selections.some(s => (stakes[s.id] || 0) > 0 && (stakes[s.id] || 0) < 400) && (
-              <div className="xb-warn">Minimum stake per placed bet is GHS 400.00 — booking needs no stake.</div>
+            {betMode === 'single' && selections.some(s => (stakes[s.id] || 0) > 0 && (stakes[s.id] || 0) < 300) && (
+              <div className="xb-warn">Minimum stake per placed bet is GHS 300.00 — booking needs no stake.</div>
             )}
             {totalStake > (account?.balance || 0) && betRealMode === 'REAL' && (
               <div className="xb-warn" style={{ color: '#d32f2f' }}>

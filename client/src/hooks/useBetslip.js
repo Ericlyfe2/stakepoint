@@ -272,7 +272,7 @@ export default function useBetslip(initialBetMode = 'multiple') {
 
   const loadSelections = useCallback((newSelections, mode) => {
     setSelections(deduplicateSelections(newSelections));
-    setStakes({ multiple: 400 });
+    setStakes({ multiple: 300 });
     if (mode) setBetModeRaw(mode);
     setOddsChanges([]);
   }, []);

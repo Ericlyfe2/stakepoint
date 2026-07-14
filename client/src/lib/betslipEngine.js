@@ -219,7 +219,7 @@ export function deduplicateSelections(selections) {
   return [...seen.values()];
 }
 
-export function validateBetSlip({ selections, betMode, stakes, account, minStake = 400 }) {
+export function validateBetSlip({ selections, betMode, stakes, account, minStake = 300 }) {
   const errors = [];
 
   if (!selections.length) {

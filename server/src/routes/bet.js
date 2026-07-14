@@ -32,7 +32,7 @@ import { SYSTEM_TYPES, maxSystemReturn } from '../lib/systemBets.js';
 import * as cashOutEngine from '../services/cashOutEngine.js';
 import { LIVE_BETTING } from '../config/env.js';
 
-const MIN_STAKE = Number(process.env.MIN_STAKE) || 400; // GHS 400 min (configurable via env)
+const MIN_STAKE = Number(process.env.MIN_STAKE) || 300; // GHS 300 min (configurable via env)
 
 const BOOKING_CODE_REGEX = /^[ABCDEFGHIJKLMNPQRSTUVWXYZ]{2}[1-9]{5}$/;
 
