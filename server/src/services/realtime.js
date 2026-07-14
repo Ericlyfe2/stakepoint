@@ -255,13 +255,15 @@ export function emitToUser(userId, event, payload) {
 /** Emit a match lifecycle status change to all watchers of a fixture. */
 export function emitFixtureStatusChanged(payload) {
   if (!liveNs) return;
-  const { fixtureId, status, matchStatus, scoreHome, scoreAway, minute, sport } = payload;
+  const { fixtureId, status, matchStatus, scoreHome, scoreAway, minute, kickoff, day, sport } = payload;
   const event = {
     fixtureId,
     status: matchStatus || status,
     scoreHome,
     scoreAway,
     minute,
+    kickoff,
+    day,
     ts: Date.now(),
   };
   liveNs.to(`fixture:${fixtureId}`).emit('match:status', event);

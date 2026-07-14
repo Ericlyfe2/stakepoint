@@ -290,16 +290,23 @@ router.patch('/fixtures/:id',
     if (Object.keys(rest).length) {
       patchOverride(req.params.id, rest);
     }
-    // Emit status change if matchStatus was updated
-    if (matchStatus) {
-      emitFixtureStatusChanged({
-        fixtureId: req.params.id,
-        status: matchStatus,
-        sport: view.sport?.id,
-      });
-    }
-    audit(req, { action: 'sports.fixture.patch', target: req.params.id, targetType: 'fixture', meta: req.body });
     const refreshed = adminLookupFixture(req.params.id);
+    // Always broadcast — previously this only fired when matchStatus changed,
+    // so a plain kickoff/day edit updated the database but pushed nothing to
+    // connected clients. They kept showing whatever time was cached from
+    // before the edit until their next poll (up to 30s later), which reads
+    // like the site is just wrong about the kickoff time.
+    emitFixtureStatusChanged({
+      fixtureId: req.params.id,
+      status: matchStatus || refreshed?.match?.matchStatus,
+      scoreHome: refreshed?.match?.scoreHome,
+      scoreAway: refreshed?.match?.scoreAway,
+      minute: refreshed?.match?.minute,
+      kickoff: refreshed?.match?.kickoff,
+      day: refreshed?.match?.day,
+      sport: view.sport?.id,
+    });
+    audit(req, { action: 'sports.fixture.patch', target: req.params.id, targetType: 'fixture', meta: req.body });
     res.json({ fixture: { ...refreshed.match, sport: refreshed.sport?.id, leagueId: refreshed.league?.id } });
   }
 );

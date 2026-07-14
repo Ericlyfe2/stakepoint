@@ -364,6 +364,8 @@ export default function Home({ initialChip }) {
               scoreHome: payload.scoreHome ?? m.scoreHome,
               scoreAway: payload.scoreAway ?? m.scoreAway,
               minute: payload.minute ?? m.minute,
+              kickoff: payload.kickoff ?? m.kickoff,
+              day: payload.day ?? m.day,
               isLive: payload.status === 'live' || payload.status === 'ht' || payload.status === '2h',
               finished: payload.status === 'finished',
             };
