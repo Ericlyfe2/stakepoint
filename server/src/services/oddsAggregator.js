@@ -33,9 +33,18 @@ const lastPriceByKey = new Map(); // canonicalKey -> { [market]: { [sel]: odds }
 const failureStreak  = new Map(); // providerId -> consecutive failures
 
 const liveLastByKey  = new Map(); // fixtureKey -> { scoreHome, scoreAway, minute, redCardsHome, redCardsAway, status, sport }
+const liveMissStreak = new Map(); // fixtureKey -> consecutive polls absent from scoreRows while last known status was 'live'
 const liveFailureStreak = new Map(); // 'live' -> consecutive global live-loop failures
 let liveTimer = null;
 let liveRunning = false;
+
+// A fixture must be missing this many consecutive polls before we infer it
+// finished. A single miss is routinely just a rate-limited/failed provider
+// call for that cycle (fetchLiveOddsAll/fetchLiveScoresAll swallow per-
+// provider errors as [] so one bad poll doesn't look different from a real
+// finish) — treating one miss as final would slam still-live matches shut
+// ("Market closed") on every transient upstream hiccup.
+const VANISH_CONFIRM_POLLS = 3;
 
 /**
  * Returns the set of event kinds that occurred between prev and next.
@@ -341,14 +350,26 @@ async function liveLoop() {
     // report FINISHED, they just stop returning the fixture the instant it
     // ends. Without this, the match stays "live" forever server-side and any
     // open bet on it never settles. Best-effort: finish it with the last
-    // known score.
-    for (const [key, last] of liveLastByKey) {
-      if (seenKeys.has(key) || last.status !== 'live') continue;
-      setMatchStatus(key, 'finished');
-      setResult(key, last.scoreHome ?? 0, last.scoreAway ?? 0, 'feed');
-      emitScoreUpdate({ fixtureId: key, sport: last.sport, scoreHome: last.scoreHome, scoreAway: last.scoreAway, minute: last.minute, eventKind: 'full_time' });
-      emitFixtureStatusChanged({ fixtureId: key, status: 'finished', scoreHome: last.scoreHome, scoreAway: last.scoreAway, minute: last.minute, sport: last.sport });
-      liveLastByKey.set(key, { ...last, status: 'finished' });
+    // known score — but only once it's been absent for several consecutive
+    // polls in a row, so a single failed/rate-limited provider tick can't
+    // falsely close a match that's still being played.
+    // Skip the whole pass on a poll that returned nothing at all — that's
+    // almost certainly every provider failing together, not every live
+    // match ending in the same 6s window.
+    if (scoreRows.length > 0 || liveLastByKey.size === 0) {
+      for (const [key, last] of liveLastByKey) {
+        if (last.status !== 'live') { liveMissStreak.delete(key); continue; }
+        if (seenKeys.has(key)) { liveMissStreak.delete(key); continue; }
+        const misses = (liveMissStreak.get(key) || 0) + 1;
+        liveMissStreak.set(key, misses);
+        if (misses < VANISH_CONFIRM_POLLS) continue;
+        liveMissStreak.delete(key);
+        setMatchStatus(key, 'finished');
+        setResult(key, last.scoreHome ?? 0, last.scoreAway ?? 0, 'feed');
+        emitScoreUpdate({ fixtureId: key, sport: last.sport, scoreHome: last.scoreHome, scoreAway: last.scoreAway, minute: last.minute, eventKind: 'full_time' });
+        emitFixtureStatusChanged({ fixtureId: key, status: 'finished', scoreHome: last.scoreHome, scoreAway: last.scoreAway, minute: last.minute, sport: last.sport });
+        liveLastByKey.set(key, { ...last, status: 'finished' });
+      }
     }
 
     // 2) Odds emits via existing diffEmit machinery.
