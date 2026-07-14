@@ -45,8 +45,13 @@ export class FootballDataOrgProvider extends Provider {
   async fetchScores(sport = 'football') {
     if (!this.enabled || sport !== 'football') return [];
     // PAUSED covers half-time; LIVE and IN_PLAY are both used by the provider
-    // (semantics overlap, but both appear in the wild).
-    const url = `${this.base}/matches?status=LIVE,IN_PLAY,PAUSED`;
+    // (semantics overlap, but both appear in the wild). FINISHED is included
+    // too — without it a match simply vanishes from this feed the instant it
+    // ends and the aggregator never observes the live -> finished transition,
+    // so the fixture stays "live" forever and bets on it never settle. Scoped
+    // to today so the FINISHED addition doesn't pull in match history.
+    const today = new Date().toISOString().slice(0, 10);
+    const url = `${this.base}/matches?dateFrom=${today}&dateTo=${today}&status=LIVE,IN_PLAY,PAUSED,FINISHED`;
     const json = await this.http(url, { headers: this.headers() });
     return (json?.matches || []).map((m) => normalise(m, this.id));
   }

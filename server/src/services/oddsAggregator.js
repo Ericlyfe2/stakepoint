@@ -17,7 +17,7 @@
 import { enabledProviders, providersHealth } from './providerRegistry.js';
 import { get as cacheGet, set as cacheSet } from './cache.js';
 import { emitOddsTick, emitOddsMovement, emitProviderHealth } from './realtime.js';
-import { setOddsOverride, setMatchStatus, setResult } from '../db/sportsAdmin.js';
+import { setOddsOverride, setMatchStatus, setResult, patchOverride } from '../db/sportsAdmin.js';
 import { log } from '../utils/logger.js';
 import { recordOddsLag } from './metrics.js';
 
@@ -32,32 +32,41 @@ let running = false;
 const lastPriceByKey = new Map(); // canonicalKey -> { [market]: { [sel]: odds } }
 const failureStreak  = new Map(); // providerId -> consecutive failures
 
-const liveLastByKey  = new Map(); // fixtureKey -> { scoreHome, scoreAway, minute, redCardsHome, redCardsAway }
+const liveLastByKey  = new Map(); // fixtureKey -> { scoreHome, scoreAway, minute, redCardsHome, redCardsAway, status, sport }
 const liveFailureStreak = new Map(); // 'live' -> consecutive global live-loop failures
 let liveTimer = null;
 let liveRunning = false;
-
-function isKickOff(next) {
-  const n = Number(next?.minute);
-  return Number.isFinite(n) && n <= 1;
-}
 
 /**
  * Returns the set of event kinds that occurred between prev and next.
  * Empty array when nothing notable changed. Multiple deltas in one tick
  * (e.g. goal AND red card) all surface so downstream consumers don't
  * lose state-changing events.
+ *
+ * kick_off / full_time are derived from each provider's normalised `status`
+ * field ('upcoming' | 'live' | 'finished') rather than the raw `minute`
+ * string — providers disagree wildly on minute formatting (apiFootball sends
+ * "63'", football-data.org sends null on its free tier), so minute-string
+ * matching against literal 'HT'/'FT' never actually fired for either real
+ * provider. `status` is the one field every provider normalises consistently.
  */
 function deriveEventKinds(prev, next) {
   const out = [];
-  if (!prev) { if (isKickOff(next)) out.push('kick_off'); return out; }
-  if (next.scoreHome > (prev.scoreHome ?? 0)) out.push('goal_home');
-  if (next.scoreAway > (prev.scoreAway ?? 0)) out.push('goal_away');
+  const prevStatus = prev?.status;
+  const nextStatus = next?.status;
+  if (!prev) {
+    if (nextStatus === 'live') out.push('kick_off');
+    return out;
+  }
+  if ((next.scoreHome ?? 0) > (prev.scoreHome ?? 0)) out.push('goal_home');
+  if ((next.scoreAway ?? 0) > (prev.scoreAway ?? 0)) out.push('goal_away');
   if ((next.redCardsHome ?? 0) > (prev.redCardsHome ?? 0)) out.push('red_card');
   if ((next.redCardsAway ?? 0) > (prev.redCardsAway ?? 0)) out.push('red_card');
+  if (prevStatus !== 'live' && nextStatus === 'live') out.push('kick_off');
+  // Best-effort HT/2H — only fires for providers that do supply literal HT.
   if (prev.minute !== 'HT' && next.minute === 'HT') out.push('half_time');
-  if (prev.minute === 'HT' && next.minute !== 'HT' && next.minute !== 'FT') out.push('second_half');
-  if (prev.minute !== 'FT' && next.minute === 'FT') out.push('full_time');
+  if (prev.minute === 'HT' && next.minute !== 'HT' && nextStatus === 'live') out.push('second_half');
+  if (prevStatus !== 'finished' && nextStatus === 'finished') out.push('full_time');
   return out;
 }
 
@@ -255,13 +264,16 @@ async function liveLoop() {
 
     // 1) Score & match-event emits.
     const { emitScoreUpdate, emitFixtureStatusChanged } = await import('./realtime.js');
+    const seenKeys = new Set();
     for (const fx of scoreRows) {
       if (!fx?.key) continue;
+      seenKeys.add(fx.key);
       const prev = liveLastByKey.get(fx.key);
       const kinds = deriveEventKinds(prev, fx);
       liveLastByKey.set(fx.key, {
         scoreHome: fx.scoreHome, scoreAway: fx.scoreAway, minute: fx.minute,
         redCardsHome: fx.redCardsHome, redCardsAway: fx.redCardsAway,
+        status: fx.status, sport: fx.sport,
       });
       const scoreOrMinuteChanged = !prev
         || prev.scoreHome !== fx.scoreHome
@@ -289,6 +301,18 @@ async function liveLoop() {
         });
       }
 
+      // Persist the running score/minute so anything reading the fixture over
+      // HTTP (bet history, admin fixture list, a fresh page load) sees the
+      // real live score too — emitScoreUpdate above is socket-only and never
+      // reaches a server-rendered view. Skip once finished; setResult() below
+      // is the authoritative write at that point.
+      if (fx.status !== 'finished' && scoreOrMinuteChanged) {
+        patchOverride(fx.key, {
+          scoreHome: fx.scoreHome, scoreAway: fx.scoreAway, minute: fx.minute,
+          isLive: fx.status === 'live',
+        });
+      }
+
       // Persist the fixture lifecycle for real, provider-confirmed transitions.
       // This is the only path that writes a 'feed' result — settlement.js
       // never settles on anything else, so a match only pays out once the
@@ -310,6 +334,21 @@ async function liveLoop() {
         setResult(fx.key, fx.scoreHome, fx.scoreAway, 'feed');
         emitFixtureStatusChanged({ fixtureId: fx.key, status: 'finished', scoreHome: fx.scoreHome, scoreAway: fx.scoreAway, minute: fx.minute, sport: fx.sport });
       }
+    }
+
+    // 1b) Fixtures that were live last poll but vanished from this poll's
+    // scoreRows entirely — some providers (apiFootball's `live=all`) never
+    // report FINISHED, they just stop returning the fixture the instant it
+    // ends. Without this, the match stays "live" forever server-side and any
+    // open bet on it never settles. Best-effort: finish it with the last
+    // known score.
+    for (const [key, last] of liveLastByKey) {
+      if (seenKeys.has(key) || last.status !== 'live') continue;
+      setMatchStatus(key, 'finished');
+      setResult(key, last.scoreHome ?? 0, last.scoreAway ?? 0, 'feed');
+      emitScoreUpdate({ fixtureId: key, sport: last.sport, scoreHome: last.scoreHome, scoreAway: last.scoreAway, minute: last.minute, eventKind: 'full_time' });
+      emitFixtureStatusChanged({ fixtureId: key, status: 'finished', scoreHome: last.scoreHome, scoreAway: last.scoreAway, minute: last.minute, sport: last.sport });
+      liveLastByKey.set(key, { ...last, status: 'finished' });
     }
 
     // 2) Odds emits via existing diffEmit machinery.

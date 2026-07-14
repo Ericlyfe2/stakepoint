@@ -26,12 +26,24 @@ const store = createStore('sports_admin', {
   archived: [],
 });
 
+// Only these sources are authoritative results (see settlement.js — it never
+// pays out on anything else). Older builds persisted 'simulated' results;
+// treating those as real here would mark real fixtures "finished" forever
+// with a result that can never actually settle. Filtered at read-time so any
+// stale rows already on disk self-heal without a migration script.
+const AUTHORITATIVE_RESULT_SOURCES = new Set(['manual', 'feed']);
+
 export function readSportsAdmin() {
+  const rawResults = store.get('results') || {};
+  const results = {};
+  for (const [id, r] of Object.entries(rawResults)) {
+    if (r && AUTHORITATIVE_RESULT_SOURCES.has(r.source)) results[id] = r;
+  }
   return {
     overrides: store.get('overrides') || {},
     oddsOverrides: store.get('oddsOverrides') || {},
     suspensions: store.get('suspensions') || {},
-    results: store.get('results') || {},
+    results,
     custom: store.get('custom') || {},
     customLeagues: store.get('customLeagues') || {},
     matchStatuses: store.get('matchStatuses') || {},
@@ -388,6 +400,14 @@ export function adminLookupSelection({ matchId, market, outcome }) {
 
 function publicMatch(m) { const { fh, fa, ...rest } = m; return rest; }
 
+// Same "is this fixture done?" test the storefront applies before hiding a
+// row — kept in sync here so the sport-chip count never advertises more
+// fixtures than are actually visible.
+function isOpenMatch(m) {
+  const status = m.matchStatus || (m.finished ? MATCH_STATUSES.FINISHED : null);
+  return !status || !FINAL_STATUSES.has(status);
+}
+
 /** Build a getOddsSnapshot-style payload that reflects all admin overrides. */
 export function buildPublicSnapshot(sportId = 'football', seedSlipFn) {
   const sports = compiledLeagues(false);  // no archived in user-facing views
@@ -396,7 +416,7 @@ export function buildPublicSnapshot(sportId = 'football', seedSlipFn) {
     sport: sport.id,
     sports: sports.map((s) => ({
       id: s.id, name: s.name,
-      count: (s.leagues || []).reduce((n, l) => n + (l.matches?.length || 0), 0),
+      count: (s.leagues || []).reduce((n, l) => n + (l.matches || []).filter(isOpenMatch).length, 0),
     })),
     featuredMatchId: sport.leagues[0]?.matches[0]?.id || null,
     seedSlip: sport.id === 'football' && typeof seedSlipFn === 'function' ? seedSlipFn() : [],
