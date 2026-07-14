@@ -6,6 +6,7 @@ import {
   placeBet,
   bookBet,
   fetchBetByCode,
+  fetchRecentPayouts,
 } from '../api/betApi.js';
 import { useToast, useAccount } from '../layout/AppShell.jsx';
 import { toBookingCode } from '../components/BetSuccessModal.jsx';
@@ -154,6 +155,7 @@ export default function Home({ initialChip }) {
   const [snapshot, setSnapshot]       = useState(null);
   const [loadErr, setLoadErr]         = useState(null);
   const [activeLeague, setActiveLeague] = useState(null);
+  const [recentPayouts, setRecentPayouts] = useState([]);
 
   // new mobile-first UI state
   const [subTab, setSubTab]           = useState(initialChip === 'live' ? 'live' : 'highlights');
@@ -268,6 +270,18 @@ export default function Home({ initialChip }) {
     return () => { cancelled = true; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sportId]);
+
+  // Verified Sports Payouts ticker — real settled wins only (never fabricated).
+  // Refreshes every 2 minutes; hidden entirely if there's nothing real to show.
+  useEffect(() => {
+    let cancelled = false;
+    const load = () => {
+      fetchRecentPayouts(12).then((d) => { if (!cancelled) setRecentPayouts(d.payouts || []); }).catch(() => {});
+    };
+    load();
+    const t = setInterval(load, 120000);
+    return () => { cancelled = true; clearInterval(t); };
+  }, []);
 
   // Odds refresh — 10s on Live tab, 30s otherwise. Always calls the API
   // so prices stay in sync with the server snapshot.
@@ -1019,12 +1033,33 @@ export default function Home({ initialChip }) {
 
       {/* ─── Verified Sports Payouts ─── */}
       <div className="xb-payouts-ticker">
-        <span className="xb-ticker-badge">Instant Payouts</span>
+        <span className="xb-ticker-badge">Verified Sports Payouts</span>
         <span className="xb-ticker-right">
-          <span className="xb-paid-dot" />Big wins paid instantly
+          <span className="xb-paid-dot" />Paid winners
           <span className="xb-ticker-date">Updated {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}, {new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}</span>
         </span>
       </div>
+
+      {recentPayouts.length > 0 && (
+        <div className="xb-winners-wrap">
+          <div className="xb-winners-track">
+            {[0, 1].map((dup) => (
+              <div className="xb-winners-set" key={dup} aria-hidden={dup > 0 ? 'true' : undefined}>
+                {recentPayouts.map((p) => (
+                  <div className="xb-winner-card" key={`${dup}-${p.id}`}>
+                    <div className="xb-winner-top">
+                      <span className="xb-winner-trophy">🏆</span>
+                      <span className="xb-winner-phone">{p.maskedId} won</span>
+                    </div>
+                    <div className="xb-winner-amount">{p.currency} {formatAmt(p.amount)}</div>
+                    <span className="xb-winner-badge">{(p.sport || 'sports').toUpperCase()} · PAID</span>
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* ─── Live Matches widget ─── */}
       <div className="xb-live-widget">

@@ -122,6 +122,7 @@ const patch= (p, body)  => rawFetch(p, { method: 'PATCH',  body: JSON.stringify(
 export const fetchHealth = () => get('/health');
 export const fetchAuthConfig = () => get('/auth/config');
 export const fetchSports = () => get('/bet/sports');
+export const fetchRecentPayouts = (limit = 12) => get(`/bet/recent-payouts?limit=${encodeURIComponent(limit)}`);
 
 /* matches */
 export const fetchMatches = (sport = 'football') => get(`/bet/matches?sport=${encodeURIComponent(sport)}`);

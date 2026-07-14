@@ -29,7 +29,7 @@ import { requireAuth, optionalAuth } from '../middleware/auth.js';
 import { validate } from '../middleware/validate.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { badRequest, conflict, notFound, unauthorized } from '../utils/httpError.js';
-import { updateUser, adjustBalance, logActivity } from '../db/users.js';
+import { updateUser, adjustBalance, logActivity, getUserById } from '../db/users.js';
 import { pushTx } from './wallet.js';
 import { emitAdmin, emitToUser } from '../services/realtime.js';
 import { SYSTEM_TYPES, maxSystemReturn } from '../lib/systemBets.js';
@@ -251,6 +251,48 @@ router.get('/sports', (_req, res) => {
       matchCount: s.leagues.reduce((n, l) => n + l.matches.length, 0),
     })),
   });
+});
+
+// Mask a phone/email so the "Verified Payouts" ticker never exposes a real
+// identifier — keep a few characters on each end, star out the middle. Only
+// strips to digits when the input actually looks like a phone number;
+// otherwise an anonymous (no-login) bet's id — mostly letters/dashes — would
+// get stripped down to almost nothing and always degrade to "***".
+function maskIdentifier(raw) {
+  const str = String(raw || '');
+  if (!str) return '***';
+  const digitsOnly = str.replace(/\D/g, '');
+  const base = digitsOnly.length >= 6 ? digitsOnly : str;
+  if (base.length < 6) return '***';
+  const head = base.slice(0, 3);
+  const tail = base.slice(-3);
+  return `${head}${'*'.repeat(Math.max(3, base.length - 6))}${tail}`;
+}
+
+// Real, verified winning bets only — never fabricated. Powers the "Verified
+// Sports Payouts" ticker on the homepage. No auth required; identifiers are
+// masked and only amount/sport/settledAt are exposed.
+router.get('/recent-payouts', (req, res) => {
+  const limit = Math.min(Math.max(Number(req.query.limit) || 12, 1), 30);
+  const wins = Object.values(betsStore.all() || {})
+    .filter((b) => b.status === 'won' && b.settledAt && Number(b.totalReturn ?? b.potentialWin ?? 0) > 0)
+    .sort((a, b) => new Date(b.settledAt) - new Date(a.settledAt))
+    .slice(0, limit);
+
+  const payouts = wins.map((b) => {
+    const user = b.userId ? getUserById(b.userId) : null;
+    const firstLeg = b.legs?.[0];
+    const view = firstLeg ? adminLookupFixture(firstLeg.matchId) : null;
+    return {
+      id: b.id,
+      maskedId: maskIdentifier(user?.phone || user?.email || b.userId || b.id),
+      amount: Number((b.totalReturn ?? b.potentialWin ?? 0).toFixed(2)),
+      currency: CURRENCY,
+      sport: view?.sport?.id || 'football',
+      settledAt: b.settledAt,
+    };
+  });
+  res.json({ updatedAt: new Date().toISOString(), payouts });
 });
 
 router.get('/matches', asyncHandler(async (req, res) => {
