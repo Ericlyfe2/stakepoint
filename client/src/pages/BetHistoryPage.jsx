@@ -27,6 +27,7 @@ function fmt(n) {
 function placedAtLabel(iso) {
   if (!iso) return '';
   const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
   const dt = d.toLocaleDateString('en-GH', { day: '2-digit', month: 'short' });
   const tm = d.toLocaleTimeString('en-GH', { hour: '2-digit', minute: '2-digit' });
   return `${dt}, ${tm}`;
@@ -45,6 +46,7 @@ function legKickoffLabel(leg, bet) {
 function placedAtLabelShort(iso) {
   if (!iso) return '';
   const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return ''; // never render "NaN/NaN NaN:NaN"
   const dd = String(d.getDate()).padStart(2, '0');
   const mm = String(d.getMonth() + 1).padStart(2, '0');
   const hh = String(d.getHours()).padStart(2, '0');
@@ -86,6 +88,7 @@ function stableHash(key) {
 function ticketTimeFull(iso) {
   if (!iso) return '';
   const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
   const dd = String(d.getDate()).padStart(2, '0');
   const mm = String(d.getMonth() + 1).padStart(2, '0');
   const yyyy = d.getFullYear();
@@ -208,6 +211,7 @@ function TicketDetails({ bet, onClose, onRemix, onShare }) {
   const headerDate = (() => {
     if (!bet.placedAt) return '';
     const d = new Date(bet.placedAt);
+    if (Number.isNaN(d.getTime())) return '';
     const dd = String(d.getDate()).padStart(2, '0');
     const mm = String(d.getMonth() + 1).padStart(2, '0');
     const hh = String(d.getHours()).padStart(2, '0');
