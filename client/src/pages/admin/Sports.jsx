@@ -10,8 +10,10 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   adminFixtures, adminFixture, adminCreateFixture, adminPatchFixture, adminDeleteFixture,
   adminPatchOdds, adminResetOdds, adminSuspend, adminClearSuspend,
-  adminRecordResult, adminTriggerSettle, adminLeagues, adminCreateLeague,
+  adminRecordResult, adminTriggerSettle, adminLeagues, adminCreateLeague, adminDeleteLeague,
   adminAddMarket, adminRemoveMarket, adminBulkFixtures,
+  adminSetFixtureStatus, adminDuplicateFixture, adminArchiveFixture, adminRestoreFixture,
+  adminCancelFixture, adminPostponeFixture,
 } from '../../api/adminApi.js';
 import { useAdmin } from '../../providers/AdminProvider.jsx';
 import { Card, Badge, Drawer, Modal, Empty, SkeletonRow, moneyFmt, numFmt, ago } from '../../components/admin/primitives.jsx';
@@ -107,8 +109,8 @@ export default function SportsAdmin() {
 
       <div className="adm-stat-grid">
         <StatTile label="Total fixtures" value={numFmt(data?.total)} />
-        <StatTile label="Live now" value={numFmt(data?.fixtures?.filter((f) => f.isLive).length)} />
-        <StatTile label="Finished" value={numFmt(data?.fixtures?.filter((f) => f.finished).length)} />
+        <StatTile label="Live" value={numFmt(data?.fixtures?.filter((f) => f.isLive || f.matchStatus === 'live' || f.matchStatus === 'ht' || f.matchStatus === '2h').length)} />
+        <StatTile label="Finished" value={numFmt(data?.fixtures?.filter((f) => f.finished || f.matchStatus === 'finished' || f.matchStatus === 'ft').length)} />
         <StatTile label="Suspended" value={numFmt(data?.fixtures?.filter((f) => f.suspended).length)} />
       </div>
 
@@ -135,6 +137,9 @@ export default function SportsAdmin() {
             <option value="upcoming">Upcoming</option>
             <option value="finished">Finished</option>
             <option value="suspended">Suspended</option>
+            <option value="cancelled">Cancelled</option>
+            <option value="postponed">Postponed</option>
+            <option value="archived">Archived</option>
           </select>
           <div className="grow" />
           <div style={{ color: 'var(--text-dim)', fontSize: 12.5 }}>{data?.total ?? '—'} fixtures</div>
@@ -165,7 +170,21 @@ export default function SportsAdmin() {
                 const home = main?.selections?.find((s) => s.key === '1');
                 const draw = main?.selections?.find((s) => s.key === 'X');
                 const away = main?.selections?.find((s) => s.key === '2');
-                const status = m.finished ? 'finished' : m.isLive ? 'live' : m.suspended ? 'suspended' : 'upcoming';
+                const matchStatus = m.matchStatus || (m.finished ? 'finished' : m.isLive ? 'live' : m.suspended ? 'suspended' : 'upcoming');
+                function statusBadge() {
+                  if (m.matchStatus === 'cancelled') return <Badge tone="warn">Cancelled</Badge>;
+                  if (m.matchStatus === 'postponed') return <Badge tone="info">Postponed</Badge>;
+                  if (m.matchStatus === 'abandoned') return <Badge tone="warn">Abandoned</Badge>;
+                  if (m.matchStatus === 'void') return <Badge tone="warn">Void</Badge>;
+                  if (m.matchStatus === 'ft') return <Badge tone="success">FT {m.scoreHome ?? ''}-{m.scoreAway ?? ''}</Badge>;
+                  if (m.matchStatus === 'ht') return <Badge tone="danger" dot>HT {m.minute || ''}</Badge>;
+                  if (m.matchStatus === '2h') return <Badge tone="danger" dot>2H {m.minute || ''}</Badge>;
+                  if (matchStatus === 'live') return <Badge tone="danger" dot>Live {m.minute || ''}</Badge>;
+                  if (matchStatus === 'upcoming') return <Badge tone="info">Upcoming</Badge>;
+                  if (matchStatus === 'finished') return <Badge tone="success">Finished {m.scoreHome}-{m.scoreAway}</Badge>;
+                  if (matchStatus === 'suspended') return <Badge tone="warn">Suspended</Badge>;
+                  return <Badge tone="default">{matchStatus}</Badge>;
+                }
                 return (
                   <tr key={m.id} onClick={() => setSelected(m)} className={selected?.id === m.id ? 'selected' : ''}>
                     <td style={{ width: 32 }} onClick={(e) => e.stopPropagation()}>
@@ -176,12 +195,7 @@ export default function SportsAdmin() {
                       <div style={{ color: 'var(--text-dim)', fontSize: 12 }}>{m.sport} · {m.id}</div>
                     </td>
                     <td>{m.leagueName || m.leagueId}</td>
-                    <td>
-                      {status === 'live' && <Badge tone="danger" dot>Live {m.minute || ''}</Badge>}
-                      {status === 'upcoming' && <Badge tone="info">Upcoming</Badge>}
-                      {status === 'finished' && <Badge tone="success">Finished {m.scoreHome}-{m.scoreAway}</Badge>}
-                      {status === 'suspended' && <Badge tone="warn">Suspended</Badge>}
-                    </td>
+                    <td>{statusBadge()}</td>
                     <td>{m.day} {m.kickoff || ''}</td>
                     <td className="num">{home ? home.odds.toFixed(2) : '—'}</td>
                     <td className="num">{draw ? draw.odds.toFixed(2) : '—'}</td>
@@ -304,6 +318,65 @@ function FixtureDrawer({ open, fixtureId, onClose, hasRole, showToast, onChange 
     catch (e) { showToast(e.message, 'error'); }
   }
 
+  /* ─── Lifecycle actions ─── */
+  const isFinal = fx?.matchStatus === 'finished' || fx?.matchStatus === 'cancelled' || fx?.matchStatus === 'void' || fx?.finished;
+  async function setStatus(status, extra) {
+    try {
+      const r = await adminSetFixtureStatus(fx.id, { status, ...extra });
+      setFx(r.fixture);
+      onChange?.();
+      showToast(`Status set to ${status}.`);
+    } catch (e) { showToast(e.message, 'error'); }
+  }
+  async function doCancel() {
+    if (!confirm(`Cancel "${fx.home} vs ${fx.away}"? This will block all betting and mark the fixture as cancelled.`)) return;
+    try { await adminCancelFixture(fx.id); await reload(); onChange?.(); showToast('Fixture cancelled.'); }
+    catch (e) { showToast(e.message, 'error'); }
+  }
+  async function doPostpone() {
+    const newDay = prompt('Reschedule to day (e.g. "Tomorrow" or leave blank):');
+    const newKickoff = prompt('New kickoff time (e.g. "20:00" or leave blank):');
+    try {
+      await adminPostponeFixture(fx.id, { newKickoff: newKickoff || undefined, newDay: newDay || undefined });
+      await reload(); onChange?.(); showToast('Fixture postponed.');
+    } catch (e) { showToast(e.message, 'error'); }
+  }
+  async function doArchive() {
+    if (!confirm(`Archive "${fx.home} vs ${fx.away}"? Archived fixtures are hidden from users.`)) return;
+    try { await adminArchiveFixture(fx.id); await reload(); onChange?.(); showToast('Fixture archived.'); }
+    catch (e) { showToast(e.message, 'error'); }
+  }
+  async function doRestore() {
+    try { await adminRestoreFixture(fx.id); await reload(); onChange?.(); showToast('Fixture restored.'); }
+    catch (e) { showToast(e.message, 'error'); }
+  }
+  async function doDuplicate() {
+    const home = prompt('Home team:', fx.home);
+    if (!home) return;
+    const away = prompt('Away team:', fx.away);
+    if (!away) return;
+    try {
+      const r = await adminDuplicateFixture(fx.id, { home, away, kickoff: fx.kickoff, day: fx.day });
+      setFx(r.fixture);
+      onChange?.();
+      showToast(`Duplicated as ${r.fixture.id}`);
+    } catch (e) { showToast(e.message, 'error'); }
+  }
+
+  function renderStatusBadge() {
+    const ms = fx?.matchStatus;
+    if (ms === 'cancelled') return <Badge tone="warn">Cancelled</Badge>;
+    if (ms === 'postponed') return <Badge tone="info">Postponed</Badge>;
+    if (ms === 'abandoned') return <Badge tone="warn">Abandoned</Badge>;
+    if (ms === 'void') return <Badge tone="warn">Void</Badge>;
+    if (ms === 'ft') return <Badge tone="success">FT {fx.scoreHome ?? ''}-{fx.scoreAway ?? ''}</Badge>;
+    if (ms === 'ht') return <Badge tone="danger" dot>HT {fx.minute || ''}</Badge>;
+    if (ms === '2h') return <Badge tone="danger" dot>2H {fx.minute || ''}</Badge>;
+    if (fx?.finished) return <Badge tone="success">Finished {fx.scoreHome}-{fx.scoreAway}</Badge>;
+    if (fx?.isLive) return <Badge tone="danger" dot>Live {fx.minute || ''}</Badge>;
+    return <Badge tone="info">Upcoming</Badge>;
+  }
+
   return (
     <Drawer
       open={open}
@@ -314,7 +387,7 @@ function FixtureDrawer({ open, fixtureId, onClose, hasRole, showToast, onChange 
         <>
           {fx.adminCreated && <button className="adm-btn ghost" onClick={deleteFx}>Delete</button>}
           <button className="adm-btn warn" onClick={toggleSuspendAll}><IconBan size={14} /> {fx.suspended ? 'Unsuspend' : 'Suspend all'}</button>
-          <button className="adm-btn primary" onClick={() => setResultModal(true)}><IconSettle size={14} /> Record result & settle</button>
+          {!isFinal && <button className="adm-btn primary" onClick={() => setResultModal(true)}><IconSettle size={14} /> Record result & settle</button>}
         </>
       ) : null}
     >
@@ -325,19 +398,26 @@ function FixtureDrawer({ open, fixtureId, onClose, hasRole, showToast, onChange 
               <dt>Fixture id</dt><dd style={{ fontFamily: 'var(--ff-mono)', fontSize: 12 }}>{fx.id}</dd>
               <dt>Sport · League</dt><dd>{fx.sport} · {fx.leagueName || fx.leagueId}</dd>
               <dt>Kick-off</dt><dd>{fx.day} {fx.kickoff}</dd>
-              <dt>Status</dt><dd>
-                {fx.finished ? <Badge tone="success">Finished {fx.scoreHome}-{fx.scoreAway}</Badge>
-                  : fx.isLive ? <Badge tone="danger" dot>Live {fx.minute || ''}</Badge>
-                  : <Badge tone="info">Upcoming</Badge>}
-              </dd>
+              <dt>Status</dt><dd>{renderStatusBadge()}</dd>
               {fx.suspended && <><dt>Suspended</dt><dd><Badge tone="warn">All markets suspended</Badge></dd></>}
             </dl>
-            {hasRole('odds_manager') && !fx.finished && (
-              <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
-                <button className="adm-btn sm" onClick={() => setLive(!fx.isLive)}>
+            {hasRole('odds_manager') && (
+              <div style={{ display: 'flex', gap: 4, marginTop: 10, flexWrap: 'wrap' }}>
+                <button className="adm-btn sm" onClick={() => setLive(!fx.isLive)} disabled={isFinal}>
                   <IconLive size={12} /> {fx.isLive ? 'Mark not live' : 'Mark live'}
                 </button>
                 <button className="adm-btn sm" onClick={resetOdds}><IconRefresh size={12} /> Reset odds</button>
+                {!isFinal && (
+                  <>
+                    <button className="adm-btn sm warn" onClick={doCancel}>Cancel</button>
+                    <button className="adm-btn sm" onClick={doPostpone}>Postpone</button>
+                    <button className="adm-btn sm" onClick={() => setStatus('ht')}>→ HT</button>
+                    <button className="adm-btn sm" onClick={() => setStatus('2h')}>→ 2H</button>
+                    <button className="adm-btn sm" onClick={() => setStatus('ft', { scoreHome: fx.scoreHome, scoreAway: fx.scoreAway })}>→ FT</button>
+                  </>
+                )}
+                <button className="adm-btn sm" onClick={doDuplicate}>Duplicate</button>
+                {fx.id?.startsWith('adm-') && <button className="adm-btn sm ghost" onClick={doArchive}>Archive</button>}
               </div>
             )}
           </Card>

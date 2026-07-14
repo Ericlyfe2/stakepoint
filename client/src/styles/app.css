@@ -2330,6 +2330,23 @@ nav a:active { transform: scale(.96); }
   background: var(--success);
   color: #fff;
 }
+.sb-badge-status {
+  display: inline-flex; align-items: center;
+  padding: 2px 8px;
+  border-radius: 3px;
+  font-size: 10px; font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  background: var(--text-dim);
+  color: var(--surface);
+}
+.sb-match-closed {
+  opacity: 0.6;
+}
+.sb-odd-closed {
+  color: var(--text-dim) !important;
+  cursor: default !important;
+}
 
 /* Match ID bar */
 .sb-match-id-bar {

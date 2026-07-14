@@ -2,7 +2,7 @@
  * Small, dependency-free admin UI primitives.
  * Each one composes the css tokens defined in styles/admin.css.
  */
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { IconClose, IconCheck, IconAlert } from './Icons.jsx';
 
 export function Card({ title, subtitle, action, pill, children, className = '', flush = false }) {
@@ -126,10 +126,10 @@ export function SkeletonRow({ cols = 6 }) {
 
 export function useToast() {
   const [state, set] = useState({ open: false, kind: 'success', message: '' });
-  const show = (message, kind = 'success') => {
+  const show = useCallback((message, kind = 'success') => {
     set({ open: true, kind, message });
     setTimeout(() => set((s) => ({ ...s, open: false })), 3200);
-  };
+  }, []);
   return { toast: state, show };
 }
 

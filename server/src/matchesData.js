@@ -4,6 +4,98 @@ import { fetchSportSnapshot } from './services/oddsApi.js';
 export const BONUS_RATE = 0.08;
 export const CURRENCY = 'GHS';
 
+// Match lifecycle statuses — ordered progression.
+export const MATCH_STATUSES = {
+  SCHEDULED: 'scheduled',
+  UPCOMING: 'upcoming',
+  LIVE: 'live',
+  HT: 'ht',         // half-time (football)
+  SECOND_HALF: '2h',
+  FT: 'ft',         // full-time (waiting for admin confirmation)
+  FINISHED: 'finished',
+  CANCELLED: 'cancelled',
+  POSTPONED: 'postponed',
+  ABANDONED: 'abandoned',
+  VOID: 'void',
+  ARCHIVED: 'archived',
+};
+
+// Statuses that block betting.
+export const BLOCKED_STATUSES = new Set([
+  MATCH_STATUSES.FINISHED,
+  MATCH_STATUSES.CANCELLED,
+  MATCH_STATUSES.POSTPONED,
+  MATCH_STATUSES.ABANDONED,
+  MATCH_STATUSES.VOID,
+  MATCH_STATUSES.ARCHIVED,
+  MATCH_STATUSES.FT,
+]);
+
+// Statuses that represent a finalised match (result is authoritative).
+export const FINAL_STATUSES = new Set([
+  MATCH_STATUSES.FINISHED,
+  MATCH_STATUSES.CANCELLED,
+  MATCH_STATUSES.POSTPONED,
+  MATCH_STATUSES.ABANDONED,
+  MATCH_STATUSES.VOID,
+]);
+
+/**
+ * Compute the current lifecycle status of a match from its raw fields.
+ * The explicit matchStatus override (set by admin or the lifecycle engine)
+ * takes priority. Otherwise we derive from isLive, finished, kickoff, etc.
+ */
+export function computeMatchStatus(match) {
+  if (match.matchStatus) return match.matchStatus;
+
+  if (match.finished) return MATCH_STATUSES.FINISHED;
+  if (match.isLive) {
+    const min = String(match.minute || '');
+    if (min.startsWith('HT')) return MATCH_STATUSES.HT;
+    if (min.startsWith('2H') || min.startsWith('45+') || /^[5-9]\d/.test(min) || /^1\d\d/.test(min)) {
+      return MATCH_STATUSES.SECOND_HALF;
+    }
+    return MATCH_STATUSES.LIVE;
+  }
+  if (match.kickoff) {
+    const ko = parseKickoffTime(match);
+    if (ko && Date.now() >= ko - 600_000) return MATCH_STATUSES.UPCOMING;
+  }
+  return MATCH_STATUSES.SCHEDULED;
+}
+
+export function parseKickoffTime(match) {
+  if (!match.kickoff) return 0;
+  // First try parsing day as ISO date (e.g. '2026-07-13')
+  const dayStr = String(match.day || '').trim();
+  let baseDay = new Date();
+  baseDay.setHours(0, 0, 0, 0);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(dayStr)) {
+    baseDay = new Date(dayStr + 'T00:00:00');
+  } else {
+    const dayLow = dayStr.toLowerCase();
+    if (dayLow === 'tomorrow') baseDay = new Date(baseDay.getTime() + 86_400_000);
+    else if (dayLow.startsWith('in ')) {
+      const n = parseInt(dayLow.replace(/[^0-9]/g, ''), 10) || 0;
+      baseDay = new Date(baseDay.getTime() + n * 86_400_000);
+    }
+  }
+  const [hh = '0', mm = '0'] = String(match.kickoff).split(':');
+  return new Date(baseDay.getTime() + Number(hh) * 3600_000 + Number(mm) * 60_000).getTime();
+}
+
+/** Check if a match's kickoff has passed (betting should be locked). */
+export function isKickoffPassed(match) {
+  const status = computeMatchStatus(match);
+  if (BLOCKED_STATUSES.has(status)) return true;
+  if (status === MATCH_STATUSES.LIVE || status === MATCH_STATUSES.HT ||
+      status === MATCH_STATUSES.SECOND_HALF || status === MATCH_STATUSES.FT) {
+    return true;
+  }
+  const ko = parseKickoffTime(match);
+  return ko > 0 && Date.now() >= ko;
+}
+
 const formDots = (s) => s.split('').map((c) => (c === 'w' ? 'w' : c === 'd' ? 'd' : 'l'));
 
 // Decimal odds from probability, with a small house margin baked in.

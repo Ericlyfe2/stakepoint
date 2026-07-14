@@ -14,6 +14,10 @@ import {
   ensureFreshLeagues,
   BONUS_RATE,
   CURRENCY,
+  computeMatchStatus,
+  isKickoffPassed,
+  MATCH_STATUSES,
+  BLOCKED_STATUSES,
 } from '../matchesData.js';
 import {
   adminLookupSelection, adminLookupFixture, buildPublicSnapshot,
@@ -373,6 +377,10 @@ router.post('/book',
       if (hasRealResult || fxView?.suspended) {
         return res.json({ success: false, error: 'Market closed — fixture is no longer available.', code: 'MARKET_CLOSED' });
       }
+      // Kickoff-based lock: if kickoff has passed, block booking
+      if (isKickoffPassed(fxView)) {
+        return res.json({ success: false, error: 'This match has already started — betting is closed.', code: 'KICKOFF_PASSED' });
+      }
       if (found.market?.suspended || found.selection?.suspended) {
         return res.json({ success: false, error: 'Selection suspended — refresh and try a different market.', code: 'SELECTION_SUSPENDED' });
       }
@@ -454,15 +462,13 @@ router.post('/place',
       const found = adminLookupSelection({ matchId: sel.matchId, market: sel.market, outcome: sel.outcome });
       if (!found) return res.json({ success: false, error: `Invalid selection ${sel.market} ${sel.outcome} for match ${sel.matchId}.` });
       const fxView = found.row?.match || found.row;
-      // Only block placement when the market is *actually* closed:
-      //   - admin has explicitly suspended the fixture, or
-      //   - the fixture has a real authoritative result (manual or feed).
-      // Auto-simulated demo results (finalSource === 'simulated') should not
-      // block bets — the engine will settle them on the next tick using the
-      // same simulated score, so the user still gets a booking code now.
       const hasRealResult = fxView?.finished && (fxView.finalSource === 'feed' || fxView.finalSource === 'manual');
       if (hasRealResult || fxView?.suspended) {
         return res.json({ success: false, error: 'Market closed — fixture is no longer available.', code: 'MARKET_CLOSED' });
+      }
+      // Kickoff-based lock: if kickoff has passed, block placing
+      if (isKickoffPassed(fxView)) {
+        return res.json({ success: false, error: 'This match has already started — betting is closed.', code: 'KICKOFF_PASSED' });
       }
       if (found.market?.suspended || found.selection?.suspended) {
         return res.json({ success: false, error: 'Selection suspended — refresh and try a different market.', code: 'SELECTION_SUSPENDED' });

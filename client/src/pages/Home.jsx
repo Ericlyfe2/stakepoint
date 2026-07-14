@@ -971,38 +971,11 @@ export default function Home({ initialChip }) {
 
       {/* ─── Verified Sports Payouts ─── */}
       <div className="xb-payouts-ticker">
-        <span className="xb-ticker-badge">✅ Verified Sports Payouts</span>
+        <span className="xb-ticker-badge">Instant Payouts</span>
         <span className="xb-ticker-right">
-          <span className="xb-paid-dot" />Paid winners
+          <span className="xb-paid-dot" />Big wins paid instantly
           <span className="xb-ticker-date">Updated {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}, {new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}</span>
         </span>
-      </div>
-      <div className="xb-winners-wrap">
-        <div className="xb-winners-track">
-          {[0, 1].map((dup) => (
-            <div className="xb-winners-set" key={dup}>
-              {[
-                { phone: '059*****782', amount: 'GHS 187,340' },
-                { phone: '055****081', amount: 'GHS 42,650' },
-                { phone: '059*****602', amount: 'GHS 128,900' },
-                { phone: '050*****439', amount: 'GHS 73,210' },
-                { phone: '024****391', amount: 'GHS 15,870' },
-                { phone: '053*****117', amount: 'GHS 96,500' },
-                { phone: '020****845', amount: 'GHS 154,280' },
-                { phone: '026*****963', amount: 'GHS 61,740' },
-              ].map((w, i) => (
-                <div className="xb-winner-card" key={`${dup}-${i}`}>
-                  <div className="xb-winner-top">
-                    <span className="xb-winner-trophy">🏆</span>
-                    <span className="xb-winner-phone">{w.phone} won</span>
-                  </div>
-                  <div className="xb-winner-amount">{w.amount}</div>
-                  <div className="xb-winner-badge">⏱ SPORTS · PAID</div>
-                </div>
-              ))}
-            </div>
-          ))}
-        </div>
       </div>
 
       {/* ─── Live Matches widget ─── */}
@@ -1300,14 +1273,21 @@ export default function Home({ initialChip }) {
                       const isBestOdds = !match.isLive && minOdds >= 1.3 && minOdds < 2.2 && mIdx % 3 !== 2;
                       const commentCount = ((match.id?.charCodeAt?.(0) || mIdx) % 5) + 1;
 
+                      const lifecycleStatus = match.matchStatus || (match.finished ? 'finished' : match.isLive ? 'live' : null);
+                      const isClosed = ['cancelled', 'postponed', 'abandoned', 'void', 'finished'].includes(lifecycleStatus);
+                      const statusLabel = lifecycleStatus === 'cancelled' ? 'Cancelled'
+                        : lifecycleStatus === 'postponed' ? 'Postponed'
+                        : lifecycleStatus === 'abandoned' ? 'Abandoned'
+                        : lifecycleStatus === 'void' ? 'Void'
+                        : null;
+
                       return (
-                        <div key={match.id} className={`sb-match ${gridClass}`}>
-                          {(isHot || isBestOdds) && (
-                            <div className="sb-match-badges">
-                              {isHot && <span className="sb-badge-hot">HOT</span>}
-                              {isBestOdds && <span className="sb-badge-best">BEST ODDS</span>}
-                            </div>
-                          )}
+                        <div key={match.id} className={`sb-match ${gridClass}${isClosed ? ' sb-match-closed' : ''}`}>
+                          <div className="sb-match-badges">
+                            {isHot && <span className="sb-badge-hot">HOT</span>}
+                            {isBestOdds && <span className="sb-badge-best">BEST ODDS</span>}
+                            {statusLabel && <span className="sb-badge-status">{statusLabel}</span>}
+                          </div>
 
                           <div className="sb-match-id-bar">
                             <span>ID {String(match.id || '').slice(-5).replace(/\D/g, '') || (43000 + mIdx)}</span>
@@ -1320,14 +1300,17 @@ export default function Home({ initialChip }) {
                             <button
                               type="button"
                               className="sb-match-time"
-                              onClick={() => openMarkets(lg, match)}
+                              onClick={() => !isClosed && openMarkets(lg, match)}
+                              disabled={isClosed}
                             >
-                              {match.isLive ? (
+                              {match.isLive && lifecycleStatus !== 'finished' ? (
                                 <>
                                   <span className="live">LIVE</span>
                                   <span className="score">{match.scoreHome}-{match.scoreAway}</span>
                                   <span className="minute">{match.minute || ''}'</span>
                                 </>
+                              ) : statusLabel ? (
+                                <span className="kickoff" style={{ color: 'var(--text-dim)' }}>{statusLabel}</span>
                               ) : (
                                 <>
                                   <span className="kickoff">{match.kickoff || ''}</span>
@@ -1338,14 +1321,17 @@ export default function Home({ initialChip }) {
                             <button
                               type="button"
                               className="sb-match-teams"
-                              onClick={() => openMarkets(lg, match)}
+                              onClick={() => !isClosed && openMarkets(lg, match)}
+                              disabled={isClosed}
                             >
                               <span className="row">{match.home}</span>
                               <span className="row">{match.away}</span>
                             </button>
 
                             <div className="sb-odds-group">
-                              {match.suspended ? (
+                              {isClosed ? (
+                                <span className="sb-odd disabled sb-odd-closed">CLOSED</span>
+                              ) : match.suspended ? (
                                 <span className="sb-odd disabled sb-odd-suspended">SUSP</span>
                               ) : cols ? (
                                 cols.selections.map((s) => {
@@ -1394,11 +1380,6 @@ export default function Home({ initialChip }) {
           })}
         </>
       )}
-
-      {/* ─── Grand Prize Winners ─── */}
-      <div className="sb-bottom-stack">
-        <GrandPrizeWinners />
-      </div>
 
       {/* ─── Draggable floating betslip button ─── */}
       <DraggableBetFAB
@@ -2149,51 +2130,4 @@ function DraggableBetFAB({ count, totalOdds, onClick }) {
   );
 }
 
-function makeWinner() {
-  // Ghana mobile prefixes (MTN, Vodafone/Telecel, AirtelTigo, Glo) — masked
-  // so the punter's identity stays private. Example: 024 *** **42
-  const prefixes = ['024', '025', '054', '055', '059', '020', '050', '027', '057', '026', '056'];
-  const prefix = prefixes[Math.floor(Math.random() * prefixes.length)];
-  const lastTwo = String(Math.floor(Math.random() * 100)).padStart(2, '0');
-  const who = `${prefix} *** **${lastTwo}`;
-  const amt = 200000 + Math.random() * (600501.75 - 200000);
-  const mins = Math.floor(Math.random() * 3) + 1;
-  return { who, amt, src: 'in Sports', ago: mins === 1 ? '1 min ago' : `${mins} mins ago` };
-}
-
-/* ─── Live Grand Prize Winners ticker ─── */
-function GrandPrizeWinners() {
-  const [items, setItems] = useState(() => Array.from({ length: 10 }, () => makeWinner()));
-
-  useEffect(() => {
-    const id = setInterval(() => {
-      setItems((prev) => { const n = [...prev]; n.shift(); n.push(makeWinner()); return n; });
-    }, 3500);
-    return () => clearInterval(id);
-  }, []);
-
-  const doubled = [...items, ...items];
-
-  return (
-    <section className="sb-winners">
-      <div className="sb-winners-head">
-        <h3>🏆 Grand Prize Winners</h3>
-      </div>
-      <div className="sb-winners-scroll">
-        <div className="sb-winners-track">
-          {doubled.map((w, i) => (
-            <div key={i} className="sb-winner">
-              <div className="sb-winner-bg-icon">
-                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19,5h-2V3c0-0.55-0.45-1-1-1H8C7.45,2,7,2.45,7,3v2H5C3.9,5,3,5.9,3,7v1c0,2.55,1.92,4.63,4.39,4.94C8.23,14.73,9.44,16,11,16v3H7v2h10v-2h-4v-3c1.56,0,2.77-1.27,3.61-3.06C19.08,12.63,21,10.55,21,8V7C21,5.9,20.1,5,19,5z M5,8V7h2v3.82C5.84,10.4,5,9.3,5,8z M19,8c0,1.3-0.84,2.4-2,2.82V7h2V8z"/></svg>
-              </div>
-              <span className="who">{w.who}</span>
-              <span className="amt">GHS {formatAmt(w.amt)}</span>
-              <span className="src">{w.src}</span>
-              <span className="ago">{w.ago}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-}
+/* Grand Prize Winners ticker removed — replaced by real settlement engine */

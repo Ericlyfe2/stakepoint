@@ -252,6 +252,24 @@ export function emitToUser(userId, event, payload) {
   liveNs.to(`user:${userId}`).emit(event, payload);
 }
 
+/** Emit a match lifecycle status change to all watchers of a fixture. */
+export function emitFixtureStatusChanged(payload) {
+  if (!liveNs) return;
+  const { fixtureId, status, matchStatus, scoreHome, scoreAway, minute, sport } = payload;
+  const event = {
+    fixtureId,
+    status: matchStatus || status,
+    scoreHome,
+    scoreAway,
+    minute,
+    ts: Date.now(),
+  };
+  liveNs.to(`fixture:${fixtureId}`).emit('match:status', event);
+  if (sport) liveNs.to(`sport:${sport}`).emit('match:status', event);
+  // Also propagate to admin namespace
+  if (adminNs) adminNs.to('global').emit('match:status', event);
+}
+
 /** Push a cash-out offer to a specific user's room. */
 export function emitCashoutOffer(userId, payload) {
   if (!liveNs || !userId) return;

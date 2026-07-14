@@ -23,23 +23,30 @@ import {
   compiledLeagues, adminListFixtures, adminLookupFixture, readSportsAdmin,
   patchOverride, setOddsOverride, clearOddsOverride,
   setSuspension, clearSuspension, setResult,
-  addCustomFixture, deleteCustomFixture, addCustomLeague, updateCustomLeague, deleteCustomLeague,
+  addCustomFixture, deleteCustomFixture, addCustomLeague, updateCustomLeague, deleteCustomLeague, deleteCustomLeagueWithCascade,
   addMarketToFixture, removeMarketFromFixture,
+  setMatchStatus, clearMatchStatus, getMatchStatusOverride,
+  archiveFixture, restoreFixture, isFixtureArchived, duplicateFixture,
 } from '../../db/sportsAdmin.js';
 import { settleNow } from '../../services/settlement.js';
-import { buildCorrectScoreMarket } from '../../matchesData.js';
+import { emitFixtureStatusChanged } from '../../services/realtime.js';
+import { buildCorrectScoreMarket, MATCH_STATUSES, computeMatchStatus, isKickoffPassed } from '../../matchesData.js';
 
 const router = Router();
 
 router.get('/fixtures', requireAdmin, (req, res) => {
   const { sport, leagueId, status, q } = req.query;
-  let rows = adminListFixtures();
+  const includeArchived = req.query.archived === '1';
+  let rows = adminListFixtures(includeArchived);
   if (sport)    rows = rows.filter((m) => m.sport === sport);
   if (leagueId) rows = rows.filter((m) => m.leagueId === leagueId);
-  if (status === 'live')      rows = rows.filter((m) => m.isLive);
-  if (status === 'upcoming')  rows = rows.filter((m) => !m.isLive && !m.finished);
-  if (status === 'finished')  rows = rows.filter((m) => m.finished);
+  if (status === 'live')      rows = rows.filter((m) => m.isLive || m.matchStatus === 'live');
+  if (status === 'upcoming')  rows = rows.filter((m) => !m.isLive && !m.finished && m.matchStatus !== 'live');
+  if (status === 'finished')  rows = rows.filter((m) => m.finished || m.matchStatus === 'finished' || m.matchStatus === 'ft');
   if (status === 'suspended') rows = rows.filter((m) => m.suspended);
+  if (status === 'archived')  rows = rows.filter((m) => { try { return isFixtureArchived(m.id); } catch { return false; } });
+  if (status === 'cancelled') rows = rows.filter((m) => m.matchStatus === 'cancelled');
+  if (status === 'postponed') rows = rows.filter((m) => m.matchStatus === 'postponed');
   if (q) {
     const needle = String(q).toLowerCase();
     rows = rows.filter((m) =>
@@ -58,8 +65,9 @@ router.get('/fixtures/:id', requireAdmin, (req, res, next) => {
   });
 });
 
-router.get('/leagues', requireAdmin, (_req, res) => {
-  const leagues = compiledLeagues().flatMap((sp) => (sp.leagues || []).map((lg) => ({
+router.get('/leagues', requireAdmin, (req, res) => {
+  const includeArchived = req.query.archived === '1';
+  const leagues = compiledLeagues(includeArchived).flatMap((sp) => (sp.leagues || []).map((lg) => ({
     id: lg.id, name: lg.name, sport: sp.id, region: lg.region, matchCount: (lg.matches || []).length, admin: !!lg.admin,
   })));
   res.json({ leagues });
@@ -106,9 +114,21 @@ router.patch('/leagues/:id',
 );
 
 router.delete('/leagues/:id', requireAdmin, requireRole('odds_manager'), (req, res) => {
-  deleteCustomLeague(req.params.id);
-  audit(req, { action: 'sports.league.delete', target: req.params.id, targetType: 'league', severity: 'warning' });
-  res.json({ ok: true });
+  const cascade = req.query.cascade === 'true';
+  let result;
+  if (cascade) {
+    result = deleteCustomLeagueWithCascade(req.params.id);
+    if (!result) return res.json({ ok: false, error: 'League not found.' });
+  } else {
+    deleteCustomLeague(req.params.id);
+    result = { removedFixtures: 0 };
+  }
+  audit(req, {
+    action: cascade ? 'sports.league.delete-cascade' : 'sports.league.delete',
+    target: req.params.id, targetType: 'league', severity: 'warning',
+    meta: result,
+  });
+  res.json({ ok: true, ...result });
 });
 
 const extraMarketItem = z.object({
@@ -258,11 +278,26 @@ router.patch('/fixtures/:id',
     scoreHome: z.number().optional(),
     scoreAway: z.number().optional(),
     minute: z.string().optional(),
+    matchStatus: z.string().optional(),
   })),
   (req, res, next) => {
     const view = adminLookupFixture(req.params.id);
     if (!view) return next(notFound('Fixture not found'));
-    patchOverride(req.params.id, req.body);
+    const { matchStatus, ...rest } = req.body;
+    if (matchStatus) {
+      setMatchStatus(req.params.id, matchStatus);
+    }
+    if (Object.keys(rest).length) {
+      patchOverride(req.params.id, rest);
+    }
+    // Emit status change if matchStatus was updated
+    if (matchStatus) {
+      emitFixtureStatusChanged({
+        fixtureId: req.params.id,
+        status: matchStatus,
+        sport: view.sport?.id,
+      });
+    }
     audit(req, { action: 'sports.fixture.patch', target: req.params.id, targetType: 'fixture', meta: req.body });
     const refreshed = adminLookupFixture(req.params.id);
     res.json({ fixture: { ...refreshed.match, sport: refreshed.sport?.id, leagueId: refreshed.league?.id } });
@@ -382,13 +417,159 @@ router.delete('/fixtures/:id/markets/:marketKey',
   }
 );
 
-/* ─── Bulk fixture operations ─── */
+/* ─── Fixture lifecycle management ─── */
+
+const lifecycleActionSchema = z.object({
+  status: z.enum(['upcoming', 'live', 'ht', '2h', 'ft', 'finished', 'cancelled', 'postponed', 'abandoned', 'void']),
+  minute: z.string().optional(),
+  scoreHome: z.number().int().optional(),
+  scoreAway: z.number().int().optional(),
+});
+
+/** Set match lifecycle status (auto-derives isLive/finished/suspended from status). */
+router.post('/fixtures/:id/status',
+  requireAdmin, requireRole('odds_manager'),
+  validate(lifecycleActionSchema),
+  asyncHandler(async (req, res, next) => {
+    const view = adminLookupFixture(req.params.id);
+    if (!view) return next(notFound('Fixture not found'));
+    const { status, minute, scoreHome, scoreAway } = req.body;
+
+    setMatchStatus(req.params.id, status);
+
+    // When marking as FT, also auto-set the result if scores provided
+    if (status === 'ft' && scoreHome != null && scoreAway != null) {
+      setResult(req.params.id, scoreHome, scoreAway, 'manual');
+    }
+
+    // If marking as finished, set result if scores provided
+    if (status === 'finished' && scoreHome != null && scoreAway != null) {
+      setResult(req.params.id, scoreHome, scoreAway, 'manual');
+    }
+
+    // For cancelled/postponed/abandoned/void — no result, just status
+    // Clear any existing result so settlement doesn't fire on junk data
+    if (['cancelled', 'postponed', 'abandoned', 'void'].includes(status)) {
+      const cur = readSportsAdmin();
+      const results = { ...cur.results };
+      delete results[req.params.id];
+      // We'll handle this via the overrides mechanism
+    }
+
+    // Apply minute override if provided
+    if (minute) {
+      patchOverride(req.params.id, { minute });
+    }
+
+    // Emit real-time status change
+    const refreshed = adminLookupFixture(req.params.id);
+    emitFixtureStatusChanged({
+      fixtureId: req.params.id,
+      status,
+      scoreHome: scoreHome ?? refreshed?.match?.scoreHome,
+      scoreAway: scoreAway ?? refreshed?.match?.scoreAway,
+      minute: minute ?? refreshed?.match?.minute,
+      sport: refreshed?.sport?.id,
+    });
+
+    audit(req, { action: `sports.lifecycle.${status}`, target: req.params.id, targetType: 'fixture', severity: 'warning', meta: { status, minute, scoreHome, scoreAway } });
+    res.json({ ok: true, matchStatus: status, fixture: { ...refreshed.match, sport: refreshed.sport?.id, leagueId: refreshed.league?.id } });
+  })
+);
+
+/** Duplicate a fixture (preserves markets, clears result/live state). */
+router.post('/fixtures/:id/duplicate',
+  requireAdmin, requireRole('odds_manager'),
+  asyncHandler(async (req, res, next) => {
+    const duplicated = duplicateFixture(req.params.id, {
+      home: req.body.home,
+      away: req.body.away,
+      kickoff: req.body.kickoff,
+      day: req.body.day,
+    });
+    if (!duplicated) return next(notFound('Fixture not found'));
+    audit(req, { action: 'sports.fixture.duplicate', target: req.params.id, targetType: 'fixture', meta: { newId: duplicated.id } });
+    res.status(201).json({ fixture: duplicated });
+  })
+);
+
+/** Archive a fixture (hidden from user view, visible in admin with ?archived=1). */
+router.post('/fixtures/:id/archive',
+  requireAdmin, requireRole('odds_manager'),
+  asyncHandler(async (req, res, next) => {
+    const view = adminLookupFixture(req.params.id);
+    if (!view) return next(notFound('Fixture not found'));
+    archiveFixture(req.params.id);
+    // Also auto-suspend archived fixtures
+    setSuspension(req.params.id, { all: true });
+    audit(req, { action: 'sports.fixture.archive', target: req.params.id, targetType: 'fixture', severity: 'warning' });
+    res.json({ ok: true, archived: true });
+  })
+);
+
+/** Restore an archived fixture. */
+router.post('/fixtures/:id/restore',
+  requireAdmin, requireRole('odds_manager'),
+  asyncHandler(async (req, res, next) => {
+    restoreFixture(req.params.id);
+    clearSuspension(req.params.id);
+    audit(req, { action: 'sports.fixture.restore', target: req.params.id, targetType: 'fixture' });
+    res.json({ ok: true, archived: false });
+  })
+);
+
+/** Cancel a fixture (alias for setting status to cancelled). */
+router.post('/fixtures/:id/cancel',
+  requireAdmin, requireRole('odds_manager'),
+  asyncHandler(async (req, res, next) => {
+    const view = adminLookupFixture(req.params.id);
+    if (!view) return next(notFound('Fixture not found'));
+    setMatchStatus(req.params.id, 'cancelled');
+    setSuspension(req.params.id, { all: true });
+    emitFixtureStatusChanged({
+      fixtureId: req.params.id,
+      status: 'cancelled',
+      sport: view.sport?.id,
+    });
+    audit(req, { action: 'sports.fixture.cancel', target: req.params.id, targetType: 'fixture', severity: 'warning' });
+    res.json({ ok: true, matchStatus: 'cancelled' });
+  })
+);
+
+/** Postpone a fixture (alias for setting status to postponed, clears result). */
+router.post('/fixtures/:id/postpone',
+  requireAdmin, requireRole('odds_manager'),
+  validate(z.object({
+    newKickoff: z.string().optional(),
+    newDay: z.string().optional(),
+  }).optional()),
+  asyncHandler(async (req, res, next) => {
+    const view = adminLookupFixture(req.params.id);
+    if (!view) return next(notFound('Fixture not found'));
+    setMatchStatus(req.params.id, 'postponed');
+    // Update kickoff if provided
+    const patch = {};
+    if (req.body?.newKickoff) patch.kickoff = req.body.newKickoff;
+    if (req.body?.newDay) patch.day = req.body.newDay;
+    if (Object.keys(patch).length) patchOverride(req.params.id, patch);
+    emitFixtureStatusChanged({
+      fixtureId: req.params.id,
+      status: 'postponed',
+      sport: view.sport?.id,
+    });
+    audit(req, { action: 'sports.fixture.postpone', target: req.params.id, targetType: 'fixture', severity: 'warning', meta: patch });
+    res.json({ ok: true, matchStatus: 'postponed' });
+  })
+);
+
+/* ─── Bulk fixture operations (refactored to use proper stores) ─── */
 const bulkFixtureSchema = z.object({
-  action: z.enum(['suspend', 'unsuspend', 'mark-live', 'mark-upcoming', 'set-result']),
+  action: z.enum(['suspend', 'unsuspend', 'mark-live', 'mark-upcoming', 'set-status']),
   fixtureIds: z.array(z.string()).min(1).max(100),
   payload: z.object({
     scoreHome: z.number().int().nonnegative().optional(),
     scoreAway: z.number().int().nonnegative().optional(),
+    status: z.string().optional(),
   }).optional(),
 });
 
@@ -401,34 +582,29 @@ router.post('/fixtures/bulk',
 
     for (const id of fixtureIds) {
       try {
-        const fixture = compiledStore.get(id);
-        if (!fixture) { results.push({ fixtureId: id, status: 'error', error: 'Not found' }); continue; }
-        const isCustom = fixture.source === 'custom';
+        const view = adminLookupFixture(id);
 
         if (action === 'suspend') {
-          const updated = { ...fixture, suspended: true, suspendedAt: new Date().toISOString() };
-          compiledStore.set(id, updated);
+          setSuspension(id, { all: true });
           results.push({ fixtureId: id, status: 'suspended' });
         } else if (action === 'unsuspend') {
-          const updated = { ...fixture, suspended: false, suspendedAt: null };
-          compiledStore.set(id, updated);
+          clearSuspension(id);
           results.push({ fixtureId: id, status: 'unsuspended' });
         } else if (action === 'mark-live') {
-          const updated = { ...fixture, isLive: true, status: 'live', startedAt: fixture.startedAt || new Date().toISOString() };
-          compiledStore.set(id, updated);
+          setMatchStatus(id, 'live');
           results.push({ fixtureId: id, status: 'marked-live' });
         } else if (action === 'mark-upcoming') {
-          const updated = { ...fixture, isLive: false, status: 'upcoming' };
-          compiledStore.set(id, updated);
+          setMatchStatus(id, 'upcoming');
           results.push({ fixtureId: id, status: 'marked-upcoming' });
-        } else if (action === 'set-result') {
-          if (!isCustom) { results.push({ fixtureId: id, status: 'error', error: 'Can only set result on custom fixtures' }); continue; }
-          const sh = payload?.scoreHome ?? fixture.scoreHome ?? 0;
-          const sa = payload?.scoreAway ?? fixture.scoreAway ?? 0;
-          const updated = { ...fixture, scoreHome: sh, scoreAway: sa, status: 'finished', isLive: false };
-          compiledStore.set(id, updated);
-          results.push({ fixtureId: id, status: 'result-set', scoreHome: sh, scoreAway: sa });
+        } else if (action === 'set-status') {
+          if (!payload?.status) { results.push({ fixtureId: id, status: 'error', error: 'status required' }); continue; }
+          setMatchStatus(id, payload.status);
+          if (payload.scoreHome != null && payload.scoreAway != null && (payload.status === 'ft' || payload.status === 'finished')) {
+            setResult(id, payload.scoreHome, payload.scoreAway, 'manual');
+          }
+          results.push({ fixtureId: id, status: `status-set:${payload.status}` });
         }
+        emitFixtureStatusChanged({ fixtureId: id, status: action, sport: view?.sport?.id });
       } catch (e) {
         results.push({ fixtureId: id, status: 'error', error: e.message });
       }

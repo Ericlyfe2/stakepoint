@@ -171,6 +171,15 @@ export const adminCreateLeague  = (body)   => post('/sports/leagues', body);
 export const adminAddMarket     = (id, body) => post(`/sports/fixtures/${encodeURIComponent(id)}/markets`, body);
 export const adminRemoveMarket  = (id, marketKey) => del(`/sports/fixtures/${encodeURIComponent(id)}/markets/${encodeURIComponent(marketKey)}`);
 
+/* fixture lifecycle */
+export const adminSetFixtureStatus = (id, body) => post(`/sports/fixtures/${encodeURIComponent(id)}/status`, body);
+export const adminDuplicateFixture = (id, body) => post(`/sports/fixtures/${encodeURIComponent(id)}/duplicate`, body);
+export const adminArchiveFixture   = (id)     => post(`/sports/fixtures/${encodeURIComponent(id)}/archive`);
+export const adminRestoreFixture   = (id)     => post(`/sports/fixtures/${encodeURIComponent(id)}/restore`);
+export const adminCancelFixture    = (id)     => post(`/sports/fixtures/${encodeURIComponent(id)}/cancel`);
+export const adminPostponeFixture  = (id, body) => post(`/sports/fixtures/${encodeURIComponent(id)}/postpone`, body);
+export const adminDeleteLeague     = (id, cascade) => del(`/sports/leagues/${encodeURIComponent(id)}${qs({ cascade })}`);
+
 /* promotions */
 export const adminListPromotions  = ()     => get('/promotions');
 export const adminCreatePromotion = (body) => post('/promotions', body);
@@ -242,8 +251,6 @@ export const adminAuditStats = () => get('/management/audit-stats');
 
 /* leagues CRUD (sports admin) */
 export const adminUpdateLeague = (id, body) => patch_(`/sports/leagues/${encodeURIComponent(id)}`, body);
-export const adminDeleteLeague = (id) => del(`/sports/leagues/${encodeURIComponent(id)}`);
-
 /* result management */
 export const adminEnterResult = (fixtureId, body) => post(`/sports/fixtures/${encodeURIComponent(fixtureId)}/result`, body);
 export const adminReverseResult = (fixtureId) => del(`/sports/fixtures/${encodeURIComponent(fixtureId)}/result`);
