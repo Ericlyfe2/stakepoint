@@ -332,6 +332,7 @@ function TicketDetails({ bet, onClose, onRemix, onShare }) {
               const actualOutcome = (lost && bet.legsResolved?.[i]?.actualOutcome)
                 ? bet.legsResolved[i].actualOutcome
                 : pick;
+              const isPending = res === 'pending';
 
               return (
                 <div key={i} className="td-leg" style={{ borderLeftColor: borderColor }}>
@@ -364,7 +365,7 @@ function TicketDetails({ bet, onClose, onRemix, onShare }) {
                         <div className="td-leg-details">
                           <div className="td-leg-detail"><span>Pick:</span> <span className="td-leg-detail-val">{getPickName(pick)} {odds}</span></div>
                           <div className="td-leg-detail"><span>Market:</span> <span className="td-leg-detail-val">{getMarketName(leg.market)}</span></div>
-                          <div className="td-leg-detail"><span>Outcome:</span> <span className="td-leg-detail-val" style={{ color: won ? '#22c66e' : lost ? '#e53935' : 'var(--text)' }}>{getPickName(actualOutcome)}</span></div>
+                          <div className="td-leg-detail"><span>Outcome:</span> <span className="td-leg-detail-val" style={{ color: won ? '#22c66e' : lost ? '#e53935' : 'var(--text)' }}>{isPending ? 'Pending' : getPickName(actualOutcome)}</span></div>
                         </div>
                       </div>
                     </div>
