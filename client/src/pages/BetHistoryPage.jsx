@@ -215,15 +215,17 @@ function TicketDetails({ bet, onClose, onRemix, onShare }) {
     return `${dd}/${mm} ${hh}:${mn}`;
   })();
 
+  // Never invent a per-leg outcome. Cashing out ends the ticket early — it
+  // does not resolve any individual leg, so a cashed-out match that hasn't
+  // been played yet has no real win/lost outcome to show. Same for a
+  // (legacy) settled bet missing legsResolved: better to show nothing than
+  // a coin-flip pretending to be a result.
   const legResult = (i) => {
-    if (bet.status === 'open') return 'pending';
     if (bet.legsResolved && bet.legsResolved[i]) return bet.legsResolved[i].won ? 'won' : 'lost';
+    if (bet.status === 'open' || bet.status === 'cashed_out') return 'pending';
     if (bet.status === 'won') return 'won';
-    if (bet.status === 'cashed_out') return (stableHash(`${bet.id}-${i}-co`) % 100) < 55 ? 'lost' : 'won';
     if (bet.status === 'void') return 'void';
-    const total = legs.length || 1;
-    const loserIdx = stableHash(bet.id) % total;
-    return i === loserIdx ? 'lost' : 'won';
+    return 'pending';
   };
 
   const resolvedScore = (i) => {
@@ -321,26 +323,11 @@ function TicketDetails({ bet, onClose, onRemix, onShare }) {
               const borderColor = won ? '#22c66e' : lost ? '#e53935' : '#4f8bff';
               const odds = leg.odds ? `@${Number(leg.odds).toFixed(2)}` : '';
 
-              let actualOutcome = pick;
-              if (lost) {
-                if (bet.legsResolved?.[i]?.actualOutcome) {
-                  actualOutcome = bet.legsResolved[i].actualOutcome;
-                } else {
-                  const m = leg.market || '1X2';
-                  const alts1X2 = { '1': ['X', '2'], 'X': ['1', '2'], '2': ['1', 'X'] };
-                  const altsOU = { 'Over': ['Under'], 'Under': ['Over'] };
-                  const altsBTTS = { 'Yes': ['No'], 'No': ['Yes'] };
-                  const altsDC = { '1X': ['2'], 'X2': ['1'], '12': ['X'] };
-                  let pool;
-                  if (m === 'OU25' || m === 'OU15' || m === 'OU35' || m === '1HOU05') pool = altsOU[pick];
-                  else if (m === 'BTTS' || m === '1HBTTS') pool = altsBTTS[pick];
-                  else if (m === 'DC') pool = altsDC[pick];
-                  else pool = alts1X2[pick];
-                  if (pool && pool.length) {
-                    actualOutcome = pool[stableHash(`${bet.id}-${i}-out`) % pool.length];
-                  }
-                }
-              }
+              // Only ever show a real actual-outcome from legsResolved (written by
+              // the settlement engine off a verified result) — never invent one.
+              const actualOutcome = (lost && bet.legsResolved?.[i]?.actualOutcome)
+                ? bet.legsResolved[i].actualOutcome
+                : pick;
 
               return (
                 <div key={i} className="td-leg" style={{ borderLeftColor: borderColor }}>
