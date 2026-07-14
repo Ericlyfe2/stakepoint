@@ -74,10 +74,30 @@ export function parseKickoffTime(match) {
     baseDay = new Date(dayStr + 'T00:00:00');
   } else {
     const dayLow = dayStr.toLowerCase();
-    if (dayLow === 'tomorrow') baseDay = new Date(baseDay.getTime() + 86_400_000);
-    else if (dayLow.startsWith('in ')) {
+    if (dayLow === 'tomorrow') {
+      baseDay = new Date(baseDay.getTime() + 86_400_000);
+    } else if (dayLow.startsWith('in ')) {
       const n = parseInt(dayLow.replace(/[^0-9]/g, ''), 10) || 0;
       baseDay = new Date(baseDay.getTime() + n * 86_400_000);
+    } else if (dayLow !== 'today' && dayStr) {
+      // "Sat 22 Aug" style (commenceToHumanTime's format for anything beyond
+      // tomorrow) — strip the leading weekday name and parse "DD Mon" against
+      // the current year. Previously this whole branch was unhandled and
+      // silently fell back to *today*, which made every fixture more than a
+      // day out look like its kickoff had already passed the moment today's
+      // clock ticked past that time of day — blocking real bets on real,
+      // still-upcoming matches.
+      const cleaned = dayStr.replace(/^[A-Za-z]{3,9}\s+/, '').trim();
+      const now = new Date();
+      const parsed = new Date(`${cleaned} ${now.getFullYear()}`);
+      if (!Number.isNaN(parsed.getTime())) {
+        parsed.setHours(0, 0, 0, 0);
+        // Landed far in the past -> must mean next year (Dec/Jan wraparound).
+        if (now.getTime() - parsed.getTime() > 200 * 86_400_000) {
+          parsed.setFullYear(parsed.getFullYear() + 1);
+        }
+        baseDay = parsed;
+      }
     }
   }
   const [hh = '0', mm = '0'] = String(match.kickoff).split(':');

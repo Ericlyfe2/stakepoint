@@ -19,7 +19,9 @@ export function getAdminSocket() {
   if (socket) return socket;
   socket = io(`${URL}/admin`, {
     path: '/socket.io',
-    transports: ['websocket', 'polling'],
+    // Polling first, then upgrade — see socketClient.js for why forcing
+    // 'websocket' first fails against a cold-starting/proxied host.
+    transports: ['polling', 'websocket'],
     auth: { token: getAdminAccess() || undefined },
     reconnection: true,
     reconnectionAttempts: Infinity,

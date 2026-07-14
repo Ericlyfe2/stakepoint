@@ -24,7 +24,12 @@ export function getSocket() {
   connectAttempted = true;
   socket = io(`${URL}/live`, {
     path: '/socket.io',
-    transports: ['websocket', 'polling'],
+    // Polling first, then upgrade — forcing 'websocket' first races the
+    // handshake against a cold-starting/proxied host (Render free tier) and
+    // frequently dies with "WebSocket is closed before the connection is
+    // established". Polling establishes reliably over plain HTTP, then
+    // engine.io upgrades to a real WebSocket once the connection is warm.
+    transports: ['polling', 'websocket'],
     auth: { token: getAccess() || undefined },
     reconnection: true,
     reconnectionAttempts: Infinity,
