@@ -388,6 +388,8 @@ router.post('/book',
       normalized.push({
         matchId: sel.matchId, market: sel.market, outcome: sel.outcome, odds: serverOdds,
         home: found.row.match.home, away: found.row.match.away,
+        kickoff: found.row.match.kickoff, day: found.row.match.day,
+        league: found.row.league?.name,
         marketName: found.row.match.markets?.[sel.market]?.name || sel.market,
       });
     }
@@ -493,6 +495,8 @@ router.post('/place',
       normalized.push({
         matchId: sel.matchId, market: sel.market, outcome: sel.outcome, odds: serverOdds,
         home: found.row.match.home, away: found.row.match.away,
+        kickoff: found.row.match.kickoff, day: found.row.match.day,
+        league: found.row.league?.name,
         marketName: found.row.match.markets?.[sel.market]?.name || sel.market,
       });
     }

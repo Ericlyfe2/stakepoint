@@ -32,6 +32,26 @@ function placedAtLabel(iso) {
   return `${dt}, ${tm}`;
 }
 
+// Each leg's `kickoff`/`day` are plain display strings like "11:30"/"Sat 22
+// Aug" (matching the odds board), never a parseable date — `new Date(leg.
+// kickoff)` is always Invalid Date, which silently fell back to bet.placedAt
+// and showed "when you staked" instead of the match's actual kickoff. Show
+// the real fields as-is; only fall back to the stake time for old bets
+// placed before legs carried kickoff/day.
+function legKickoffLabel(leg, bet) {
+  if (leg?.day || leg?.kickoff) return [leg.day, leg.kickoff].filter(Boolean).join(' ');
+  return placedAtLabelShort(bet?.placedAt);
+}
+function placedAtLabelShort(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  const dd = String(d.getDate()).padStart(2, '0');
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const hh = String(d.getHours()).padStart(2, '0');
+  const mn = String(d.getMinutes()).padStart(2, '0');
+  return `${dd}/${mm} ${hh}:${mn}`;
+}
+
 function computeOffer(b) {
   if (b.status !== 'open') return 0;
   const stake = Number(b.stake || 0);
@@ -216,14 +236,7 @@ function TicketDetails({ bet, onClose, onRemix, onShare }) {
 
   const legGameId = (l, i) => String(stableHash(`${bet?.id}-${l?.matchId || i}`)).slice(0, 5).padStart(5, '0');
 
-  const legDate = (l) => {
-    const d = new Date(l.kickoff || bet.placedAt || Date.now());
-    const dd = String(d.getDate()).padStart(2, '0');
-    const mm = String(d.getMonth() + 1).padStart(2, '0');
-    const hh = String(d.getHours()).padStart(2, '0');
-    const mn = String(d.getMinutes()).padStart(2, '0');
-    return `${dd}/${mm} ${hh}:${mn}`;
-  };
+  const legDate = (l) => legKickoffLabel(l, bet);
 
   const handleCopy = () => {
     navigator.clipboard?.writeText(code);
@@ -401,15 +414,6 @@ export function BetCardView({ bet, onCashout, onRemix, onDetails, copiedCode, on
     const firstLeg = legs[0] || {};
     const matchName = firstLeg.home && firstLeg.away ? `${firstLeg.home} vs ${firstLeg.away}` : firstLeg.match || firstLeg.event || (legs.length > 1 ? `${legs.length} selections` : 'Bet');
     const league = firstLeg.league || firstLeg.competition || '';
-    const legDate = (() => {
-      const d = new Date(firstLeg.kickoff || bet.placedAt || Date.now());
-      const dd = String(d.getDate()).padStart(2, '0');
-      const mm = String(d.getMonth() + 1).padStart(2, '0');
-      const yyyy = d.getFullYear();
-      const hh = String(d.getHours()).padStart(2, '0');
-      const mn = String(d.getMinutes()).padStart(2, '0');
-      return `${dd}/${mm} ${hh}:${mn}`;
-    })();
 
     return (
       <motion.div
@@ -511,7 +515,7 @@ export function BetCardView({ bet, onCashout, onRemix, onDetails, copiedCode, on
                           ) : isFT ? (
                             <div className="xh-leg-ft-status">FT{score ? ` | ${score}` : ''}</div>
                           ) : (
-                            <div className="xh-open-leg-date">{legDate}</div>
+                            <div className="xh-open-leg-date">{legKickoffLabel(leg, bet)}</div>
                           )}
                         </div>
                       </div>
