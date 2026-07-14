@@ -858,9 +858,19 @@ export default function Home({ initialChip }) {
     });
   };
 
-  const visibleLeagues = activeLeague
+  const visibleLeaguesAll = activeLeague
     ? snapshot.leagues.filter((l) => l.id === activeLeague)
     : snapshot.leagues;
+
+  // Hide matches that are done (cancelled/postponed/abandoned/void/finished) — they used
+  // to render as a disabled "CLOSED" row, but users want them gone from the board entirely.
+  const isMatchClosed = (m) => {
+    const status = m.matchStatus || (m.finished ? 'finished' : null);
+    return ['cancelled', 'postponed', 'abandoned', 'void', 'finished'].includes(status);
+  };
+  const visibleLeagues = visibleLeaguesAll
+    .map((lg) => ({ ...lg, matches: lg.matches.filter((m) => !isMatchClosed(m)) }))
+    .filter((lg) => lg.matches.length > 0);
 
   // Today = matches whose `day` doesn't read like a date string ("Sun", "Mon", a future date).
   // Live always counts as today. Live tab = only isLive matches.
