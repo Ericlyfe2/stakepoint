@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { fetchBetHistory, fetchBetByCode, fetchCashoutOffer, executeCashout, setAutoCashout as apiSetAutoCashout } from '../api/betApi.js';
+import { onLive } from '../api/socketClient.js';
 import { useAccount, useToast } from '../providers/AccountProvider.jsx';
 import CashoutModal from '../components/CashoutModal.jsx';
 import AutoCashoutPanel from '../components/AutoCashoutPanel.jsx';
@@ -752,6 +753,23 @@ export default function BetHistoryPage() {
     };
     const id = setInterval(tick, 4000);
     return () => clearInterval(id);
+  }, [account, refresh]);
+
+  // Instant refresh on settlement/cashout events instead of waiting for the
+  // next 4s poll tick — bet status and cashout availability should update
+  // the moment the server confirms them.
+  useEffect(() => {
+    if (!account) return undefined;
+    const offSettled = onLive('bet:settled', () => { refresh(); });
+    const offWon = onLive('bet:won', () => { refresh(); });
+    const offAutoCashout = onLive('cashout:auto-triggered', () => { refresh(); });
+    const offSuspended = onLive('cashout:suspended', () => { refresh(); });
+    return () => {
+      try { offSettled?.(); } catch { /* ignore */ }
+      try { offWon?.(); } catch { /* ignore */ }
+      try { offAutoCashout?.(); } catch { /* ignore */ }
+      try { offSuspended?.(); } catch { /* ignore */ }
+    };
   }, [account, refresh]);
 
   // ── Derived Data ──

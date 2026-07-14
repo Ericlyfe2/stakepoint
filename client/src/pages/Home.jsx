@@ -281,10 +281,11 @@ export default function Home({ initialChip }) {
   }, [sportId, subTab]);
 
   // Realtime socket overlay on Live tab — merges odds:tick and score:update
-  // into the snapshot so prices/scores move between API polls.
+  // into the snapshot so prices/scores move between API polls. Room
+  // join/leave for `sport:<id>` is owned by the always-on lifecycle effect
+  // below so the two overlays don't fight over the same socket room.
   useEffect(() => {
     if (subTab !== 'live') return;
-    subscribeSports([sportId]);
 
     const offOdds = onLive('odds:tick', (payload) => {
       if (!payload?.fixtureId || !payload?.market) return;
@@ -338,9 +339,44 @@ export default function Home({ initialChip }) {
     return () => {
       try { offOdds?.(); } catch { /* ignore */ }
       try { offScore?.(); } catch { /* ignore */ }
-      try { unsubscribeSports([sportId]); } catch { /* ignore */ }
     };
   }, [subTab, sportId]);
+
+  // Fixture lifecycle overlay — always on (any tab), so kickoff/HT/2H/FT/
+  // cancelled/postponed/void land instantly instead of waiting for the next
+  // poll. Matches that become closed disappear from the board immediately
+  // (see isMatchClosed filter below).
+  useEffect(() => {
+    subscribeSports([sportId]);
+    const offStatus = onLive('match:status', (payload) => {
+      if (!payload?.fixtureId) return;
+      setSnapshot((cur) => {
+        if (!cur) return cur;
+        let touched = false;
+        const leagues = cur.leagues.map((lg) => ({
+          ...lg,
+          matches: lg.matches.map((m) => {
+            if (m.id !== payload.fixtureId) return m;
+            touched = true;
+            return {
+              ...m,
+              matchStatus: payload.status,
+              scoreHome: payload.scoreHome ?? m.scoreHome,
+              scoreAway: payload.scoreAway ?? m.scoreAway,
+              minute: payload.minute ?? m.minute,
+              isLive: payload.status === 'live' || payload.status === 'ht' || payload.status === '2h',
+              finished: payload.status === 'finished',
+            };
+          }),
+        }));
+        return touched ? { ...cur, leagues } : cur;
+      });
+    });
+    return () => {
+      try { offStatus?.(); } catch { /* ignore */ }
+      try { unsubscribeSports([sportId]); } catch { /* ignore */ }
+    };
+  }, [sportId]);
 
   // Bottom-sheet open/close wiring
   useEffect(() => {

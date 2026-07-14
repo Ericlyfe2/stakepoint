@@ -17,7 +17,7 @@
 import { enabledProviders, providersHealth } from './providerRegistry.js';
 import { get as cacheGet, set as cacheSet } from './cache.js';
 import { emitOddsTick, emitOddsMovement, emitProviderHealth } from './realtime.js';
-import { setOddsOverride } from '../db/sportsAdmin.js';
+import { setOddsOverride, setMatchStatus, setResult } from '../db/sportsAdmin.js';
 import { log } from '../utils/logger.js';
 import { recordOddsLag } from './metrics.js';
 
@@ -56,6 +56,7 @@ function deriveEventKinds(prev, next) {
   if ((next.redCardsHome ?? 0) > (prev.redCardsHome ?? 0)) out.push('red_card');
   if ((next.redCardsAway ?? 0) > (prev.redCardsAway ?? 0)) out.push('red_card');
   if (prev.minute !== 'HT' && next.minute === 'HT') out.push('half_time');
+  if (prev.minute === 'HT' && next.minute !== 'HT' && next.minute !== 'FT') out.push('second_half');
   if (prev.minute !== 'FT' && next.minute === 'FT') out.push('full_time');
   return out;
 }
@@ -253,7 +254,7 @@ async function liveLoop() {
     ]);
 
     // 1) Score & match-event emits.
-    const { emitScoreUpdate } = await import('./realtime.js');
+    const { emitScoreUpdate, emitFixtureStatusChanged } = await import('./realtime.js');
     for (const fx of scoreRows) {
       if (!fx?.key) continue;
       const prev = liveLastByKey.get(fx.key);
@@ -286,6 +287,28 @@ async function liveLoop() {
           scoreAway: fx.scoreAway,
           minute: fx.minute,
         });
+      }
+
+      // Persist the fixture lifecycle for real, provider-confirmed transitions.
+      // This is the only path that writes a 'feed' result — settlement.js
+      // never settles on anything else, so a match only pays out once the
+      // official data source confirms full time.
+      if (kinds.includes('kick_off')) {
+        setMatchStatus(fx.key, 'live');
+        emitFixtureStatusChanged({ fixtureId: fx.key, status: 'live', scoreHome: fx.scoreHome, scoreAway: fx.scoreAway, minute: fx.minute, sport: fx.sport });
+      }
+      if (kinds.includes('half_time')) {
+        setMatchStatus(fx.key, 'ht');
+        emitFixtureStatusChanged({ fixtureId: fx.key, status: 'ht', scoreHome: fx.scoreHome, scoreAway: fx.scoreAway, minute: fx.minute, sport: fx.sport });
+      }
+      if (kinds.includes('second_half')) {
+        setMatchStatus(fx.key, '2h');
+        emitFixtureStatusChanged({ fixtureId: fx.key, status: '2h', scoreHome: fx.scoreHome, scoreAway: fx.scoreAway, minute: fx.minute, sport: fx.sport });
+      }
+      if (kinds.includes('full_time')) {
+        setMatchStatus(fx.key, 'finished');
+        setResult(fx.key, fx.scoreHome, fx.scoreAway, 'feed');
+        emitFixtureStatusChanged({ fixtureId: fx.key, status: 'finished', scoreHome: fx.scoreHome, scoreAway: fx.scoreAway, minute: fx.minute, sport: fx.sport });
       }
     }
 
