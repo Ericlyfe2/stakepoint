@@ -231,6 +231,7 @@ export const adminImpersonate    = (id)   => post(`/users/${encodeURIComponent(i
 
 /* deposits */
 export const adminListPendingDeposits = ()    => get('/deposits/pending');
+export const adminListDepositHistory  = ()    => get('/deposits/history');
 export const adminApproveDeposit     = (id)  => post(`/deposits/${encodeURIComponent(id)}/approve`);
 export const adminRejectDeposit      = (id, body) => post(`/deposits/${encodeURIComponent(id)}/reject`, body);
 

@@ -20,6 +20,24 @@ function pushTx(userId, tx) {
   return entry;
 }
 
+router.get('/history', requireAdmin, requireRole('finance_admin'), (req, res) => {
+  const all = txStore.all() || {};
+  const deposits = [];
+  for (const [userId, txs] of Object.entries(all)) {
+    for (const tx of txs) {
+      if (tx.kind === 'deposit') {
+        const user = getUserById(userId);
+        deposits.push({
+          ...tx,
+          user: user ? { id: user.id, email: user.email, displayName: user.displayName, phone: user.phone } : null,
+        });
+      }
+    }
+  }
+  deposits.sort((a, b) => new Date(b.at) - new Date(a.at));
+  res.json({ deposits });
+});
+
 router.get('/pending', requireAdmin, requireRole('finance_admin'), (req, res) => {
   const all = txStore.all() || {};
   const pending = [];
