@@ -80,9 +80,46 @@ function CopyButton({ value, label }) {
   );
 }
 
+function StatusBadge({ status }) {
+  const isPending = status === 'Pending';
+  return (
+    <span style={{
+      display: 'inline-flex', alignItems: 'center', padding: '4px 10px', borderRadius: 999,
+      fontSize: 11, fontWeight: 800, letterSpacing: '0.02em',
+      background: isPending ? 'rgba(255, 181, 71, 0.16)' : 'var(--success-soft)',
+      color: isPending ? 'var(--accent-warm)' : 'var(--success)',
+    }}>
+      {status}
+    </span>
+  );
+}
+
+function DetailRow({ label, value, accent, mono, copy }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '10px 0' }}>
+      <div style={{ fontSize: 13, color: 'var(--text-dim)' }}>{label}</div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+        <div style={{
+          fontSize: 14, fontWeight: 800, color: accent ? 'var(--accent-warm)' : 'var(--text)',
+          fontFamily: mono ? 'ui-monospace, SFMono-Regular, Menlo, monospace' : 'inherit',
+          textAlign: 'right', wordBreak: 'break-word',
+        }}>
+          {value}
+        </div>
+        {copy && <CopyButton value={value} label={label} />}
+      </div>
+    </div>
+  );
+}
+
 export default function PaybillInstructions({
   paybillId = '222000',
+  merchantName = 'Xenbet',
   accountRef,
+  amount,
+  reference,
+  depositId,
+  status = 'Pending',
   context = 'deposit', // 'deposit' | 'withdraw'
 }) {
   const [network, setNetwork] = useState('mtn');
@@ -91,6 +128,44 @@ export default function PaybillInstructions({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+
+      {context === 'deposit' && (
+        <div style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 12, padding: 16 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+            <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--text)' }}>PayBill Details</div>
+            <StatusBadge status={status} />
+          </div>
+          <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 6 }}>Complete your PayBill payment</div>
+          <div style={{ height: 1, background: 'var(--line)', margin: '4px 0' }} />
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            <DetailRow label="PayBill Number" value={paybillId} copy />
+            <div style={{ height: 1, background: 'var(--line)' }} />
+            <DetailRow label="Name" value={merchantName} />
+            <div style={{ height: 1, background: 'var(--line)' }} />
+            <DetailRow label="Amount" value={`GHS ${amount}`} accent />
+            {reference && (
+              <>
+                <div style={{ height: 1, background: 'var(--line)' }} />
+                <DetailRow label="Reference" value={reference} accent mono copy />
+              </>
+            )}
+            {accountRef && (
+              <>
+                <div style={{ height: 1, background: 'var(--line)' }} />
+                <DetailRow label="Registered Number" value={accountRef} />
+              </>
+            )}
+            {depositId && (
+              <>
+                <div style={{ height: 1, background: 'var(--line)' }} />
+                <DetailRow label="Deposit ID" value={`#${depositId}`} mono />
+              </>
+            )}
+            <div style={{ height: 1, background: 'var(--line)' }} />
+            <DetailRow label="Status" value={<StatusBadge status={status} />} />
+          </div>
+        </div>
+      )}
 
       {/* Network chips */}
       <div role="tablist" aria-label="Network" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
@@ -124,26 +199,27 @@ export default function PaybillInstructions({
         })}
       </div>
 
-      {/* Paybill ID + Reference */}
-      <div style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 10, padding: 14, display: 'flex', flexDirection: 'column', gap: 12 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-          <div style={{ minWidth: 0 }}>
-            <div style={{ fontSize: 11, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 700 }}>Paybill ID</div>
-            <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--text)', letterSpacing: '0.05em' }}>{paybillId}</div>
-          </div>
-          <CopyButton value={paybillId} label="Paybill ID" />
-        </div>
-        <div style={{ height: 1, background: 'var(--line)' }} />
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-          <div style={{ minWidth: 0 }}>
-            <div style={{ fontSize: 11, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 700 }}>Pay ID (Account Reference)</div>
-            <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--text)', wordBreak: 'break-all' }}>
-              {accountRef || '—'}
+      {context !== 'deposit' && (
+        <div style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 10, padding: 14, display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: 11, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 700 }}>Paybill ID</div>
+              <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--text)', letterSpacing: '0.05em' }}>{paybillId}</div>
             </div>
+            <CopyButton value={paybillId} label="Paybill ID" />
           </div>
-          {accountRef && <CopyButton value={accountRef} label="Pay ID" />}
+          <div style={{ height: 1, background: 'var(--line)' }} />
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: 11, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 700 }}>Pay ID (Account Reference)</div>
+              <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--text)', wordBreak: 'break-all' }}>
+                {accountRef || '—'}
+              </div>
+            </div>
+            {accountRef && <CopyButton value={accountRef} label="Pay ID" />}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Step-by-step */}
       <div style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 10, padding: 14 }}>
@@ -155,7 +231,7 @@ export default function PaybillInstructions({
             {active.tag}
           </span>
           <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--text)' }}>
-            {active.label} — Step by step
+            {context === 'deposit' ? 'How to make the payment' : `${active.label} — Step by step`}
           </div>
         </div>
         <ol style={{ paddingLeft: 20, margin: 0, fontSize: 13, color: 'var(--text-soft)', lineHeight: 1.7 }}>

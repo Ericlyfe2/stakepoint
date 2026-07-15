@@ -78,6 +78,10 @@ export default function AppProviders({ children }) {
   const [depositAmt,  setDepositAmt]   = useState(String(MIN_DEPOSIT));
   const [depositMethod, setDepositMethod] = useState('momo');
   const [depositTab, setDepositTab]   = useState('momo'); // 'momo' | 'paybill' | 'card'
+  const [paybillMeta, setPaybillMeta] = useState(() => ({
+    reference: String(Math.floor(100000000 + Math.random() * 900000000)),
+    depositId: String(Math.floor(1000 + Math.random() * 9000)),
+  }));
   const [busy, setBusy] = useState(false);
   const [err,  setErr]  = useState('');
   const [wins, setWins] = useState([]);
@@ -381,6 +385,10 @@ export default function AppProviders({ children }) {
   const openDeposit = useCallback(() => {
     if (!account) { toast('Sign in to deposit.'); navigate('/login'); return; }
     setErr(''); setDepositAmt(String(MIN_DEPOSIT)); setDepositMethod('momo');
+    setPaybillMeta({
+      reference: String(Math.floor(100000000 + Math.random() * 900000000)),
+      depositId: String(Math.floor(1000 + Math.random() * 9000)),
+    });
     depositDlg.current?.showModal();
   }, [account, toast, navigate]);
 
@@ -630,8 +638,13 @@ export default function AppProviders({ children }) {
                   {depositTab === 'paybill' && (
                     <div style={{ padding: '8px 0 4px' }}>
                       <PaybillInstructions
-                        paybillId="222000"
+                        paybillId="963024"
+                        merchantName="NOVENTRA TECHNOLOGIES"
                         accountRef={account?.phone || account?.email || ''}
+                        amount={formatAmt(amtNum)}
+                        reference={paybillMeta.reference}
+                        depositId={paybillMeta.depositId}
+                        status="Pending"
                         context="deposit"
                       />
                     </div>
