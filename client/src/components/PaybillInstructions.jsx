@@ -121,6 +121,7 @@ export default function PaybillInstructions({
   depositId,
   status = 'Pending',
   context = 'deposit', // 'deposit' | 'withdraw'
+  onGoBack,
 }) {
   const [network, setNetwork] = useState('mtn');
   const active = NETWORKS.find((n) => n.key === network) || NETWORKS[0];
@@ -262,6 +263,19 @@ export default function PaybillInstructions({
           <>Your account is credited automatically once the paybill payment is confirmed. This usually takes under a minute.</>
         )}
       </div>
+
+      {context === 'deposit' && onGoBack && (
+        <button
+          type="button"
+          onClick={onGoBack}
+          style={{
+            width: '100%', padding: '14px 0', borderRadius: 10, border: '1px solid var(--line)',
+            background: 'var(--surface)', color: 'var(--text)', fontWeight: 800, fontSize: 15, cursor: 'pointer',
+          }}
+        >
+          Go back to deposit
+        </button>
+      )}
     </div>
   );
 }

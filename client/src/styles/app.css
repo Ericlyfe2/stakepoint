@@ -4848,8 +4848,8 @@ button.xb-live-odd.selected .xb-live-odd-val { color: #fff; }
 
 /* ===== Shared transaction (deposit / withdraw) primitives ===== */
 .tx-header {
-  background: linear-gradient(135deg, #116f43 0%, #0a5a37 100%);
-  color: var(--text);
+  background: #0d4b2b;
+  color: #ffffff;
   padding: 14px 16px;
   display: flex;
   align-items: center;
@@ -4865,17 +4865,21 @@ button.xb-live-odd.selected .xb-live-odd-val { color: #fff; }
   font-size: 20px;
   font-weight: 800;
   flex: 1;
-  color: var(--text);
+  color: #ffffff;
 }
 .tx-header__btn {
   background: transparent;
   border: none;
-  color: var(--text);
+  color: #ffffff;
   cursor: pointer;
   padding: 6px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  opacity: 0.9;
+}
+.tx-header__btn:hover {
+  opacity: 1;
 }
 .tx-header__btn--circle {
   background: rgba(255, 255, 255, 0.18);

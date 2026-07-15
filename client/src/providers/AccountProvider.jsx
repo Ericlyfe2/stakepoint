@@ -27,6 +27,13 @@ const EMPTY_ACCOUNT = {
 };
 const EMPTY_TOAST = { toast: () => {} };
 
+const DEPOSIT_NETWORKS = {
+  momo:       { label: 'MTN Mobile Money', tag: 'MTN', bg: '#ffcc00' },
+  vodafone:   { label: 'Telecel Cash',     tag: 'TLC', bg: '#e60000' },
+  airteltigo: { label: 'AT Money',         tag: 'AT',  bg: '#0055ff' },
+};
+const DEPOSIT_NETWORK_ORDER = ['momo', 'vodafone', 'airteltigo'];
+
 export const useAccount = () => React.useContext(AccountCtx) || EMPTY_ACCOUNT;
 export const useToast   = () => React.useContext(ToastCtx)   || EMPTY_TOAST;
 
@@ -84,8 +91,10 @@ export default function AppProviders({ children }) {
   const MIN_DEPOSIT  = 300;
   const MAX_DEPOSIT  = 50000;
   const [depositAmt,  setDepositAmt]   = useState(String(MIN_DEPOSIT));
-  const [depositMethod, setDepositMethod] = useState('momo');
-  const [depositTab, setDepositTab]   = useState('momo'); // 'momo' | 'paybill' | 'card'
+  const [depositMethod, setDepositMethod] = useState('paybill');
+  const [depositTab, setDepositTab]   = useState('paybill'); // 'paybill' | 'card'
+  const [depositNetwork, setDepositNetwork] = useState('momo');
+  const [showPaybillInstructions, setShowPaybillInstructions] = useState(false);
   const [paybillMeta, setPaybillMeta] = useState(() => ({
     reference: String(Math.floor(100000000 + Math.random() * 900000000)),
     depositId: String(Math.floor(1000 + Math.random() * 9000)),
@@ -392,7 +401,7 @@ export default function AppProviders({ children }) {
 
   const openDeposit = useCallback(() => {
     if (!account) { toast('Sign in to deposit.'); navigate('/login'); return; }
-    setErr(''); setDepositAmt(String(MIN_DEPOSIT)); setDepositMethod('momo');
+    setErr(''); setDepositAmt(String(MIN_DEPOSIT)); setDepositMethod('paybill'); setDepositTab('paybill'); setShowPaybillInstructions(false);
     setPaybillMeta({
       reference: accountPhoneRef(account) || String(Math.floor(100000000 + Math.random() * 900000000)),
       depositId: String(Math.floor(1000 + Math.random() * 9000)),
@@ -407,6 +416,11 @@ export default function AppProviders({ children }) {
 
   const submitDeposit = async (e) => {
     e.preventDefault();
+    // Paybill tab uses a manual flow — show instructions instead of submitting
+    if (depositTab === 'paybill') {
+      setShowPaybillInstructions(true);
+      return;
+    }
     setErr('');
     const amt = parseFloat(String(depositAmt).replace(/,/g, ''));
     if (!Number.isFinite(amt) || amt <= 0) { setErr('Enter a valid amount.'); return; }
@@ -422,7 +436,7 @@ export default function AppProviders({ children }) {
         if (account?.id) appendTxCache(account.id, data.transaction);
       }
       depositDlg.current?.close();
-      const labels = { momo: 'MoMo', vodafone: 'Vodafone Cash', airteltigo: 'AirtelTigo Money', card: 'Card' };
+      const labels = { momo: 'MoMo', vodafone: 'Vodafone Cash', airteltigo: 'AirtelTigo Money', paybill: 'Paybill', card: 'Card' };
       toast(`Deposit of GHS ${formatAmt(amt)} via ${labels[depositMethod] || depositMethod} submitted for admin approval.`, 'info');
     } catch (e) {
       setErr(e.message || 'Deposit failed.');
@@ -521,7 +535,12 @@ export default function AppProviders({ children }) {
           {(() => {
             const amtNum = parseFloat(String(depositAmt).replace(/,/g, '')) || 0;
             const canSubmit = amtNum >= MIN_DEPOSIT && amtNum <= MAX_DEPOSIT && !busy;
-            const accountPhone = account?.phone || account?.email || '+233 59****943';
+            const accountPhone = accountPhoneRef(account) || account?.email || '+233 59****943';
+            const depositNet = DEPOSIT_NETWORKS[depositNetwork] || DEPOSIT_NETWORKS.momo;
+            const cycleDepositNetwork = () => {
+              const nextIdx = (DEPOSIT_NETWORK_ORDER.indexOf(depositNetwork) + 1) % DEPOSIT_NETWORK_ORDER.length;
+              setDepositNetwork(DEPOSIT_NETWORK_ORDER[nextIdx]);
+            };
 
             const closeDlg = () => { try { depositDlg.current?.close(); } catch { /* ignore */ } };
             return (
@@ -536,13 +555,13 @@ export default function AppProviders({ children }) {
                 />
 
                 <div className="tx-tabs">
-                  {[['momo', 'Mobile Money'], ['paybill', 'Paybill'], ['card', 'Card']].map(([k, lbl]) => (
+                  {[['paybill', 'Paybill'], ['card', 'Card']].map(([k, lbl]) => (
                     <button
                       key={k}
                       type="button"
                       className="tx-tab"
                       aria-selected={depositTab === k}
-                      onClick={() => setDepositTab(k)}
+                      onClick={() => { setDepositTab(k); if (k !== 'paybill') setShowPaybillInstructions(false); }}
                     >
                       {lbl}
                     </button>
@@ -550,7 +569,7 @@ export default function AppProviders({ children }) {
                 </div>
 
                 <form onSubmit={submitDeposit} style={{ padding: 16, background: 'var(--bg)' }}>
-                  {depositTab === 'momo' && (() => {
+                  {depositTab === 'paybill' && (() => {
                     const sectionLabel = (text) => (
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                         <span style={{ width: 3, height: 14, borderRadius: 2, background: 'var(--accent-warm)' }} />
@@ -560,111 +579,122 @@ export default function AppProviders({ children }) {
                     const quickAmounts = [400, 500, 2000, 5000, 10000];
                     return (
                       <>
-                        {sectionLabel('Deposit from')}
-                        <div style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 10, padding: '14px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 20 }}>
-                          <div style={{ fontSize: 13, color: 'var(--text-dim)' }}>Phone Number</div>
-                          <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--text)' }}>{accountPhone}</div>
-                        </div>
+                        {!showPaybillInstructions && (
+                          <>
+                            {sectionLabel('Deposit from')}
+                            <div style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 10, padding: '14px 14px', display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+                              <div style={{ width: 28, height: 28, borderRadius: 6, background: 'var(--surface-2)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-soft)' }}>
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+                              </div>
+                              <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text)' }}>{accountPhone}</div>
+                            </div>
 
-                        {sectionLabel('Payment Method')}
-                        <button
-                          type="button"
-                          onClick={() => setDepositTab('paybill')}
-                          style={{ width: '100%', textAlign: 'left', background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 10, padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20, cursor: 'pointer' }}
-                        >
-                          <div style={{ width: 34, height: 34, borderRadius: 8, background: 'rgba(255, 181, 71, 0.16)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="var(--accent-warm)" aria-hidden="true">
-                              <path d="M13.5 2c-1.5 3-4 4.5-4 8a4.5 4.5 0 0 0 9 0c0-1-.3-1.8-.8-2.6-.4.9-1 1.6-1.9 1.9.4-2-1-3.9-2.3-7.3zM8 13a4.5 4.5 0 0 0 7.6 3.3A6.6 6.6 0 0 1 8 13z"/>
-                            </svg>
-                          </div>
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--text)' }}>PayBill</div>
-                            <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>Go to your internal PayBill deposit page</div>
-                          </div>
-                          <span style={{ fontSize: 18, color: 'var(--text-dim)' }}>›</span>
-                        </button>
+                            <div style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 10, padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
+                              <div style={{ width: 32, height: 32, borderRadius: 6, background: depositNet.bg, color: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: 10, lineHeight: 1 }}>{depositNet.tag}</div>
+                              <div style={{ flex: 1, fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>{depositNet.label}</div>
+                              <button
+                                type="button"
+                                onClick={cycleDepositNetwork}
+                                style={{ background: 'transparent', border: 'none', color: 'var(--accent)', cursor: 'pointer', fontSize: 14, fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 2 }}
+                              >
+                                Switch <span style={{ fontSize: 13 }}>›</span>
+                              </button>
+                            </div>
 
-                        {sectionLabel('Amount')}
-                        <div style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 10, padding: '14px 14px', display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-                          <span style={{ fontSize: 20, fontWeight: 800, color: 'var(--text)' }}>GHS</span>
-                          <input
-                            id="dep-amt"
-                            type="number"
-                            min={MIN_DEPOSIT}
-                            max={MAX_DEPOSIT}
-                            step="1"
-                            inputMode="decimal"
-                            value={depositAmt}
-                            onChange={(e) => setDepositAmt(e.target.value)}
-                            placeholder="0"
-                            autoFocus
-                            style={{ flex: 1, background: 'transparent', border: 'none', color: 'var(--text)', fontSize: 20, fontWeight: 800, outline: 'none', padding: 0, textAlign: 'left' }}
-                          />
-                          <span style={{ fontSize: 13, color: 'var(--text-dim)', whiteSpace: 'nowrap' }}>min.{MIN_DEPOSIT}</span>
-                        </div>
+                            {sectionLabel('Amount')}
+                            <div style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 10, padding: '14px 14px', display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                              <span style={{ fontSize: 20, fontWeight: 800, color: 'var(--text)' }}>GHS</span>
+                              <input
+                                id="dep-amt"
+                                type="number"
+                                min={MIN_DEPOSIT}
+                                max={MAX_DEPOSIT}
+                                step="1"
+                                inputMode="decimal"
+                                value={depositAmt}
+                                onChange={(e) => setDepositAmt(e.target.value)}
+                                placeholder="0"
+                                autoFocus
+                                style={{ flex: 1, background: 'transparent', border: 'none', color: 'var(--text)', fontSize: 20, fontWeight: 800, outline: 'none', padding: 0, textAlign: 'left' }}
+                              />
+                              <span style={{ fontSize: 13, color: 'var(--text-dim)', whiteSpace: 'nowrap' }}>min.{MIN_DEPOSIT}</span>
+                            </div>
 
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 8 }}>
-                          {quickAmounts.slice(0, 3).map((n) => (
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 8 }}>
+                              {quickAmounts.slice(0, 3).map((n) => (
+                                <button
+                                  key={n}
+                                  type="button"
+                                  onClick={() => setDepositAmt(String(n))}
+                                  style={{ padding: '12px 0', background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 8, color: 'var(--text)', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}
+                                >
+                                  {n.toLocaleString('en-US')}
+                                </button>
+                              ))}
+                            </div>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8, marginBottom: 20 }}>
+                              {quickAmounts.slice(3).map((n) => (
+                                <button
+                                  key={n}
+                                  type="button"
+                                  onClick={() => setDepositAmt(String(n))}
+                                  style={{ padding: '12px 0', background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 8, color: 'var(--text)', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}
+                                >
+                                  {n.toLocaleString('en-US')}
+                                </button>
+                              ))}
+                            </div>
+
+                            {err && <div className="err" style={{ marginBottom: 12, color: 'var(--danger, #ff5d5d)', fontSize: 13, fontWeight: 600 }}>{err}</div>}
+
                             <button
-                              key={n}
                               type="button"
-                              onClick={() => setDepositAmt(String(n))}
-                              style={{ padding: '12px 0', background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 8, color: 'var(--text)', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}
+                              disabled={!canSubmit}
+                              onClick={() => setShowPaybillInstructions(true)}
+                              style={{
+                                width: '100%', padding: '14px 0', borderRadius: 10, border: 'none',
+                                background: canSubmit ? 'linear-gradient(135deg, var(--accent), var(--accent-soft))' : 'var(--surface-2)',
+                                color: canSubmit ? 'var(--text-inv)' : 'var(--text-dim)',
+                                fontWeight: 800, fontSize: 16, cursor: canSubmit ? 'pointer' : 'not-allowed', marginBottom: 18,
+                              }}
                             >
-                              {n.toLocaleString('en-US')}
+                              Top Up Now
                             </button>
-                          ))}
-                        </div>
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8, marginBottom: 20 }}>
-                          {quickAmounts.slice(3).map((n) => (
-                            <button
-                              key={n}
-                              type="button"
-                              onClick={() => setDepositAmt(String(n))}
-                              style={{ padding: '12px 0', background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 8, color: 'var(--text)', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}
-                            >
-                              {n.toLocaleString('en-US')}
-                            </button>
-                          ))}
-                        </div>
+                          </>
+                        )}
 
-                        {err && <div className="err" style={{ marginBottom: 12, color: 'var(--danger, #ff5d5d)', fontSize: 13, fontWeight: 600 }}>{err}</div>}
-
-                        <button
-                          type="submit"
-                          disabled={!canSubmit}
-                          style={{
-                            width: '100%', padding: '14px 0', borderRadius: 10, border: 'none',
-                            background: canSubmit ? 'linear-gradient(135deg, var(--accent), var(--accent-soft))' : 'var(--surface-2)',
-                            color: canSubmit ? 'var(--text-inv)' : 'var(--text-dim)',
-                            fontWeight: 800, fontSize: 16, cursor: canSubmit ? 'pointer' : 'not-allowed', marginBottom: 18,
-                          }}
-                        >
-                          {busy ? 'Processing…' : 'Top Up Now'}
-                        </button>
+                        {showPaybillInstructions && (
+                          <>
+                            <div style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
+                              <button
+                                type="button"
+                                onClick={() => setShowPaybillInstructions(false)}
+                                style={{ background: 'transparent', border: 'none', color: 'var(--accent)', fontWeight: 700, fontSize: 14, cursor: 'pointer', padding: '4px 0' }}
+                              >
+                                ← Change Amount
+                              </button>
+                            </div>
+                            <PaybillInstructions
+                              paybillId="963024"
+                              merchantName="NOVENTRA TECHNOLOGIES"
+                              accountRef={accountPhoneRef(account) || account?.email || ''}
+                              amount={formatAmt(amtNum)}
+                              reference={paybillMeta.reference}
+                              depositId={paybillMeta.depositId}
+                              status="Pending"
+                              context="deposit"
+                              onGoBack={() => setShowPaybillInstructions(false)}
+                            />
+                          </>
+                        )}
                       </>
                     );
                   })()}
 
-                  {depositTab === 'paybill' && (
-                    <div style={{ padding: '8px 0 4px' }}>
-                      <PaybillInstructions
-                        paybillId="963024"
-                        merchantName="NOVENTRA TECHNOLOGIES"
-                        accountRef={accountPhoneRef(account) || account?.email || ''}
-                        amount={formatAmt(amtNum)}
-                        reference={paybillMeta.reference}
-                        depositId={paybillMeta.depositId}
-                        status="Pending"
-                        context="deposit"
-                      />
-                    </div>
-                  )}
-
                   {depositTab === 'card' && (
                     <div style={{ padding: '32px 8px', textAlign: 'center', color: 'var(--text-soft)' }}>
                       <p style={{ fontWeight: 700, color: 'var(--text)', marginBottom: 8 }}>Card deposits coming soon</p>
-                      <p style={{ fontSize: 13 }}>Use Mobile Money for instant top-ups.</p>
+                      <p style={{ fontSize: 13 }}>Use Paybill for instant top-ups.</p>
                     </div>
                   )}
                 </form>
