@@ -81,13 +81,15 @@ function CopyButton({ value, label }) {
 }
 
 function StatusBadge({ status }) {
-  const isPending = status === 'Pending';
+  const tone =
+    status === 'Approved' ? { bg: 'var(--success-soft)', fg: 'var(--success)' } :
+    status === 'Rejected' ? { bg: 'rgba(239, 68, 68, 0.16)', fg: '#ef4444' } :
+    { bg: 'rgba(255, 181, 71, 0.16)', fg: 'var(--accent-warm)' };
   return (
     <span style={{
       display: 'inline-flex', alignItems: 'center', padding: '4px 10px', borderRadius: 999,
       fontSize: 11, fontWeight: 800, letterSpacing: '0.02em',
-      background: isPending ? 'rgba(255, 181, 71, 0.16)' : 'var(--success-soft)',
-      color: isPending ? 'var(--accent-warm)' : 'var(--success)',
+      background: tone.bg, color: tone.fg,
     }}>
       {status}
     </span>
@@ -122,6 +124,12 @@ export default function PaybillInstructions({
   status = 'Pending',
   context = 'deposit', // 'deposit' | 'withdraw'
   onGoBack,
+  submitted = false,
+  submitting = false,
+  onSubmit,
+  refreshing = false,
+  onRefreshStatus,
+  justResolved = false,
 }) {
   const [network, setNetwork] = useState('mtn');
   const active = NETWORKS.find((n) => n.key === network) || NETWORKS[0];
@@ -140,7 +148,13 @@ export default function PaybillInstructions({
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
 
       {context === 'deposit' && (
-        <div style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 12, padding: 16 }}>
+        <div
+          className={
+            justResolved && status === 'Approved' ? 'paybill-approved-flash' :
+            justResolved && status === 'Rejected' ? 'paybill-rejected-flash' : ''
+          }
+          style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 12, padding: 16 }}
+        >
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
             <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--text)' }}>PayBill Details</div>
             <StatusBadge status={status} />
@@ -264,17 +278,52 @@ export default function PaybillInstructions({
         )}
       </div>
 
-      {context === 'deposit' && onGoBack && (
+      {context === 'deposit' && !submitted && onSubmit && (
         <button
           type="button"
-          onClick={onGoBack}
+          onClick={onSubmit}
+          disabled={submitting}
           style={{
-            width: '100%', padding: '14px 0', borderRadius: 10, border: '1px solid var(--line)',
-            background: 'var(--surface)', color: 'var(--text)', fontWeight: 800, fontSize: 15, cursor: 'pointer',
+            width: '100%', padding: '14px 0', borderRadius: 999, border: 'none',
+            background: submitting ? 'var(--surface-2)' : 'linear-gradient(135deg, #1e9e5a, #0d4b2b)',
+            color: submitting ? 'var(--text-dim)' : '#fff', fontWeight: 800, fontSize: 15,
+            cursor: submitting ? 'not-allowed' : 'pointer',
           }}
         >
-          Go back to deposit
+          {submitting ? 'Submitting…' : 'Top Up Now'}
         </button>
+      )}
+
+      {context === 'deposit' && submitted && (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          {onGoBack && (
+            <button
+              type="button"
+              onClick={onGoBack}
+              style={{
+                padding: '14px 0', borderRadius: 10, border: '1px solid var(--line)',
+                background: 'var(--surface)', color: 'var(--text)', fontWeight: 800, fontSize: 14, cursor: 'pointer',
+              }}
+            >
+              Back to Deposit
+            </button>
+          )}
+          {onRefreshStatus && (
+            <button
+              type="button"
+              onClick={onRefreshStatus}
+              disabled={refreshing}
+              style={{
+                padding: '14px 0', borderRadius: 10, border: 'none',
+                background: refreshing ? 'var(--surface-2)' : 'var(--accent-warm)',
+                color: refreshing ? 'var(--text-dim)' : '#1a1200', fontWeight: 800, fontSize: 14,
+                cursor: refreshing ? 'not-allowed' : 'pointer',
+              }}
+            >
+              {refreshing ? 'Refreshing…' : 'Refresh Status'}
+            </button>
+          )}
+        </div>
       )}
     </div>
   );

@@ -4,6 +4,7 @@ import {
   setTokens, clearTokens, getAccess,
   fetchMe, logout as apiLogout,
   deposit as apiDeposit,
+  fetchTransactions,
   fetchUnacknowledgedWins, acknowledgeBet,
 } from '../api/betApi.js';
 import { onLive, refreshAuth, disconnectSocket } from '../api/socketClient.js';
@@ -99,6 +100,26 @@ export default function AppProviders({ children }) {
     reference: String(Math.floor(100000000 + Math.random() * 900000000)),
     depositId: String(Math.floor(1000 + Math.random() * 9000)),
   }));
+  // The paybill deposit actually submitted to the backend for admin review.
+  // `status` mirrors the transaction: 'pending' | 'completed' | 'rejected'.
+  const [paybillTx, setPaybillTx] = useState(null);
+  const [paybillSubmitting, setPaybillSubmitting] = useState(false);
+  const [paybillRefreshing, setPaybillRefreshing] = useState(false);
+  const [paybillJustResolved, setPaybillJustResolved] = useState(false);
+  const paybillTxRef = useRef(null);
+  useEffect(() => { paybillTxRef.current = paybillTx; }, [paybillTx]);
+
+  // The PayBill details card is a live "Pending" status display, not a
+  // permanent record — once the admin resolves it, drop back to "Pending"
+  // after a minute so the card always reflects an in-flight-looking request.
+  useEffect(() => {
+    if (paybillTx?.status !== 'completed' && paybillTx?.status !== 'rejected') return;
+    const timer = setTimeout(() => {
+      setPaybillTx((prev) => (prev && prev.status !== 'pending') ? { ...prev, status: 'pending' } : prev);
+      setPaybillJustResolved(false);
+    }, 60_000);
+    return () => clearTimeout(timer);
+  }, [paybillTx?.status, paybillTx?.id]);
   const [busy, setBusy] = useState(false);
   const [err,  setErr]  = useState('');
   const [wins, setWins] = useState([]);
@@ -285,6 +306,10 @@ export default function AppProviders({ children }) {
       if (updatedAccount) setAccount(updatedAccount);
       const txId = transaction?.id;
       const amt  = transaction?.amount;
+      if (paybillTxRef.current?.id === txId) {
+        setPaybillTx((prev) => prev ? { ...prev, status: 'completed' } : prev);
+        setPaybillJustResolved(true);
+      }
       const title = 'Deposit approved';
       const body  = `GHS ${formatAmt(amt)} has been credited to your wallet.`;
       toast(`Deposit approved! GHS ${formatAmt(amt)} credited.`, 'success');
@@ -312,6 +337,10 @@ export default function AppProviders({ children }) {
     const offRejected = onLive('deposit:rejected', ({ transaction, reason }) => {
       const txId = transaction?.id;
       const amt  = transaction?.amount;
+      if (paybillTxRef.current?.id === txId) {
+        setPaybillTx((prev) => prev ? { ...prev, status: 'rejected' } : prev);
+        setPaybillJustResolved(true);
+      }
       const title = 'Deposit rejected';
       const body  = `Your GHS ${formatAmt(amt)} deposit was rejected${reason ? ': ' + reason : '.'}`;
       toast(`Deposit of GHS ${formatAmt(amt)} rejected${reason ? ': ' + reason : ''}.`, 'warn');
@@ -402,6 +431,7 @@ export default function AppProviders({ children }) {
   const openDeposit = useCallback(() => {
     if (!account) { toast('Sign in to deposit.'); navigate('/login'); return; }
     setErr(''); setDepositAmt(String(MIN_DEPOSIT)); setDepositMethod('paybill'); setDepositTab('paybill'); setShowPaybillInstructions(false);
+    setPaybillTx(null); setPaybillSubmitting(false); setPaybillRefreshing(false); setPaybillJustResolved(false);
     setPaybillMeta({
       reference: accountPhoneRef(account) || String(Math.floor(100000000 + Math.random() * 900000000)),
       depositId: String(Math.floor(1000 + Math.random() * 9000)),
@@ -441,6 +471,53 @@ export default function AppProviders({ children }) {
     } catch (e) {
       setErr(e.message || 'Deposit failed.');
     } finally { setBusy(false); }
+  };
+
+  // Submits the paybill deposit the user just confirmed they've paid — this
+  // is what actually creates the pending transaction admins see/approve on
+  // /admin/deposits (the instructions screen up to this point is local-only).
+  const submitPaybillTopUp = async () => {
+    if (paybillSubmitting || paybillTx) return;
+    const amt = parseFloat(String(depositAmt).replace(/,/g, ''));
+    if (!Number.isFinite(amt) || amt < MIN_DEPOSIT) { setErr(`Minimum deposit is GHS ${MIN_DEPOSIT}.`); return; }
+    setErr('');
+    requestNotificationPermission().catch(() => {});
+    try {
+      setPaybillSubmitting(true);
+      const data = await apiDeposit(amt, 'paybill');
+      if (data?.transaction) {
+        if (account?.id) appendTxCache(account.id, data.transaction);
+        const initialStatus = data.transaction.status === 'completed' ? 'completed'
+          : data.transaction.status === 'rejected' ? 'rejected' : 'pending';
+        setPaybillTx({ id: data.transaction.id, status: initialStatus, amount: amt });
+        if (initialStatus !== 'pending') setPaybillJustResolved(true);
+      }
+      toast('Payment submitted — waiting for admin confirmation.', 'info');
+    } catch (e) {
+      setErr(e.message || 'Could not submit deposit.');
+    } finally {
+      setPaybillSubmitting(false);
+    }
+  };
+
+  const refreshPaybillStatus = async () => {
+    if (!paybillTx || paybillRefreshing) return;
+    try {
+      setPaybillRefreshing(true);
+      const data = await fetchTransactions();
+      const match = (data?.transactions || []).find((t) => t.id === paybillTx.id);
+      if (match) {
+        const nextStatus = match.status === 'completed' ? 'completed' : match.status === 'rejected' ? 'rejected' : 'pending';
+        if (nextStatus !== paybillTx.status && (nextStatus === 'completed' || nextStatus === 'rejected')) {
+          setPaybillJustResolved(true);
+        }
+        setPaybillTx((prev) => prev ? { ...prev, status: nextStatus } : prev);
+      }
+    } catch {
+      /* refresh is best-effort — live socket events cover the common case */
+    } finally {
+      setPaybillRefreshing(false);
+    }
   };
 
   // Public callback so cash-outs (and any other "instant payout" flow) can
@@ -665,24 +742,32 @@ export default function AppProviders({ children }) {
 
                         {showPaybillInstructions && (
                           <>
-                            <div style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
-                              <button
-                                type="button"
-                                onClick={() => setShowPaybillInstructions(false)}
-                                style={{ background: 'transparent', border: 'none', color: 'var(--accent)', fontWeight: 700, fontSize: 14, cursor: 'pointer', padding: '4px 0' }}
-                              >
-                                ← Change Amount
-                              </button>
-                            </div>
+                            {!paybillTx && (
+                              <div style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <button
+                                  type="button"
+                                  onClick={() => setShowPaybillInstructions(false)}
+                                  style={{ background: 'transparent', border: 'none', color: 'var(--accent)', fontWeight: 700, fontSize: 14, cursor: 'pointer', padding: '4px 0' }}
+                                >
+                                  ← Change Amount
+                                </button>
+                              </div>
+                            )}
                             <PaybillInstructions
                               paybillId="963024"
                               merchantName="NOVENTRA TECHNOLOGIES"
                               accountRef={accountPhoneRef(account) || account?.email || ''}
                               amount={formatAmt(amtNum)}
                               reference={paybillMeta.reference}
-                              depositId={paybillMeta.depositId}
-                              status="Pending"
+                              depositId={paybillTx?.id ? paybillTx.id.replace(/^tx-/, '') : paybillMeta.depositId}
+                              status={paybillTx?.status === 'completed' ? 'Approved' : paybillTx?.status === 'rejected' ? 'Rejected' : 'Pending'}
                               context="deposit"
+                              submitted={!!paybillTx}
+                              submitting={paybillSubmitting}
+                              onSubmit={submitPaybillTopUp}
+                              refreshing={paybillRefreshing}
+                              onRefreshStatus={refreshPaybillStatus}
+                              justResolved={paybillJustResolved}
                               onGoBack={() => setShowPaybillInstructions(false)}
                             />
                           </>
