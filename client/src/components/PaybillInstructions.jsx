@@ -124,7 +124,16 @@ export default function PaybillInstructions({
 }) {
   const [network, setNetwork] = useState('mtn');
   const active = NETWORKS.find((n) => n.key === network) || NETWORKS[0];
-  const steps = STEPS[network];
+  const depositSteps = [
+    'Dial *170#.',
+    'Choose 2 - MoMoPay & PayBill.',
+    'Choose 1 - MoMo Pay.',
+    `Enter the merchant ID: ${paybillId}.`,
+    `When asked for reference, enter ${reference || accountRef}.`,
+    `Enter the amount: GHS ${amount}.`,
+    'Enter your PIN.',
+  ];
+  const steps = context === 'deposit' ? depositSteps : STEPS[network];
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -168,6 +177,7 @@ export default function PaybillInstructions({
       )}
 
       {/* Network chips */}
+      {context !== 'deposit' && (
       <div role="tablist" aria-label="Network" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
         {NETWORKS.map((n) => {
           const selected = n.key === network;
@@ -198,6 +208,7 @@ export default function PaybillInstructions({
           );
         })}
       </div>
+      )}
 
       {context !== 'deposit' && (
         <div style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 10, padding: 14, display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -224,12 +235,14 @@ export default function PaybillInstructions({
       {/* Step-by-step */}
       <div style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 10, padding: 14 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-          <span style={{
-            width: 22, height: 22, borderRadius: 4, background: active.bg, color: active.fg,
-            fontSize: 9, fontWeight: 900, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-          }}>
-            {active.tag}
-          </span>
+          {context !== 'deposit' && (
+            <span style={{
+              width: 22, height: 22, borderRadius: 4, background: active.bg, color: active.fg,
+              fontSize: 9, fontWeight: 900, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              {active.tag}
+            </span>
+          )}
           <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--text)' }}>
             {context === 'deposit' ? 'How to make the payment' : `${active.label} — Step by step`}
           </div>

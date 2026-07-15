@@ -386,7 +386,7 @@ export default function AppProviders({ children }) {
     if (!account) { toast('Sign in to deposit.'); navigate('/login'); return; }
     setErr(''); setDepositAmt(String(MIN_DEPOSIT)); setDepositMethod('momo');
     setPaybillMeta({
-      reference: String(Math.floor(100000000 + Math.random() * 900000000)),
+      reference: account?.phone || String(Math.floor(100000000 + Math.random() * 900000000)),
       depositId: String(Math.floor(1000 + Math.random() * 9000)),
     });
     depositDlg.current?.showModal();
@@ -511,16 +511,9 @@ export default function AppProviders({ children }) {
 
         <dialog ref={depositDlg} className="deposit-dlg">
           {(() => {
-            const networks = {
-              momo:       { label: 'MTN Mobile Money', short: 'MTN', tag: 'MTN' },
-              vodafone:   { label: 'Telecel Cash',     short: 'Telecel', tag: 'TLC' },
-              airteltigo: { label: 'AT Money',         short: 'AT',  tag: 'AT'  },
-            };
-            const net = networks[depositMethod] || networks.momo;
             const amtNum = parseFloat(String(depositAmt).replace(/,/g, '')) || 0;
             const canSubmit = amtNum >= MIN_DEPOSIT && amtNum <= MAX_DEPOSIT && !busy;
             const accountPhone = account?.phone || account?.email || '+233 59****943';
-            const bump = (n) => setDepositAmt(String(Math.min(MAX_DEPOSIT, Math.round(amtNum + n))));
 
             const closeDlg = () => { try { depositDlg.current?.close(); } catch { /* ignore */ } };
             return (
@@ -549,91 +542,101 @@ export default function AppProviders({ children }) {
                 </div>
 
                 <form onSubmit={submitDeposit} style={{ padding: 16, background: 'var(--bg)' }}>
-                  {depositTab === 'momo' && (
-                    <>
-                      <div style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 10, padding: '14px 14px', display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
-                        <div style={{ width: 28, height: 28, borderRadius: 6, background: 'var(--surface-2)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-soft)' }}>
-                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
-                        </div>
-                        <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text)' }}>{accountPhone}</div>
+                  {depositTab === 'momo' && (() => {
+                    const sectionLabel = (text) => (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                        <span style={{ width: 3, height: 14, borderRadius: 2, background: 'var(--accent-warm)' }} />
+                        <span style={{ fontSize: 13, fontWeight: 800, color: 'var(--text)' }}>{text}</span>
                       </div>
+                    );
+                    const quickAmounts = [400, 500, 2000, 5000, 10000];
+                    return (
+                      <>
+                        {sectionLabel('Deposit from')}
+                        <div style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 10, padding: '14px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 20 }}>
+                          <div style={{ fontSize: 13, color: 'var(--text-dim)' }}>Phone Number</div>
+                          <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--text)' }}>{accountPhone}</div>
+                        </div>
 
-                      <div style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 10, padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
-                        <div style={{ width: 32, height: 32, borderRadius: 6, background: '#ffcc00', color: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: 10, lineHeight: 1 }}>{net.tag}</div>
-                        <div style={{ flex: 1, fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>{net.label}</div>
+                        {sectionLabel('Payment Method')}
                         <button
                           type="button"
-                          onClick={() => {
-                            const order = ['momo', 'vodafone', 'airteltigo'];
-                            const nextIdx = (order.indexOf(depositMethod) + 1) % order.length;
-                            setDepositMethod(order[nextIdx]);
-                          }}
-                          style={{ background: 'transparent', border: 'none', color: 'var(--accent)', cursor: 'pointer', fontSize: 14, fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 2 }}
+                          onClick={() => setDepositTab('paybill')}
+                          style={{ width: '100%', textAlign: 'left', background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 10, padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20, cursor: 'pointer' }}
                         >
-                          Switch <span style={{ fontSize: 13 }}>›</span>
+                          <div style={{ width: 34, height: 34, borderRadius: 8, background: 'rgba(255, 181, 71, 0.16)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="var(--accent-warm)" aria-hidden="true">
+                              <path d="M13.5 2c-1.5 3-4 4.5-4 8a4.5 4.5 0 0 0 9 0c0-1-.3-1.8-.8-2.6-.4.9-1 1.6-1.9 1.9.4-2-1-3.9-2.3-7.3zM8 13a4.5 4.5 0 0 0 7.6 3.3A6.6 6.6 0 0 1 8 13z"/>
+                            </svg>
+                          </div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--text)' }}>PayBill</div>
+                            <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>Go to your internal PayBill deposit page</div>
+                          </div>
+                          <span style={{ fontSize: 18, color: 'var(--text-dim)' }}>›</span>
                         </button>
-                      </div>
 
-                      <div style={{ textAlign: 'right', fontSize: 13, color: 'var(--text-soft)', marginBottom: 6 }}>
-                        Balance (GHS) {formatAmt(balance)}
-                      </div>
-
-                      <div style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 10, padding: '14px 14px', marginBottom: 10 }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                          <label htmlFor="dep-amt" style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>Amount (GHS)</label>
-                          <span style={{ fontSize: 13, color: 'var(--text-dim)' }}>min. {MIN_DEPOSIT}.00</span>
+                        {sectionLabel('Amount')}
+                        <div style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 10, padding: '14px 14px', display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                          <span style={{ fontSize: 20, fontWeight: 800, color: 'var(--text)' }}>GHS</span>
+                          <input
+                            id="dep-amt"
+                            type="number"
+                            min={MIN_DEPOSIT}
+                            max={MAX_DEPOSIT}
+                            step="1"
+                            inputMode="decimal"
+                            value={depositAmt}
+                            onChange={(e) => setDepositAmt(e.target.value)}
+                            placeholder="0"
+                            autoFocus
+                            style={{ flex: 1, background: 'transparent', border: 'none', color: 'var(--text)', fontSize: 20, fontWeight: 800, outline: 'none', padding: 0, textAlign: 'left' }}
+                          />
+                          <span style={{ fontSize: 13, color: 'var(--text-dim)', whiteSpace: 'nowrap' }}>min.{MIN_DEPOSIT}</span>
                         </div>
-                        <input
-                          id="dep-amt"
-                          type="number"
-                          min={MIN_DEPOSIT}
-                          max={MAX_DEPOSIT}
-                          step="1"
-                          inputMode="decimal"
-                          value={depositAmt}
-                          onChange={(e) => setDepositAmt(e.target.value)}
-                          placeholder={`min. ${MIN_DEPOSIT}`}
-                          autoFocus
-                          style={{ width: '100%', background: 'transparent', border: 'none', color: 'var(--text)', fontSize: 24, fontWeight: 800, outline: 'none', padding: 0 }}
-                        />
-                      </div>
 
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 6, marginBottom: 16 }}>
-                        {[2, 5, 10, 50, 100].map((n) => (
-                          <button
-                            key={n}
-                            type="button"
-                            onClick={() => bump(n)}
-                            style={{ padding: '12px 0', background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 8, color: 'var(--text)', fontWeight: 700, fontSize: 14, cursor: 'pointer' }}
-                          >
-                            +{n}
-                          </button>
-                        ))}
-                      </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 8 }}>
+                          {quickAmounts.slice(0, 3).map((n) => (
+                            <button
+                              key={n}
+                              type="button"
+                              onClick={() => setDepositAmt(String(n))}
+                              style={{ padding: '12px 0', background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 8, color: 'var(--text)', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}
+                            >
+                              {n.toLocaleString('en-US')}
+                            </button>
+                          ))}
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8, marginBottom: 20 }}>
+                          {quickAmounts.slice(3).map((n) => (
+                            <button
+                              key={n}
+                              type="button"
+                              onClick={() => setDepositAmt(String(n))}
+                              style={{ padding: '12px 0', background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 8, color: 'var(--text)', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}
+                            >
+                              {n.toLocaleString('en-US')}
+                            </button>
+                          ))}
+                        </div>
 
-                      {err && <div className="err" style={{ marginBottom: 12, color: 'var(--danger, #ff5d5d)', fontSize: 13, fontWeight: 600 }}>{err}</div>}
+                        {err && <div className="err" style={{ marginBottom: 12, color: 'var(--danger, #ff5d5d)', fontSize: 13, fontWeight: 600 }}>{err}</div>}
 
-                      <button
-                        type="submit"
-                        disabled={!canSubmit}
-                        style={{
-                          width: '100%', padding: '14px 0', borderRadius: 10, border: 'none',
-                          background: canSubmit ? 'linear-gradient(135deg, var(--accent), var(--accent-soft))' : 'var(--surface-2)',
-                          color: canSubmit ? 'var(--text-inv)' : 'var(--text-dim)',
-                          fontWeight: 800, fontSize: 16, cursor: canSubmit ? 'pointer' : 'not-allowed', marginBottom: 18,
-                        }}
-                      >
-                        {busy ? 'Processing…' : 'Top Up Now'}
-                      </button>
-
-                      <ol style={{ paddingLeft: 18, margin: 0, fontSize: 13, color: 'var(--text-soft)', lineHeight: 1.7 }}>
-                        <li>Maximum per transaction is GHS {MAX_DEPOSIT.toLocaleString('en-US')}.00</li>
-                        <li>Minimum per transaction is {MIN_DEPOSIT}.00</li>
-                        <li>Deposit is free, no transaction fees.</li>
-                        <li>Your balance can only be withdrawn to the mobile number that&rsquo;s registered with.</li>
-                      </ol>
-                    </>
-                  )}
+                        <button
+                          type="submit"
+                          disabled={!canSubmit}
+                          style={{
+                            width: '100%', padding: '14px 0', borderRadius: 10, border: 'none',
+                            background: canSubmit ? 'linear-gradient(135deg, var(--accent), var(--accent-soft))' : 'var(--surface-2)',
+                            color: canSubmit ? 'var(--text-inv)' : 'var(--text-dim)',
+                            fontWeight: 800, fontSize: 16, cursor: canSubmit ? 'pointer' : 'not-allowed', marginBottom: 18,
+                          }}
+                        >
+                          {busy ? 'Processing…' : 'Top Up Now'}
+                        </button>
+                      </>
+                    );
+                  })()}
 
                   {depositTab === 'paybill' && (
                     <div style={{ padding: '8px 0 4px' }}>
