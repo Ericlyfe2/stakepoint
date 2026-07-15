@@ -34,6 +34,14 @@ function formatAmt(n) {
   return Number(n || 0).toLocaleString('en-GH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+// Some accounts only have a phone-like value stored in `email` (users who
+// registered with a phone number instead of an email address).
+function accountPhoneRef(account) {
+  if (account?.phone) return account.phone;
+  if (account?.email && !account.email.includes('@')) return account.email;
+  return '';
+}
+
 // ---------- session cache helpers ----------
 // Persist the last known account to localStorage so the user stays
 // visually logged in across page reloads and brief server hibernation.
@@ -386,7 +394,7 @@ export default function AppProviders({ children }) {
     if (!account) { toast('Sign in to deposit.'); navigate('/login'); return; }
     setErr(''); setDepositAmt(String(MIN_DEPOSIT)); setDepositMethod('momo');
     setPaybillMeta({
-      reference: account?.phone || String(Math.floor(100000000 + Math.random() * 900000000)),
+      reference: accountPhoneRef(account) || String(Math.floor(100000000 + Math.random() * 900000000)),
       depositId: String(Math.floor(1000 + Math.random() * 9000)),
     });
     depositDlg.current?.showModal();
@@ -643,7 +651,7 @@ export default function AppProviders({ children }) {
                       <PaybillInstructions
                         paybillId="963024"
                         merchantName="NOVENTRA TECHNOLOGIES"
-                        accountRef={account?.phone || account?.email || ''}
+                        accountRef={accountPhoneRef(account) || account?.email || ''}
                         amount={formatAmt(amtNum)}
                         reference={paybillMeta.reference}
                         depositId={paybillMeta.depositId}
