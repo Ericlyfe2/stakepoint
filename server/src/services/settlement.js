@@ -32,45 +32,94 @@ let timer = null;
 
 /* ------------ leg resolvers ------------ */
 
-function legWon(leg, scoreHome, scoreAway) {
+// Correct Score selection keys mirror db/markets.js's CS template — anything
+// outside this list (e.g. 5-2) settles as 'OTHER'.
+const CS_KNOWN_SCORES = new Set([
+  '1-0', '2-0', '2-1', '3-0', '3-1', '3-2', '4-0', '4-1', '4-2', '4-3',
+  '0-0', '1-1', '2-2', '3-3', '4-4',
+  '0-1', '0-2', '1-2', '0-3', '1-3', '2-3', '0-4', '1-4', '2-4', '3-4',
+]);
+function csOutcome(scoreHome, scoreAway) {
+  const key = `${scoreHome}-${scoreAway}`;
+  return CS_KNOWN_SCORES.has(key) ? key : 'OTHER';
+}
+
+const FOOTBALL_OU_LINES = { OU05: 0.5, OU15: 1.5, OU25: 2.5, OU35: 3.5, OU45: 4.5 };
+
+// NOTE: 1H1X2, 1HOU05, 1HBTTS and HTFT depend on the half-time score, which
+// nothing in this codebase captures/persists on the result record — they
+// fall through to the null return below and void (stake refunded) rather
+// than settle on data we don't actually have.
+export function legWon(leg, scoreHome, scoreAway) {
   const m = String(leg.market || '').toUpperCase();
   const o = String(leg.outcome || '');
-  if (m === '1X2') {
+
+  if (m === '1X2' || m === 'ML') {
     if (o === '1') return scoreHome > scoreAway;
     if (o === '2') return scoreAway > scoreHome;
     if (o === 'X') return scoreHome === scoreAway;
-  }
-  if (m === 'ML') {
-    if (o === '1') return scoreHome > scoreAway;
-    if (o === '2') return scoreAway > scoreHome;
-  }
-  if (m === 'OU25') {
-    const total = scoreHome + scoreAway;
-    if (o === 'Over')  return total > 2.5;
-    if (o === 'Under') return total < 2.5;
-  }
-  if (m === 'BTTS') {
-    const both = scoreHome > 0 && scoreAway > 0;
-    if (o === 'Yes') return both;
-    if (o === 'No')  return !both;
   }
   if (m === 'DC') {
     if (o === '1X') return scoreHome >= scoreAway;
     if (o === 'X2') return scoreAway >= scoreHome;
     if (o === '12') return scoreHome !== scoreAway;
   }
-  if (m === 'TP') {
+  if (m === 'DNB') {
+    if (scoreHome === scoreAway) return null; // push on a draw -> void, stake refunded
+    if (o === '1') return scoreHome > scoreAway;
+    if (o === '2') return scoreAway > scoreHome;
+  }
+  if (m === 'BTTS') {
+    const both = scoreHome > 0 && scoreAway > 0;
+    if (o === 'Yes') return both;
+    if (o === 'No')  return !both;
+  }
+  if (m in FOOTBALL_OU_LINES) {
     const total = scoreHome + scoreAway;
-    const line = leg.line || 220.5;
+    const line = FOOTBALL_OU_LINES[m];
     if (o === 'Over')  return total > line;
     if (o === 'Under') return total < line;
+  }
+  if (m === 'TP') {
+    const total = scoreHome + scoreAway;
+    const line = Number(leg.line || 220.5);
+    if (o === 'Over')  return total > line;
+    if (o === 'Under') return total < line;
+  }
+  if (m === 'AH1') {
+    // Whole-goal Asian handicap — an exact tie after the adjustment is a
+    // push (void), not a win or loss for either side.
+    if (o === 'H-1') {
+      const adj = scoreHome - 1 - scoreAway;
+      return adj === 0 ? null : adj > 0;
+    }
+    if (o === 'A+1') {
+      const adj = scoreAway + 1 - scoreHome;
+      return adj === 0 ? null : adj > 0;
+    }
   }
   if (m === 'HCAP') {
     const hc = Number(leg.handicap || 0);
     if (o === '1H') return (scoreHome - hc) > scoreAway;
     if (o === '2H') return (scoreAway + hc) > scoreHome;
   }
-  return null; // unknown market -> void leg
+  if (m === 'CS') {
+    return csOutcome(scoreHome, scoreAway) === o;
+  }
+  if (m === 'WINBTTS') {
+    const both = scoreHome > 0 && scoreAway > 0;
+    const res = scoreHome > scoreAway ? '1' : scoreAway > scoreHome ? '2' : 'X';
+    const map = { '1Y': res === '1' && both, '1N': res === '1' && !both, 'XY': res === 'X' && both, 'XN': res === 'X' && !both, '2Y': res === '2' && both, '2N': res === '2' && !both };
+    if (o in map) return map[o];
+  }
+  if (m === 'WINOU25') {
+    const total = scoreHome + scoreAway;
+    const over = total > 2.5;
+    const res = scoreHome > scoreAway ? '1' : scoreAway > scoreHome ? '2' : 'X';
+    const map = { '1O': res === '1' && over, '1U': res === '1' && !over, 'XO': res === 'X' && over, 'XU': res === 'X' && !over, '2O': res === '2' && over, '2U': res === '2' && !over };
+    if (o in map) return map[o];
+  }
+  return null; // unknown / HT-dependent market -> void leg, stake refunded
 }
 
 /* ------------ main tick ------------ */

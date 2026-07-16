@@ -359,6 +359,10 @@ function BetDrawer({ open, betId, onClose, onUpdate, hasRole, showToast }) {
             <IconBan size={14} /> Cancel + refund
           </button>
         </>
+      ) : bet && ['won', 'lost', 'void'].includes(bet.status) && hasRole('odds_manager', 'finance_admin') ? (
+        <button className="adm-btn warn" onClick={() => setSettleOpen(true)} disabled={busy}>
+          <IconSettle size={14} /> Correct settlement
+        </button>
       ) : null}
     >
       {!bet ? <div className="adm-skel" style={{ height: 200 }} /> : (
@@ -430,25 +434,34 @@ function SettleModal({ open, onClose, onSubmit, busy, bet }) {
   const [reason, setReason] = useState('');
   useEffect(() => { if (open) { setResult('won'); setReason(''); } }, [open]);
   if (!bet) return null;
+  const isCorrection = bet.status !== 'open';
+  const newCredit = result === 'won' ? (bet.potentialWin || 0) : result === 'void' ? (bet.stake || 0) : 0;
+  const previousCredit = isCorrection ? (bet.settledPayout ?? bet.totalReturn ?? 0) : 0;
+  const delta = Number((newCredit - previousCredit).toFixed(2));
+  const reasonMissing = isCorrection && !reason.trim();
   return (
     <Modal open={open} onClose={onClose}
-           title="Settle bet"
-           description={`Bet ${bet.id.slice(0, 16)}…  ·  ${moneyFmt(bet.stake)} stake at ${Number(bet.totalOdds).toFixed(2)}x`}>
+           title={isCorrection ? 'Correct settlement' : 'Settle bet'}
+           description={`Bet ${bet.id.slice(0, 16)}…  ·  ${moneyFmt(bet.stake)} stake at ${Number(bet.totalOdds).toFixed(2)}x${isCorrection ? `  ·  currently ${bet.status}` : ''}`}>
       <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
         {[['won', 'Won', 'success'], ['lost', 'Lost', 'danger'], ['void', 'Void (refund stake)', 'warn']].map(([k, l, t]) => (
           <button key={k} type="button" className={`adm-btn ${result === k ? t : 'ghost'}`} onClick={() => setResult(k)}>{l}</button>
         ))}
       </div>
       <div className="adm-field" style={{ marginBottom: 12 }}>
-        <label>Reason (optional, audited)</label>
+        <label>Reason {isCorrection ? '(required, audited)' : '(optional, audited)'}</label>
         <input className="adm-input" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. match void by league" />
       </div>
       <div style={{ background: 'var(--surface-soft)', border: '1px solid var(--border)', borderRadius: 12, padding: 12, fontSize: 13 }}>
-        Settling as <strong>{result}</strong> will {result === 'won' ? `credit ${moneyFmt(bet.potentialWin)} to the player.` : result === 'void' ? `refund ${moneyFmt(bet.stake)} stake.` : 'finalise the bet with no payout.'}
+        {isCorrection ? (
+          <>Correcting to <strong>{result}</strong> will {delta > 0 ? `credit an additional ${moneyFmt(delta)}` : delta < 0 ? `debit ${moneyFmt(Math.abs(delta))} back` : 'change nothing about the payout'} (already paid {moneyFmt(previousCredit)} as {bet.status}).</>
+        ) : (
+          <>Settling as <strong>{result}</strong> will {result === 'won' ? `credit ${moneyFmt(bet.potentialWin)} to the player.` : result === 'void' ? `refund ${moneyFmt(bet.stake)} stake.` : 'finalise the bet with no payout.'}</>
+        )}
       </div>
       <div className="adm-modal-actions">
         <button className="adm-btn ghost" type="button" onClick={onClose}>Cancel</button>
-        <button className="adm-btn primary" type="button" onClick={() => onSubmit(result, reason)} disabled={busy}>
+        <button className="adm-btn primary" type="button" onClick={() => onSubmit(result, reason)} disabled={busy || reasonMissing}>
           {busy ? 'Working…' : `Confirm ${result}`}
         </button>
       </div>
