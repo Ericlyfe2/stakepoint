@@ -135,11 +135,15 @@ router.post('/withdraw', requireAuth, requireEmailVerified, validate(withdrawSch
   }
   if (amount > user.balance) throw badRequest('Insufficient balance.');
 
+  // Withdrawals now require admin approval: reserve the funds immediately
+  // (so the balance can't be double-spent while the request is pending) and
+  // let the admin either finalize it or refund the reservation on reject.
   const updated = await adjustBalance(user.id, -amount);
-  const tx = pushTx(user.id, { kind: 'withdraw', amount, method, status: 'completed', balanceAfter: updated.balance });
-  logActivity(user.id, { kind: 'withdraw', amount, method });
-  emitToUser(user.id, 'wallet:update', { balance: updated.balance, delta: -amount, reason: 'withdraw', method });
-  emitAdmin('wallet:withdraw', { userId: user.id, amount, method });
+  const tx = pushTx(user.id, { kind: 'withdraw', amount, method, status: 'pending', balanceAfter: updated.balance });
+  logActivity(user.id, { kind: 'withdraw_requested', amount, method });
+  emitToUser(user.id, 'wallet:update', { balance: updated.balance, delta: -amount, reason: 'withdraw_pending', method });
+  emitToUser(user.id, 'withdraw:pending', { transaction: tx, amount, method });
+  emitAdmin('wallet:withdraw', { userId: user.id, amount, method, transactionId: tx.id });
   res.json({ ok: true, account: { ...updated, passwordHash: undefined, googleId: undefined, activity: undefined }, transaction: tx });
 }));
 

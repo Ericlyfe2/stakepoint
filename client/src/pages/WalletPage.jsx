@@ -171,8 +171,8 @@ export default function WalletPage() {
                         {relTime(t.at || t.createdAt)}
                         {t.status === 'pending' && <span className="wallet-tx-pill pending">Pending</span>}
                         {t.status === 'rejected' && <span className="wallet-tx-pill rejected">Rejected</span>}
-                        {/* "Approved" only applies to deposits the admin queue has cleared. */}
-                        {t.kind === 'deposit' && t.status === 'completed' && (
+                        {/* Deposits and withdrawals both go through admin approval now. */}
+                        {(t.kind === 'deposit' || t.kind === 'withdraw') && t.status === 'completed' && (
                           <span className="wallet-tx-pill approved">Approved</span>
                         )}
                       </div>

@@ -10,6 +10,12 @@ function fmt(n) {
   return Number(n || 0).toLocaleString('en-GH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+function maskPhone(phone) {
+  const raw = String(phone || '').replace(/\D/g, '');
+  if (raw.length < 5) return phone || '';
+  return `${raw.slice(0, 2)}****${raw.slice(-3)}`;
+}
+
 function formatTxDate(iso) {
   if (!iso) return '';
   const d = new Date(iso);
@@ -39,6 +45,8 @@ export default function WithdrawPage() {
   const [showDepositReq, setShowDepositReq] = useState(false);     // Stage 1 modal
   const [showExtraDeposit, setShowExtraDeposit] = useState(false); // Stage 2 modal
   const [showBlocked, setShowBlocked] = useState(false);           // Stage 3 (blocked) modal
+  const [showConfirmWithdraw, setShowConfirmWithdraw] = useState(false);
+  const [showPendingRequest, setShowPendingRequest] = useState(false);
   const [busy, setBusy] = useState(false);
 
   const MIN_WITHDRAW_DEFAULT = 550;       // Stage 0, 1
@@ -134,16 +142,22 @@ export default function WithdrawPage() {
       setShowExtraDeposit(true);
       return;
     }
-    // Stage 3 and not blocked — admin has cleared the lock, allow real
-    // withdrawal to go through.
+    // Stage 3 and not blocked — admin has cleared the lock. Show the confirm
+    // step before actually submitting the request for admin approval.
+    setShowConfirmWithdraw(true);
+  };
+
+  const confirmWithdraw = async () => {
     try {
       setBusy(true);
       const data = await withdraw(amtNum, method);
       if (data.account) setAccount(data.account);
       if (data.transaction) setTxs((cur) => [data.transaction, ...cur].slice(0, 50));
-      toast(`Withdrew GHS ${fmt(amtNum)} to ${net.label}.`);
+      setShowConfirmWithdraw(false);
+      setShowPendingRequest(true);
       setAmount('');
     } catch (e2) {
+      setShowConfirmWithdraw(false);
       setErr(e2.message || 'Withdrawal failed.');
     } finally {
       setBusy(false);
@@ -381,6 +395,88 @@ export default function WithdrawPage() {
         </div>
       )}
 
+      {showConfirmWithdraw && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="confirm-withdraw-title"
+          className="wd-modal-overlay"
+          onClick={() => { if (!busy) setShowConfirmWithdraw(false); }}
+        >
+          <div className="wd-confirm-card" onClick={(e) => e.stopPropagation()}>
+            <div className="wd-confirm-bg" aria-hidden="true">
+              <span className="wd-confirm-blob wd-confirm-blob-a" />
+              <span className="wd-confirm-blob wd-confirm-blob-b" />
+            </div>
+            <div className="wd-modal-head">
+              <h3 id="confirm-withdraw-title">Confirm to Withdraw</h3>
+              <button type="button" className="wd-modal-x" aria-label="Close" disabled={busy} onClick={() => setShowConfirmWithdraw(false)}>×</button>
+            </div>
+            <div className="wd-modal-body">
+              <div className="wd-row">
+                <span>Remaining Amount (GHS)</span>
+                <strong>{fmt(Math.max(0, balance - amtNum))}</strong>
+              </div>
+              <div className="wd-row">
+                <span>Withdraw To</span>
+                <strong>{net.label}</strong>
+              </div>
+              <div className="wd-row">
+                <span>Mobile Number</span>
+                <strong>{maskPhone(accountPhone)}</strong>
+              </div>
+              <div className="wd-row wd-row-amount">
+                <span>Withdrawal Amount (GHS)</span>
+                <strong>{fmt(amtNum)}</strong>
+              </div>
+            </div>
+            <div className="wd-modal-actions">
+              <button type="button" className="wd-btn wd-btn-cancel" disabled={busy} onClick={() => setShowConfirmWithdraw(false)}>
+                Cancel
+              </button>
+              <button type="button" className="wd-btn wd-btn-confirm" disabled={busy} onClick={confirmWithdraw}>
+                {busy ? 'Processing…' : 'Confirm'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showPendingRequest && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="pending-request-title"
+          className="wd-modal-overlay"
+          onClick={() => setShowPendingRequest(false)}
+        >
+          <div className="wd-pending-card" onClick={(e) => e.stopPropagation()}>
+            <div className="wd-pending-bg" aria-hidden="true">
+              <span className="wd-pending-ring" />
+              <span className="wd-pending-dot wd-pending-dot-1" />
+              <span className="wd-pending-dot wd-pending-dot-2" />
+              <span className="wd-pending-dot wd-pending-dot-3" />
+            </div>
+            <div className="wd-pending-icon">
+              <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="9" />
+                <polyline points="12 7 12 12 15.5 14" />
+              </svg>
+            </div>
+            <h3 id="pending-request-title">Pending Request</h3>
+            <p>Your withdrawal request has been submitted, awaiting confirmation. You can check the withdrawal records in a short while.</p>
+            <div className="wd-pending-actions">
+              <button type="button" className="wd-pending-link" onClick={() => { setShowPendingRequest(false); navigate('/wallet'); }}>
+                Transactions
+              </button>
+              <button type="button" className="wd-pending-link wd-pending-link-muted" onClick={() => { setShowPendingRequest(false); navigate('/'); }}>
+                Home
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div style={{ maxWidth: 480, margin: '0 auto', background: 'var(--bg)' }}>
 
         <TxHeader title="Withdraw" />
@@ -553,8 +649,11 @@ export default function WithdrawPage() {
                       </div>
                       <div style={{ textAlign: 'right' }}>
                         <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--text)' }}>GHS {fmt(t.amount)}</div>
-                        <div style={{ fontSize: 9, fontWeight: 800, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                          {t.status === 'completed' ? 'Approved' : (t.status || 'Approved')}
+                        <div style={{
+                          fontSize: 9, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em',
+                          color: t.status === 'rejected' ? 'var(--danger, #ff5d5d)' : t.status === 'pending' ? 'var(--accent-warm, #f59e0b)' : 'var(--accent)',
+                        }}>
+                          {t.status === 'completed' ? 'Approved' : t.status === 'rejected' ? 'Rejected' : t.status === 'pending' ? 'Pending' : 'Approved'}
                         </div>
                         <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>{formatTxDate(t.at || t.createdAt)}</div>
                       </div>
@@ -567,6 +666,115 @@ export default function WithdrawPage() {
 
         </div>
       </div>
+
+      <style>{WD_MODAL_CSS}</style>
     </main>
   );
 }
+
+const WD_MODAL_CSS = `
+.wd-modal-overlay {
+  position: fixed; inset: 0; z-index: 1100;
+  background: rgba(6, 10, 8, 0.6);
+  display: flex; align-items: center; justify-content: center;
+  padding: 16px;
+  animation: wdFadeIn 0.18s ease-out both;
+}
+@keyframes wdFadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+/* ── Confirm to Withdraw ── */
+.wd-confirm-card {
+  position: relative; width: 100%; max-width: 380px;
+  background: var(--surface, #131a16); color: var(--text, #e7efea);
+  border: 1px solid var(--line, rgba(255,255,255,0.08));
+  border-radius: 18px; padding: 20px 20px 18px;
+  overflow: hidden;
+  animation: wdPopIn 0.24s cubic-bezier(.2,1,.3,1) both;
+}
+@keyframes wdPopIn { from { transform: translateY(10px) scale(0.98); opacity: 0; } to { transform: translateY(0) scale(1); opacity: 1; } }
+
+.wd-confirm-bg { position: absolute; inset: -40%; z-index: 0; pointer-events: none; overflow: hidden; }
+.wd-confirm-blob {
+  position: absolute; border-radius: 50%; filter: blur(38px);
+  animation: wdBreathe 4.5s ease-in-out infinite;
+}
+.wd-confirm-blob-a {
+  width: 220px; height: 220px; top: -40px; left: -50px;
+  background: radial-gradient(circle, var(--accent, #1e9e5a) 0%, transparent 70%);
+  opacity: 0.35;
+}
+.wd-confirm-blob-b {
+  width: 200px; height: 200px; bottom: -60px; right: -40px;
+  background: radial-gradient(circle, var(--accent-warm, #f59e0b) 0%, transparent 70%);
+  opacity: 0.22;
+  animation-delay: 1.4s;
+}
+@keyframes wdBreathe {
+  0%, 100% { transform: scale(0.92); opacity: 0.2; }
+  50%      { transform: scale(1.12); opacity: 0.4; }
+}
+
+.wd-modal-head { position: relative; z-index: 1; display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+.wd-modal-head h3 { margin: 0; font-size: 17px; font-weight: 800; }
+.wd-modal-x {
+  background: var(--surface-2, rgba(255,255,255,0.06)); border: none; color: var(--text, #e7efea);
+  width: 28px; height: 28px; border-radius: 8px; font-size: 16px; line-height: 1; cursor: pointer;
+}
+.wd-modal-body { position: relative; z-index: 1; }
+.wd-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 10px 0; border-bottom: 1px solid var(--line, rgba(255,255,255,0.08)); font-size: 13px;
+}
+.wd-row span { color: var(--text-dim, #8a9a92); }
+.wd-row strong { font-weight: 700; }
+.wd-row-amount { border-bottom: none; padding-top: 12px; }
+.wd-row-amount strong { font-size: 18px; color: var(--accent, #1e9e5a); }
+
+.wd-modal-actions { position: relative; z-index: 1; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 16px; }
+.wd-btn { padding: 13px 0; border-radius: 10px; border: none; font-weight: 800; font-size: 14px; cursor: pointer; font-family: inherit; }
+.wd-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+.wd-btn-cancel { background: var(--surface-2, rgba(255,255,255,0.06)); color: var(--text, #e7efea); }
+.wd-btn-confirm { background: linear-gradient(135deg, var(--accent, #1e9e5a), var(--accent-soft, #0d4b2b)); color: #fff; }
+
+/* ── Pending Request ── */
+.wd-pending-card {
+  position: relative; width: 100%; max-width: 340px;
+  background: var(--surface, #131a16); color: var(--text, #e7efea);
+  border: 1px solid var(--line, rgba(255,255,255,0.08));
+  border-radius: 18px; padding: 30px 22px 22px; text-align: center;
+  overflow: hidden;
+  animation: wdPopIn 0.24s cubic-bezier(.2,1,.3,1) both;
+}
+.wd-pending-bg { position: absolute; inset: 0; z-index: 0; pointer-events: none; display: flex; align-items: flex-start; justify-content: center; }
+.wd-pending-ring {
+  position: absolute; top: 14px; width: 84px; height: 84px; border-radius: 50%;
+  border: 3px solid transparent;
+  border-top-color: var(--accent-warm, #f59e0b);
+  border-right-color: rgba(245, 158, 11, 0.25);
+  animation: wdSpin 1.6s linear infinite;
+}
+.wd-pending-dot {
+  position: absolute; top: 52px; width: 6px; height: 6px; border-radius: 50%;
+  background: var(--accent-warm, #f59e0b);
+  animation: wdDotPulse 1.8s ease-in-out infinite;
+}
+.wd-pending-dot-1 { left: calc(50% - 26px); animation-delay: 0s; }
+.wd-pending-dot-2 { left: calc(50% - 3px); animation-delay: 0.3s; }
+.wd-pending-dot-3 { left: calc(50% + 20px); animation-delay: 0.6s; }
+@keyframes wdSpin { to { transform: rotate(360deg); } }
+@keyframes wdDotPulse {
+  0%, 100% { opacity: 0.25; transform: scale(0.8); }
+  50%      { opacity: 1; transform: scale(1.15); }
+}
+
+.wd-pending-icon {
+  position: relative; z-index: 1; width: 60px; height: 60px; margin: 0 auto 14px;
+  border-radius: 50%; background: rgba(245, 158, 11, 0.14); color: var(--accent-warm, #f59e0b);
+  display: flex; align-items: center; justify-content: center;
+}
+.wd-pending-card h3 { position: relative; z-index: 1; margin: 0 0 8px; font-size: 18px; font-weight: 800; }
+.wd-pending-card p { position: relative; z-index: 1; margin: 0 0 20px; font-size: 13.5px; line-height: 1.55; color: var(--text-soft, #b8c5be); }
+.wd-pending-actions { position: relative; z-index: 1; display: flex; align-items: center; justify-content: center; gap: 18px; }
+.wd-pending-link { background: none; border: none; color: var(--accent, #1e9e5a); font-weight: 800; font-size: 14px; cursor: pointer; font-family: inherit; }
+.wd-pending-link-muted { color: var(--text-soft, #b8c5be); }
+`;

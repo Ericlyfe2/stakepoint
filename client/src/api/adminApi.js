@@ -263,6 +263,9 @@ export const adminReverseSettlement = (fixtureId) => post(`/sports/fixtures/${en
 /* withdrawals management */
 export const adminListWithdrawals = (params) => get(`/withdrawals${qs(params)}`);
 export const adminWithdrawalStats = () => get('/withdrawals/stats');
+export const adminListPendingWithdrawals = () => get('/withdrawals/pending');
+export const adminApproveWithdrawal = (id) => post(`/withdrawals/${encodeURIComponent(id)}/approve`);
+export const adminRejectWithdrawal  = (id, body) => post(`/withdrawals/${encodeURIComponent(id)}/reject`, body);
 
 /* platform settings */
 export const adminGetSettings    = ()     => get('/settings');

@@ -48,6 +48,89 @@ router.get('/', requireAdmin, requireRole('finance_admin'), (req, res) => {
   res.json({ withdrawals: items });
 });
 
+router.get('/pending', requireAdmin, requireRole('finance_admin'), (req, res) => {
+  const pending = collect('withdraw', 'pending');
+  res.json({ pending });
+});
+
+function findPendingWithdrawal(txId) {
+  const all = txStore.all() || {};
+  for (const [userId, txs] of Object.entries(all)) {
+    for (const tx of txs) {
+      if (tx.id === txId) return { tx, userId };
+    }
+  }
+  return { tx: null, userId: null };
+}
+
+router.post('/:id/approve',
+  requireAdmin, requireRole('finance_admin'),
+  asyncHandler(async (req, res) => {
+    const txId = req.params.id;
+    const { tx: foundTx, userId: foundUserId } = findPendingWithdrawal(txId);
+    if (!foundTx) throw notFound('Transaction not found');
+    if (foundTx.kind !== 'withdraw' || foundTx.status !== 'pending') {
+      throw badRequest('Transaction is not a pending withdrawal');
+    }
+
+    // Funds were already deducted when the request was submitted — approval
+    // just finalizes the record, no balance change needed.
+    const userTxs = txStore.get(foundUserId) || [];
+    const updatedTxs = userTxs.map((t) =>
+      t.id === txId
+        ? { ...t, status: 'completed', approvedAt: new Date().toISOString(), approvedBy: req.admin?.email || req.admin?.id }
+        : t
+    );
+    txStore.set(foundUserId, updatedTxs);
+
+    logActivity(foundUserId, { kind: 'withdraw_approved', amount: foundTx.amount, by: req.admin?.email });
+    emitToUser(foundUserId, 'withdraw:approved', { transaction: updatedTxs.find((t) => t.id === txId) });
+    emitAdmin('withdraw:approved', { userId: foundUserId, amount: foundTx.amount, transactionId: txId, approvedBy: req.admin?.email });
+
+    audit(req, { action: 'withdraw.approve', target: foundUserId, targetType: 'user', severity: 'info', meta: { amount: foundTx.amount, transactionId: txId } });
+    res.json({ ok: true, transaction: updatedTxs.find((t) => t.id === txId) });
+  })
+);
+
+router.post('/:id/reject',
+  requireAdmin, requireRole('finance_admin'),
+  validate(z.object({ reason: z.string().max(500).optional() })),
+  asyncHandler(async (req, res) => {
+    const txId = req.params.id;
+    const { tx: foundTx, userId: foundUserId } = findPendingWithdrawal(txId);
+    if (!foundTx) throw notFound('Transaction not found');
+    if (foundTx.kind !== 'withdraw' || foundTx.status !== 'pending') {
+      throw badRequest('Transaction is not a pending withdrawal');
+    }
+
+    // Refund the reserved amount back to the user's balance.
+    const updatedUser = await adjustBalance(foundUserId, foundTx.amount, { allowNegative: true });
+
+    const userTxs = txStore.get(foundUserId) || [];
+    const updatedTxs = userTxs.map((t) =>
+      t.id === txId
+        ? {
+            ...t,
+            status: 'rejected',
+            balanceAfter: updatedUser.balance,
+            rejectedAt: new Date().toISOString(),
+            rejectedBy: req.admin?.email || req.admin?.id,
+            rejectReason: req.body?.reason || null,
+          }
+        : t
+    );
+    txStore.set(foundUserId, updatedTxs);
+
+    logActivity(foundUserId, { kind: 'withdraw_rejected', amount: foundTx.amount, by: req.admin?.email, reason: req.body?.reason });
+    emitToUser(foundUserId, 'wallet:update', { balance: updatedUser.balance, delta: foundTx.amount, reason: 'withdraw_rejected' });
+    emitToUser(foundUserId, 'withdraw:rejected', { transaction: updatedTxs.find((t) => t.id === txId), reason: req.body?.reason });
+    emitAdmin('withdraw:rejected', { userId: foundUserId, amount: foundTx.amount, transactionId: txId, rejectedBy: req.admin?.email });
+
+    audit(req, { action: 'withdraw.reject', target: foundUserId, targetType: 'user', severity: 'warning', meta: { amount: foundTx.amount, transactionId: txId, reason: req.body?.reason } });
+    res.json({ ok: true });
+  })
+);
+
 router.get('/stats', requireAdmin, requireRole('finance_admin'), (req, res) => {
   const items = collect('withdraw', null);
   const today = new Date().toISOString().slice(0, 10);

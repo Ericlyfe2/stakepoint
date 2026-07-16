@@ -369,6 +369,36 @@ export default function AppProviders({ children }) {
         return [...prev, { kind: 'rejected', amount: amt, reason, txId, at: Date.now() }];
       });
     });
+    const offWithdrawApproved = onLive('withdraw:approved', ({ transaction }) => {
+      const txId = transaction?.id;
+      const amt  = transaction?.amount;
+      const title = 'Withdrawal approved';
+      const body  = `GHS ${formatAmt(amt)} has been sent to your mobile money.`;
+      toast(`Withdrawal approved! GHS ${formatAmt(amt)} sent.`, 'success');
+      addNotification({
+        id: `withdraw-approved-${txId || Date.now()}`,
+        title,
+        body,
+        severity: 'info',
+        kind: 'withdraw_approved',
+      });
+      osNotify({ title, body, tag: `withdraw-${txId || 'approved'}` });
+    });
+    const offWithdrawRejected = onLive('withdraw:rejected', ({ transaction, reason }) => {
+      const txId = transaction?.id;
+      const amt  = transaction?.amount;
+      const title = 'Withdrawal rejected';
+      const body  = `Your GHS ${formatAmt(amt)} withdrawal was rejected${reason ? ': ' + reason : '.'} The amount has been refunded to your balance.`;
+      toast(`Withdrawal of GHS ${formatAmt(amt)} rejected${reason ? ': ' + reason : ''}. Refunded.`, 'warn');
+      addNotification({
+        id: `withdraw-rejected-${txId || Date.now()}`,
+        title,
+        body,
+        severity: 'critical',
+        kind: 'withdraw_rejected',
+      });
+      osNotify({ title, body, tag: `withdraw-${txId || 'rejected'}` });
+    });
     const offWin = onLive('bet:won', async () => { try { await tick(); } catch {} });
     const offNotif = onLive('notification:new', (payload) => {
       if (payload?.title) {
@@ -397,7 +427,7 @@ export default function AppProviders({ children }) {
     return () => {
       alive = false;
       clearInterval(id);
-      offWallet?.(); offPending?.(); offTxCleared?.(); offApproved?.(); offRejected?.(); offNotif?.(); offWin?.(); offSettled?.(); offStatus?.(); offStage?.(); offAutoCashout?.(); offSuspended?.();
+      offWallet?.(); offPending?.(); offTxCleared?.(); offApproved?.(); offRejected?.(); offWithdrawApproved?.(); offWithdrawRejected?.(); offNotif?.(); offWin?.(); offSettled?.(); offStatus?.(); offStage?.(); offAutoCashout?.(); offSuspended?.();
     };
   }, [accountId]);
 

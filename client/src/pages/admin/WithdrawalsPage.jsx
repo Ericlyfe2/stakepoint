@@ -1,162 +1,364 @@
-import { useState, useEffect, useCallback } from 'react';
-import { useAdmin } from '../../providers/AdminProvider.jsx';
-import { adminListWithdrawals, adminWithdrawalStats } from '../../api/adminApi.js';
-import { useToast as useLocalToast, Card, Badge, Drawer, Empty, Spinner, numFmt, ago, dateShort } from '../../components/admin/primitives.jsx';
-import { IconSearch, IconRefresh } from '../../components/admin/Icons.jsx';
+import { useEffect, useState, useCallback, useRef } from 'react';
+import { Card, Badge, Spinner, Empty, moneyFmt, ago, dateShort, useToast } from '../../components/admin/primitives.jsx';
+import {
+  adminListPendingWithdrawals, adminListWithdrawals,
+  adminApproveWithdrawal, adminRejectWithdrawal,
+} from '../../api/adminApi.js';
+import { IconCheck, IconClose } from '../../components/admin/Icons.jsx';
+import { onAdmin } from '../../api/adminSocket.js';
+import { requestNotificationPermission, notify as osNotify } from '../../lib/browserNotify.js';
 
-const METHOD_LABELS = { momo: 'Mobile Money', card: 'Card', bank: 'Bank Transfer' };
-const METHOD_COLORS = { momo: 'var(--accent)', card: 'var(--green)', bank: 'var(--orange)' };
+const REFRESH_MS = 8_000;
 
-export default function WithdrawalsPage() {
-  const { can } = useAdmin();
-  const { toast, show } = useLocalToast();
-  const [withdrawals, setWithdrawals] = useState([]);
-  const [stats, setStats] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
+function playChime() {
+  try {
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) return;
+    const ctx = new Ctx();
+    const o = ctx.createOscillator();
+    const g = ctx.createGain();
+    o.connect(g); g.connect(ctx.destination);
+    o.type = 'sine';
+    o.frequency.setValueAtTime(660, ctx.currentTime);
+    o.frequency.exponentialRampToValueAtTime(990, ctx.currentTime + 0.18);
+    g.gain.setValueAtTime(0.0001, ctx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.15, ctx.currentTime + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.4);
+    o.start(); o.stop(ctx.currentTime + 0.42);
+    setTimeout(() => { try { ctx.close(); } catch {} }, 600);
+  } catch {}
+}
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const [r, s] = await Promise.all([
-        adminListWithdrawals({ status: statusFilter || undefined, q: search || undefined }),
-        adminWithdrawalStats(),
-      ]);
-      setWithdrawals(r.withdrawals || []);
-      setStats(s);
-    } catch (e) { show(e.message, 'error'); }
-    finally { setLoading(false); }
-  }, [search, statusFilter, show]);
+const STATUS_META = {
+  pending:   { label: 'Pending',   cls: 'warn' },
+  completed: { label: 'Approved',  cls: 'success' },
+  rejected:  { label: 'Rejected',  cls: 'danger' },
+};
 
-  useEffect(() => { load(); }, [load]);
+function StatusBadge({ status }) {
+  const meta = STATUS_META[status] || { label: status, cls: 'default' };
+  return <Badge tone={meta.cls}>{meta.label}</Badge>;
+}
 
-  const statCards = stats ? [
-    { label: 'Total Withdrawals', value: numFmt(stats.totalCount), sub: `GHS ${numFmt(stats.total)}` },
-    { label: 'Today', value: numFmt(stats.todayCount), sub: `GHS ${numFmt(stats.todayTotal)}` },
-    { label: 'Pending', value: numFmt(stats.pendingCount), sub: `GHS ${numFmt(stats.pendingTotal)}` },
-  ] : [];
+const METHOD_LABELS = { momo: 'Mobile Money', vodafone: 'Telecel Cash', airteltigo: 'AT Money', card: 'Card' };
+
+function PendingView({ loading, err, pending, handleApprove, handleReject, busyId }) {
+  if (loading) return <Spinner label="Loading withdrawals…" />;
+  if (err) return (
+    <div style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 8, padding: '10px 14px', marginBottom: 16, fontSize: 13, color: '#ef4444' }}>
+      {err}
+    </div>
+  );
+  if (pending.length === 0) return <Empty title="No pending withdrawals" subtitle="All withdrawal requests have been processed." />;
 
   return (
-    <div className="adm-page">
-      <div className="adm-page-head">
-        <div>
-          <h1>Withdrawals</h1>
-          <p>Monitor and manage all player withdrawal requests.</p>
-        </div>
-      </div>
-
-      <div className="adm-stat-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))' }}>
-        {statCards.map((s, i) => (
-          <Card key={i}>
-            <div style={{ fontSize: 22, fontWeight: 800 }}>{s.value}</div>
-            <div style={{ color: 'var(--text-dim)', fontSize: 12 }}>{s.label}</div>
-            <div style={{ color: 'var(--text-soft)', fontSize: 13, marginTop: 2 }}>{s.sub}</div>
-          </Card>
+    <table className="adm-table">
+      <thead>
+        <tr>
+          <th>User</th>
+          <th>Amount</th>
+          <th>Method</th>
+          <th>Requested</th>
+          <th style={{ textAlign: 'right' }}>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {pending.map((tx) => (
+          <tr key={tx.id}>
+            <td>
+              <div style={{ fontWeight: 600 }}>{tx.user?.displayName || tx.user?.email || 'Unknown'}</div>
+              <div style={{ fontSize: 11.5, color: 'var(--text-dim)' }}>{tx.user?.email || ''}</div>
+            </td>
+            <td style={{ fontWeight: 700 }}>{moneyFmt(Math.abs(tx.amount))}</td>
+            <td style={{ fontSize: 13, color: 'var(--text-dim)' }}>{METHOD_LABELS[tx.method] || (tx.method || 'momo').toUpperCase()}</td>
+            <td style={{ fontSize: 13, color: 'var(--text-dim)' }}>{ago(tx.at)}</td>
+            <td style={{ textAlign: 'right' }}>
+              <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                <button
+                  type="button"
+                  onClick={() => handleApprove(tx.id)}
+                  disabled={busyId === tx.id}
+                  className="adm-btn adm-btn-sm"
+                  style={{ background: '#005A32', color: '#fff', border: 'none' }}
+                  title="Approve"
+                >
+                  <IconCheck />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleReject(tx.id)}
+                  disabled={busyId === tx.id}
+                  className="adm-btn adm-btn-sm"
+                  style={{ background: '#ef4444', color: '#fff', border: 'none' }}
+                  title="Reject"
+                >
+                  <IconClose />
+                </button>
+              </div>
+            </td>
+          </tr>
         ))}
-      </div>
+      </tbody>
+    </table>
+  );
+}
 
-      <div className="adm-table-wrap">
-        <div className="adm-table-toolbar">
-          <div style={{ position: 'relative', flex: 1, maxWidth: 320 }}>
-            <IconSearch size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-dim)' }} />
-            <input placeholder="Search by user, ID, or method..." value={search} onChange={(e) => setSearch(e.target.value)}
-              style={{ paddingLeft: 32 }} />
-          </div>
-          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
-            <option value="">All statuses</option>
-            <option value="completed">Completed</option>
-            <option value="pending">Pending</option>
-            <option value="rejected">Rejected</option>
-          </select>
-          <div className="grow" />
-          <button className="adm-btn ghost sm" onClick={load}><IconRefresh size={14} /> Refresh</button>
+function HistoryView({ history, loading, err }) {
+  if (loading) return <Spinner label="Loading withdrawal history…" />;
+  if (err) return (
+    <div style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 8, padding: '10px 14px', marginBottom: 16, fontSize: 13, color: '#ef4444' }}>
+      {err}
+    </div>
+  );
+  if (history.length === 0) return <Empty title="No withdrawals yet" subtitle="Withdrawal history will appear here once users make requests." />;
+
+  return (
+    <table className="adm-table">
+      <thead>
+        <tr>
+          <th>User</th>
+          <th>Amount</th>
+          <th>Method</th>
+          <th>Status</th>
+          <th>Date</th>
+          <th>Processed by</th>
+        </tr>
+      </thead>
+      <tbody>
+        {history.map((tx) => (
+          <tr key={tx.id}>
+            <td>
+              <div style={{ fontWeight: 600 }}>{tx.user?.displayName || tx.user?.email || 'Unknown'}</div>
+              <div style={{ fontSize: 11.5, color: 'var(--text-dim)' }}>{tx.user?.email || ''}</div>
+            </td>
+            <td style={{ fontWeight: 700 }}>{moneyFmt(Math.abs(tx.amount))}</td>
+            <td style={{ fontSize: 13, color: 'var(--text-dim)' }}>{METHOD_LABELS[tx.method] || (tx.method || 'momo').toUpperCase()}</td>
+            <td><StatusBadge status={tx.status} /></td>
+            <td style={{ fontSize: 13, color: 'var(--text-dim)', whiteSpace: 'nowrap' }}>{dateShort(tx.at)}</td>
+            <td style={{ fontSize: 13, color: 'var(--text-dim)' }}>
+              {tx.approvedBy || tx.rejectedBy || '—'}
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
+export default function WithdrawalsPage() {
+  const { toast: toastState, show } = useToast();
+  const [tab, setTab] = useState('pending'); // 'pending' | 'history'
+
+  const [data, setData] = useState(null);
+  const [err, setErr] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [busyId, setBusyId] = useState(null);
+  const seenIdsRef = useRef(new Set());
+
+  const [historyData, setHistoryData] = useState([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyErr, setHistoryErr] = useState('');
+
+  const load = useCallback(async (opts = {}) => {
+    try {
+      const r = await adminListPendingWithdrawals();
+      if (opts.seed && Array.isArray(r?.pending)) {
+        for (const tx of r.pending) seenIdsRef.current.add(tx.id);
+      }
+      setData(r);
+      setErr('');
+    } catch (e) {
+      setErr(e.message || 'Failed to load withdrawals');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const loadHistory = useCallback(async () => {
+    setHistoryLoading(true);
+    setHistoryErr('');
+    try {
+      const r = await adminListWithdrawals();
+      setHistoryData(r.withdrawals || []);
+    } catch (e) {
+      setHistoryErr(e.message || 'Failed to load withdrawal history');
+    } finally {
+      setHistoryLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    let alive = true;
+    let first = true;
+    const tick = () => load(first ? { seed: true } : {}).then(() => {
+      first = false;
+      if (alive) setTimeout(tick, REFRESH_MS);
+    });
+    tick();
+    return () => { alive = false; };
+  }, [load]);
+
+  useEffect(() => {
+    if (tab === 'history') loadHistory();
+  }, [tab, loadHistory]);
+
+  useEffect(() => {
+    requestNotificationPermission().catch(() => {});
+
+    const off = onAdmin('wallet:withdraw', (payload) => {
+      const txId = payload?.transactionId;
+      if (txId && seenIdsRef.current.has(txId)) return;
+      if (txId) seenIdsRef.current.add(txId);
+
+      const amount = payload?.amount;
+      const userId = payload?.userId;
+      const title = 'New withdrawal request';
+      const body  = `GHS ${moneyFmt(amount)} from user ${userId || ''}`.trim();
+
+      show(`New withdrawal request — GHS ${moneyFmt(amount)}`, 'info');
+      osNotify({ title, body, tag: `admin-withdraw-${txId || Date.now()}` });
+      playChime();
+      load();
+    });
+
+    return () => { off?.(); };
+  }, [load, show]);
+
+  const handleApprove = async (id) => {
+    setBusyId(id);
+    try {
+      await adminApproveWithdrawal(id);
+      show('Withdrawal approved', 'success');
+      load();
+    } catch (e) {
+      show(e.message || 'Approval failed', 'error');
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const handleReject = async (id) => {
+    if (!window.confirm('Reject this withdrawal? The reserved funds will be refunded to the user.')) return;
+    setBusyId(id);
+    try {
+      await adminRejectWithdrawal(id, {});
+      show('Withdrawal rejected — funds refunded', 'success');
+      load();
+    } catch (e) {
+      show(e.message || 'Rejection failed', 'error');
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const pending = data?.pending || [];
+  const totalGhs = pending.reduce((s, t) => s + Math.abs(t.amount || 0), 0);
+  const oldest = pending.length > 0 ? pending[pending.length - 1]?.at : null;
+
+  const completedCount = historyData.filter((t) => t.status === 'completed').length;
+  const rejectedCount  = historyData.filter((t) => t.status === 'rejected').length;
+
+  return (
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+        <div>
+          <h2 style={{ margin: 0, fontSize: 20, fontWeight: 800 }}>Withdrawals</h2>
+          <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--text-dim)' }}>
+            {tab === 'pending'
+              ? 'Approve or reject user withdrawal requests. Refreshes every 8s.'
+              : 'View all processed withdrawals.'}
+          </p>
         </div>
-
-        {loading ? (
-          <div style={{ padding: 24 }}><Spinner /></div>
-        ) : withdrawals.length === 0 ? (
-          <Empty title="No withdrawals found" subtitle="Withdrawals will appear here once players submit them." />
-        ) : (
-          <div className="adm-table-scroll">
-            <table className="adm-table">
-              <thead>
-                <tr>
-                  <th>Player</th>
-                  <th>Amount</th>
-                  <th>Method</th>
-                  <th>Status</th>
-                  <th>Date</th>
-                  <th>Ref ID</th>
-                </tr>
-              </thead>
-              <tbody>
-                {withdrawals.map((w) => (
-                  <tr key={w.id}>
-                    <td>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <div style={{
-                          width: 32, height: 32, borderRadius: 8,
-                          background: 'var(--grad-brand)', color: '#fff',
-                          display: 'grid', placeItems: 'center', fontSize: 11, fontWeight: 700, flexShrink: 0,
-                        }}>
-                          {(w.user?.displayName || w.user?.email || '?').slice(0, 2).toUpperCase()}
-                        </div>
-                        <div>
-                          <div style={{ fontWeight: 600, fontSize: 14 }}>{w.user?.displayName || w.user?.email || 'Unknown'}</div>
-                          {w.user?.email && <div style={{ color: 'var(--text-dim)', fontSize: 12 }}>{w.user.email}</div>}
-                        </div>
-                      </div>
-                    </td>
-                    <td style={{ fontWeight: 700 }}>GHS {numFmt(Math.abs(w.amount || 0))}</td>
-                    <td>
-                      <Badge tone="default" style={{ background: `${METHOD_COLORS[w.method] || 'var(--text-dim)'}18`, color: METHOD_COLORS[w.method] || 'var(--text-dim)' }}>
-                        {METHOD_LABELS[w.method] || w.method || '—'}
-                      </Badge>
-                    </td>
-                    <td>
-                      <Badge tone={w.status === 'completed' ? 'success' : w.status === 'pending' ? 'warning' : w.status === 'rejected' ? 'danger' : 'default'} dot>
-                        {w.status || 'unknown'}
-                      </Badge>
-                    </td>
-                    <td style={{ color: 'var(--text-soft)', fontSize: 13 }} title={w.at}>
-                      {ago(w.at)}
-                    </td>
-                    <td style={{ color: 'var(--text-dim)', fontSize: 11, fontFamily: 'monospace' }}>
-                      {w.id?.slice(0, 16)}…
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+        {tab === 'pending' && (
+          <Badge tone={pending.length > 0 ? 'warn' : 'success'} dot={pending.length > 0}>
+            {pending.length} pending
+          </Badge>
         )}
       </div>
 
-      {stats?.daily?.length > 1 && (
-        <Card style={{ marginTop: 20 }}>
-          <div style={{ fontWeight: 600, marginBottom: 12 }}>Daily Withdrawal Volume (last 30d)</div>
-          <div style={{ display: 'flex', gap: 3, alignItems: 'flex-end', height: 80 }}>
-            {stats.daily.map((d) => {
-              const maxVal = Math.max(...stats.daily.map((x) => x.amount), 1);
-              const pct = (d.amount / maxVal) * 100;
-              return (
-                <div key={d.date} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
-                  <div style={{
-                    width: '100%', background: 'var(--grad-brand)', borderRadius: '4px 4px 0 0',
-                    height: `${Math.max(pct, 2)}%`, minHeight: 2, transition: 'height 0.3s',
-                  }} title={`${d.date}: GHS ${numFmt(d.amount)}`} />
-                  <div style={{ fontSize: 8, color: 'var(--text-dim)', writingMode: 'vertical-lr', textOrientation: 'mixed' }}>
-                    {d.date.slice(5)}
-                  </div>
-                </div>
-              );
-            })}
+      {/* Sub-tabs: Pending | History */}
+      <div style={{ display: 'flex', gap: 0, borderBottom: '1px solid var(--line)', marginBottom: 20 }}>
+        {[['pending', 'Pending'], ['history', 'History']].map(([k, lbl]) => (
+          <button
+            key={k}
+            type="button"
+            onClick={() => setTab(k)}
+            style={{
+              flex: 1,
+              padding: '12px 16px',
+              background: 'transparent',
+              border: 'none',
+              borderBottom: `3px solid ${tab === k ? 'var(--accent)' : 'transparent'}`,
+              color: tab === k ? 'var(--accent)' : 'var(--text-soft)',
+              fontWeight: tab === k ? 800 : 600,
+              fontSize: 14,
+              cursor: 'pointer',
+              transition: 'color 120ms, border-color 120ms',
+            }}
+          >
+            {lbl}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'pending' && (
+        <>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 20 }}>
+            <div className="adm-stat">
+              <div className="lbl">Pending count</div>
+              <div className="val">{pending.length}</div>
+            </div>
+            <div className="adm-stat">
+              <div className="lbl">Total (GHS)</div>
+              <div className="val">{moneyFmt(totalGhs)}</div>
+            </div>
+            <div className="adm-stat">
+              <div className="lbl">Oldest pending</div>
+              <div className="val" style={{ fontSize: 14 }}>{oldest ? ago(oldest) : '—'}</div>
+            </div>
           </div>
-        </Card>
+
+          <Card flush>
+            <PendingView
+              loading={loading}
+              err={err}
+              pending={pending}
+              handleApprove={handleApprove}
+              handleReject={handleReject}
+              busyId={busyId}
+            />
+          </Card>
+        </>
       )}
 
-      {toast.open && <div className="adm-toast">{toast.message}</div>}
+      {tab === 'history' && (
+        <>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 20 }}>
+            <div className="adm-stat">
+              <div className="lbl">Total withdrawals</div>
+              <div className="val">{historyData.length}</div>
+            </div>
+            <div className="adm-stat">
+              <div className="lbl">Approved</div>
+              <div className="val" style={{ color: 'var(--success)' }}>{completedCount}</div>
+            </div>
+            <div className="adm-stat">
+              <div className="lbl">Rejected</div>
+              <div className="val" style={{ color: '#ef4444' }}>{rejectedCount}</div>
+            </div>
+          </div>
+
+          <Card flush>
+            <HistoryView history={historyData} loading={historyLoading} err={historyErr} />
+          </Card>
+        </>
+      )}
+
+      {toastState.open && (
+        <div className={`adm-toast ${toastState.kind}`} role="status" aria-live="polite">
+          <span>{toastState.message}</span>
+        </div>
+      )}
     </div>
   );
 }
