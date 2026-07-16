@@ -226,7 +226,14 @@ function TicketDetails({ bet, onClose, onRemix, onShare, onDelete }) {
   // (legacy) settled bet missing legsResolved: better to show nothing than
   // a coin-flip pretending to be a result.
   const legResult = (i) => {
-    if (bet.legsResolved && bet.legsResolved[i]) return bet.legsResolved[i].won ? 'won' : 'lost';
+    if (bet.legsResolved && bet.legsResolved[i]) {
+      const { won } = bet.legsResolved[i];
+      // won is tri-state: true/false/null (a push — e.g. a Draw No Bet or
+      // Asian Handicap tie) — null must NOT fall through to "lost" here.
+      if (won === true) return 'won';
+      if (won === false) return 'lost';
+      return 'void';
+    }
     if (bet.status === 'open' || bet.status === 'cashed_out') return 'pending';
     if (bet.status === 'won') return 'won';
     if (bet.status === 'void') return 'void';

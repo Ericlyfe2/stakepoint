@@ -226,6 +226,15 @@ export async function settleNow() {
  * no longer matches. Exists because settleNow() only ever processes bets
  * that are still `open` — a bug fix to legWon() has zero effect on bets
  * that were already (mis-)graded and persisted before the fix shipped.
+ *
+ * Also flags bets whose overall status is already correct but whose
+ * per-leg legsResolved record is stale — e.g. a bet corrected to "won"
+ * before applySettlement() started rewriting legsResolved still has the
+ * original mis-grade's `won: null` sitting there, and the client's ticket
+ * page reads legsResolved before falling back to status, so it'd render a
+ * red ✗ on a bet that pays out correctly. Same fix (re-run the correction)
+ * resolves both categories, so both surface as one "mismatch" list.
+ *
  * Read-only: does not change anything, so it's safe to run at any time.
  */
 export function auditSettledBets() {
@@ -236,8 +245,13 @@ export function auditSettledBets() {
   for (const bet of candidates) {
     const graded = gradeBet(bet);
     if (!graded) continue; // a leg's fixture result vanished/changed since settlement — skip, don't guess
-    const { status: correctStatus } = graded;
-    if (correctStatus === bet.status) continue;
+    const { status: correctStatus, legResults } = graded;
+
+    const legsStale = correctStatus === bet.status && (bet.legsResolved || []).some((lr, i) => {
+      const gr = legResults[i];
+      return gr && lr.won !== gr.won;
+    });
+    if (correctStatus === bet.status && !legsStale) continue;
 
     const currentPayout = bet.settledPayout ?? bet.totalReturn ?? 0;
     const correctPayout = correctStatus === 'won' ? (bet.potentialWin || 0)
@@ -250,6 +264,7 @@ export function auditSettledBets() {
       legs: (bet.legs || []).map((l) => ({ matchId: l.matchId, home: l.home, away: l.away, market: l.market, outcome: l.outcome })),
       currentStatus: bet.status,
       correctStatus,
+      legsStaleOnly: legsStale && correctStatus === bet.status,
       currentPayout: Number(currentPayout.toFixed(2)),
       correctPayout: Number(correctPayout.toFixed(2)),
       delta: Number((correctPayout - currentPayout).toFixed(2)),
@@ -290,6 +305,24 @@ export async function applySettlement(betId, { result, reason, payoutOverride, a
   const previousCredit = isCorrection ? (bet.settledPayout ?? bet.totalReturn ?? 0) : 0;
   const delta = Number((newCredit - previousCredit).toFixed(2));
 
+  // The client's ticket page shows a per-leg won/lost record (legsResolved)
+  // *before* falling back to the bet's overall status. Correcting only the
+  // status left a stale legsResolved from the original (buggy) auto-settle
+  // in place — still saying `won: null` for the leg the old code couldn't
+  // grade — so a ticket the admin just corrected to "won" still showed a
+  // red ✗ next to the match. legsResolved must never be allowed to disagree
+  // with the final status: when the objective grading agrees with `result`,
+  // use its precise per-leg breakdown (real scores included); otherwise
+  // (no verified result yet, or an admin deliberately overriding the
+  // objective grade) force every leg to match `result` directly.
+  const graded = gradeBet(bet);
+  const legsResolved = graded && graded.status === result
+    ? graded.legResults.map((r) => ({ matchId: r.leg.matchId, market: r.leg.market, outcome: r.leg.outcome, won: r.won, scoreHome: r.res.scoreHome, scoreAway: r.res.scoreAway }))
+    : (bet.legs || []).map((leg) => ({
+        matchId: leg.matchId, market: leg.market, outcome: leg.outcome,
+        won: result === 'won' ? true : result === 'void' ? null : false,
+      }));
+
   const updated = {
     ...bet,
     status: result,
@@ -298,6 +331,7 @@ export async function applySettlement(betId, { result, reason, payoutOverride, a
     settleReason: reason || null,
     settledPayout: newCredit,
     totalReturn: newCredit,
+    legsResolved,
     wonNotAcknowledged: result === 'won',
     ...(isCorrection ? { correction: { fromStatus: bet.status, at: new Date().toISOString(), by: adminEmail || 'admin', reason } } : {}),
   };

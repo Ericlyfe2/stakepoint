@@ -101,4 +101,31 @@ describe('auditSettledBets', () => {
     const { mismatches } = auditSettledBets();
     assert.ok(!mismatches.find((m) => m.betId === 'bet-4'));
   });
+
+  test('flags a bet whose status is already correct but whose legsResolved is stale', async () => {
+    const { createStore } = await import('../src/db/store.js');
+    const { setResult } = await import('../src/db/sportsAdmin.js');
+    const { auditSettledBets } = await import('../src/services/settlement.js');
+    const betsStore = createStore('bets', {});
+
+    // Represents a bet manually corrected to "won" (correct!) before
+    // applySettlement started rewriting legsResolved — the top-level status
+    // agrees with the grading, but the per-leg record still says won: null
+    // from the original mis-grade, which the client's ticket page reads first.
+    setResult('fx-5', 3, 2, 'manual');
+    betsStore.set('bet-5', {
+      id: 'bet-5', userId: 'u-5', bookingCode: 'TEST05', stake: 300, potentialWin: 9000,
+      status: 'won', settledPayout: 9000, totalReturn: 9000,
+      legs: [{ matchId: 'fx-5', market: 'CS', outcome: '3-2' }],
+      legsResolved: [{ matchId: 'fx-5', market: 'CS', outcome: '3-2', won: null, scoreHome: 3, scoreAway: 2 }],
+    });
+
+    const { mismatches } = auditSettledBets();
+    const found = mismatches.find((m) => m.betId === 'bet-5');
+    assert.ok(found, 'expected the stale-legsResolved bet to be flagged even though status is correct');
+    assert.equal(found.legsStaleOnly, true);
+    assert.equal(found.currentStatus, 'won');
+    assert.equal(found.correctStatus, 'won');
+    assert.equal(found.delta, 0, 'no money should move for a display-only fix');
+  });
 });

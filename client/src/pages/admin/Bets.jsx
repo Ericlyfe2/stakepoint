@@ -559,8 +559,12 @@ function SettlementAuditModal({ onClose, showToast, onFixed }) {
                   {m.legs?.[0] && <span style={{ color: 'var(--text-soft)', fontWeight: 500 }}> · {m.legs[0].home} — {m.legs[0].away} · {m.legs[0].market} {m.legs[0].outcome}</span>}
                 </div>
                 <div style={{ fontSize: 12.5, color: 'var(--text-soft)', marginTop: 2 }}>
-                  Stored <strong className={`bet-status ${m.currentStatus}`}>{m.currentStatus}</strong> ({moneyFmt(m.currentPayout)}) → should be <strong className={`bet-status ${m.correctStatus}`}>{m.correctStatus}</strong> ({moneyFmt(m.correctPayout)})
-                  {m.delta !== 0 && <> — {m.delta > 0 ? `owes ${moneyFmt(m.delta)} more` : `overpaid ${moneyFmt(Math.abs(m.delta))}`}</>}
+                  {m.legsStaleOnly ? (
+                    <>Payout is correct (<strong className={`bet-status ${m.currentStatus}`}>{m.currentStatus}</strong>, {moneyFmt(m.currentPayout)}) but the per-match ✓/✗ display is stale — no money moves, just re-syncs the ticket page.</>
+                  ) : (
+                    <>Stored <strong className={`bet-status ${m.currentStatus}`}>{m.currentStatus}</strong> ({moneyFmt(m.currentPayout)}) → should be <strong className={`bet-status ${m.correctStatus}`}>{m.correctStatus}</strong> ({moneyFmt(m.correctPayout)})
+                    {m.delta !== 0 && <> — {m.delta > 0 ? `owes ${moneyFmt(m.delta)} more` : `overpaid ${moneyFmt(Math.abs(m.delta))}`}</>}</>
+                  )}
                 </div>
               </div>
               <button className="adm-btn sm primary" onClick={() => fixOne(m)} disabled={fixingAll || fixingId === m.betId}>
