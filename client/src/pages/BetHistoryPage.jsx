@@ -161,6 +161,7 @@ function SvgArrowUp({ size = 13 }) { return (<svg width={size} height={size} vie
 function SvgArrowDown({ size = 13 }) { return (<svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg>); }
 function SvgPlayCircle({ size = 20 }) { return (<svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8" fill="currentColor" stroke="none"/></svg>); }
 function SvgCheckCircle({ size = 20 }) { return (<svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden><circle cx="12" cy="12" r="10" fill="#22c66e"/><polyline points="8 12.5 11 15.5 16 9.5" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>); }
+function SvgXCircle({ size = 20 }) { return (<svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden><circle cx="12" cy="12" r="10" fill="#e5342b"/><line x1="8.5" y1="8.5" x2="15.5" y2="15.5" stroke="#fff" strokeWidth="2.5" strokeLinecap="round"/><line x1="15.5" y1="8.5" x2="8.5" y2="15.5" stroke="#fff" strokeWidth="2.5" strokeLinecap="round"/></svg>); }
 function SvgBall({ size = 13 }) { return (<svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden><circle cx="12" cy="12" r="10"/><path d="M12 7l4.2 3-1.6 5h-5.2l-1.6-5z" fill="currentColor" stroke="none"/><path d="M12 2v5M4.5 6.5l3.3 3.5M19.5 6.5l-3.3 3.5M6 20l2.6-4.5M18 20l-2.6-4.5"/></svg>); }
 
 /* ── Live leg helpers ── */
@@ -354,7 +355,7 @@ function TicketDetails({ bet, onClose, onRemix, onShare, onDelete }) {
                           {won ? (
                             <SvgCheckCircle size={20} />
                           ) : (
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                            <SvgXCircle size={20} />
                           )}
                         </span>
                       )}
