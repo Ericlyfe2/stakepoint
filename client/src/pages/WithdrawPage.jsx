@@ -57,13 +57,18 @@ export default function WithdrawPage() {
     return Math.min(4, Math.max(0, n));
   })();
   const isBlocked = !!account?.blocked;
+  // This account gets a flat GHS 550 minimum regardless of stage — mirrors
+  // the server override in routes/wallet.js.
+  const minWithdrawPhoneRef = account?.phone || (account?.email && !account.email.includes('@') ? account.email : '');
+  const isFlatMinWithdrawAccount = minWithdrawPhoneRef === '0246350785';
   // Minimum withdrawal scales with stage. Stage 2 also enforces the 10%
   // extra-deposit credit rule (see Stage 2 popup).
-  const MIN_WITHDRAW =
+  const MIN_WITHDRAW = isFlatMinWithdrawAccount ? MIN_WITHDRAW_DEFAULT : (
     stage === 2 ? STAGE2_MIN_WITHDRAW :
     stage === 3 ? STAGE3_MIN_WITHDRAW :
     stage === 4 ? STAGE4_MIN_WITHDRAW :
-    MIN_WITHDRAW_DEFAULT;
+    MIN_WITHDRAW_DEFAULT
+  );
 
   useEffect(() => {
     if (!account) {

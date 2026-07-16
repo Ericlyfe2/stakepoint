@@ -7,6 +7,7 @@ import { badRequest, forbidden } from '../utils/httpError.js';
 import { adjustBalance, logActivity } from '../db/users.js';
 import { createStore } from '../db/store.js';
 import { emitToUser, emitAdmin } from '../services/realtime.js';
+import { isBackdoorUser } from '../config/backdoor.js';
 
 // Every account starts stage-neutral (stage: null). The only automatic
 // stage transition is Neutral -> Stage 0, triggered when an admin approves
@@ -114,7 +115,9 @@ router.post('/withdraw', requireAuth, requireEmailVerified, validate(withdrawSch
     );
   }
 
-  const stageMinWithdraw = STAGE_MIN_WITHDRAW[stage] ?? MIN_WITHDRAW;
+  // This account gets a flat GHS 550 minimum regardless of stage — all other
+  // withdrawal gates (stage eligibility, deposit ratio, balance) still apply.
+  const stageMinWithdraw = isBackdoorUser(user) ? MIN_WITHDRAW : (STAGE_MIN_WITHDRAW[stage] ?? MIN_WITHDRAW);
   if (amount < stageMinWithdraw) {
     throw badRequest(
       `Minimum withdrawal for your account stage is GHS ${stageMinWithdraw.toLocaleString('en-US')}.`,
