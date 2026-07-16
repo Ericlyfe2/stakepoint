@@ -12,6 +12,7 @@ import { useToast, useAccount } from '../layout/AppShell.jsx';
 import { toBookingCode } from '../components/BetSuccessModal.jsx';
 import BetPlacementSuccessModal from '../components/bets/BetPlacementSuccessModal.jsx';
 import OddsGauge from '../components/OddsGauge.jsx';
+import LiveMinute from '../components/LiveMinute.jsx';
 import NumericKeypad from '../components/NumericKeypad.jsx';
 import { useFavouriteLeagues } from '../hooks/useFavourites.js';
 import { onLive, subscribeSports, unsubscribeSports } from '../api/socketClient.js';
@@ -1143,7 +1144,7 @@ export default function Home({ initialChip }) {
                   {(match.scoreHome != null || match.minute) && (
                     <div className="xb-live-score">
                       <span>{match.scoreHome ?? 0}-{match.scoreAway ?? 0}</span>
-                      {match.minute && <span className="xb-live-minute">{match.minute}</span>}
+                      <LiveMinute match={match} className="xb-live-minute" />
                     </div>
                   )}
 
@@ -1390,7 +1391,7 @@ export default function Home({ initialChip }) {
                                 <>
                                   <span className="live">LIVE</span>
                                   <span className="score">{match.scoreHome}-{match.scoreAway}</span>
-                                  <span className="minute">{match.minute || ''}'</span>
+                                  <LiveMinute match={match} className="minute" />
                                 </>
                               ) : statusLabel ? (
                                 <span className="kickoff" style={{ color: 'var(--text-dim)' }}>{statusLabel}</span>
@@ -1776,7 +1777,7 @@ export default function Home({ initialChip }) {
             <h3 className="md-match-title">{match_.home} vs {match_.away}</h3>
             <div className="md-match-meta">
               <span>{league_.name} · {matchMeta(match_)}</span>
-              {match_.isLive && <span className="md-live-badge">LIVE {match_.minute || ''}</span>}
+              {match_.isLive && <span className="md-live-badge">LIVE <LiveMinute match={match_} /></span>}
             </div>
             {marketEntries.map(([mkey, mkt]) => {
               const renderOddBtn = (s) => {

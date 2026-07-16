@@ -4,6 +4,7 @@ import { useAdmin } from '../../providers/AdminProvider.jsx';
 import { adminOverview, adminStatsSummary, adminAudit, adminFixtures, adminAdminSessions } from '../../api/adminApi.js';
 import { Card, Stat, Badge, Empty, Spinner, moneyFmt, numFmt, ago } from '../../components/admin/primitives.jsx';
 import { IconUsers, IconReceipt, IconCash, IconActivity, IconTrending, IconTarget, IconEye } from '../../components/admin/Icons.jsx';
+import LiveMinute from '../../components/LiveMinute.jsx';
 
 function MiniSparkline({ data = [], color = 'var(--brand)', height = 36 }) {
   if (data.length < 2) return null;
@@ -58,7 +59,7 @@ function LiveFixturesBar({ fixtures }) {
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--text)' }}>{f.home} vs {f.away}</div>
               <div style={{ color: 'var(--text-dim)', fontSize: 12, marginTop: 2 }}>
-                {f.scoreHome ?? 0} - {f.scoreAway ?? 0} · {f.minute || 0}&apos;
+                {f.scoreHome ?? 0} - {f.scoreAway ?? 0} · {f.minute ? <LiveMinute match={f} /> : "0'"}
               </div>
             </div>
             <Badge tone="danger" dot>LIVE</Badge>

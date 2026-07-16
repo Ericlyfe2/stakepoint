@@ -12,6 +12,7 @@ import {
 } from '../../api/adminApi.js';
 import { useAdmin } from '../../providers/AdminProvider.jsx';
 import { Card, Badge, Empty, Modal, numFmt } from '../../components/admin/primitives.jsx';
+import LiveMinute from '../../components/LiveMinute.jsx';
 import {
   IconLive, IconRefresh, IconBan, IconCheck, IconSettle, IconAlert,
 } from '../../components/admin/Icons.jsx';
@@ -160,7 +161,7 @@ function LiveFixtureCard({ fx, canEdit, busy, onPatch, onOdds, onResetOdds, onSu
         {/* head */}
         <div className="adm-live-head">
           <div className="adm-live-title">
-            <Badge tone="danger" dot>LIVE {fx.minute || ''}</Badge>
+            <Badge tone="danger" dot>LIVE <LiveMinute match={fx} /></Badge>
             <strong>{fx.home} — {fx.away}</strong>
             <span className="adm-live-league">{fx.leagueName || fx.leagueId} · {fx.sport}</span>
             {fx.suspended && <Badge tone="warn">Match suspended</Badge>}
@@ -185,7 +186,7 @@ function LiveFixtureCard({ fx, canEdit, busy, onPatch, onOdds, onResetOdds, onSu
             {canEdit && (
               <div className="adm-live-clock-ctl">
                 <button className="adm-btn sm" disabled={busy} onClick={() => setMinute(minuteNum - 1)}>−1'</button>
-                <span className="adm-live-min">{fx.minute || "0'"}</span>
+                <span className="adm-live-min">{fx.minute ? <LiveMinute match={fx} /> : "0'"}</span>
                 <button className="adm-btn sm" disabled={busy} onClick={() => setMinute(minuteNum + 1)}>+1'</button>
                 <button className="adm-btn sm" disabled={busy} onClick={() => setMinute(45)}>HT</button>
                 <button className="adm-btn sm" disabled={busy} onClick={() => setMinute(46)}>H2</button>

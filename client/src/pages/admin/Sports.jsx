@@ -20,6 +20,7 @@ import { Card, Badge, Drawer, Modal, Empty, SkeletonRow, moneyFmt, numFmt, ago }
 import {
   IconSearch, IconRefresh, IconLive, IconBan, IconCheck, IconSettle, IconBook, IconAlert, IconClose,
 } from '../../components/admin/Icons.jsx';
+import LiveMinute from '../../components/LiveMinute.jsx';
 
 export default function SportsAdmin() {
   const { hasRole, showToast } = useAdmin();
@@ -177,9 +178,9 @@ export default function SportsAdmin() {
                   if (m.matchStatus === 'abandoned') return <Badge tone="warn">Abandoned</Badge>;
                   if (m.matchStatus === 'void') return <Badge tone="warn">Void</Badge>;
                   if (m.matchStatus === 'ft') return <Badge tone="success">FT {m.scoreHome ?? ''}-{m.scoreAway ?? ''}</Badge>;
-                  if (m.matchStatus === 'ht') return <Badge tone="danger" dot>HT {m.minute || ''}</Badge>;
-                  if (m.matchStatus === '2h') return <Badge tone="danger" dot>2H {m.minute || ''}</Badge>;
-                  if (matchStatus === 'live') return <Badge tone="danger" dot>Live {m.minute || ''}</Badge>;
+                  if (m.matchStatus === 'ht') return <Badge tone="danger" dot>HT <LiveMinute match={m} /></Badge>;
+                  if (m.matchStatus === '2h') return <Badge tone="danger" dot>2H <LiveMinute match={m} /></Badge>;
+                  if (matchStatus === 'live') return <Badge tone="danger" dot>Live <LiveMinute match={m} /></Badge>;
                   if (matchStatus === 'upcoming') return <Badge tone="info">Upcoming</Badge>;
                   if (matchStatus === 'finished') return <Badge tone="success">Finished {m.scoreHome}-{m.scoreAway}</Badge>;
                   if (matchStatus === 'suspended') return <Badge tone="warn">Suspended</Badge>;
@@ -370,10 +371,10 @@ function FixtureDrawer({ open, fixtureId, onClose, hasRole, showToast, onChange 
     if (ms === 'abandoned') return <Badge tone="warn">Abandoned</Badge>;
     if (ms === 'void') return <Badge tone="warn">Void</Badge>;
     if (ms === 'ft') return <Badge tone="success">FT {fx.scoreHome ?? ''}-{fx.scoreAway ?? ''}</Badge>;
-    if (ms === 'ht') return <Badge tone="danger" dot>HT {fx.minute || ''}</Badge>;
-    if (ms === '2h') return <Badge tone="danger" dot>2H {fx.minute || ''}</Badge>;
+    if (ms === 'ht') return <Badge tone="danger" dot>HT <LiveMinute match={fx} /></Badge>;
+    if (ms === '2h') return <Badge tone="danger" dot>2H <LiveMinute match={fx} /></Badge>;
     if (fx?.finished) return <Badge tone="success">Finished {fx.scoreHome}-{fx.scoreAway}</Badge>;
-    if (fx?.isLive) return <Badge tone="danger" dot>Live {fx.minute || ''}</Badge>;
+    if (fx?.isLive) return <Badge tone="danger" dot>Live <LiveMinute match={fx} /></Badge>;
     return <Badge tone="info">Upcoming</Badge>;
   }
 
