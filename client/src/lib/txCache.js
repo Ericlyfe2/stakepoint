@@ -29,6 +29,11 @@ export function readTxCache(userId) {
   }
 }
 
+export function clearTxCache(userId) {
+  if (!ls || !userId) return;
+  try { ls.removeItem(keyFor(userId)); } catch { /* ignore */ }
+}
+
 export function writeTxCache(userId, txs) {
   if (!ls || !userId || !Array.isArray(txs)) return;
   try {

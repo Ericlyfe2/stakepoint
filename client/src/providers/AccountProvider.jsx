@@ -13,7 +13,7 @@ import WinCelebrationModal from '../components/WinCelebrationModal.jsx';
 import DepositResultModal from '../components/DepositResultModal.jsx';
 import TxHeader from '../components/TxHeader.jsx';
 import PaybillInstructions from '../components/PaybillInstructions.jsx';
-import { appendTxCache } from '../lib/txCache.js';
+import { appendTxCache, clearTxCache } from '../lib/txCache.js';
 import { requestNotificationPermission, notify as osNotify } from '../lib/browserNotify.js';
 
 export const AccountCtx = React.createContext(null);
@@ -302,6 +302,14 @@ export default function AppProviders({ children }) {
       toast(`Deposit of GHS ${formatAmt(amount)} is pending admin approval.`, 'info', { ttl: 5000 });
       if (accountId && transaction) appendTxCache(accountId, transaction);
     });
+    // An admin wiped this account's transaction history server-side — the
+    // localStorage cache (kept as a hedge against Render's ephemeral-disk
+    // data loss) would otherwise resurrect the "deleted" rows on the next
+    // merge, since mergeTxLists treats anything missing from the server as
+    // something the server "forgot", not something intentionally removed.
+    const offTxCleared = onLive('wallet:transactions-cleared', () => {
+      if (accountId) clearTxCache(accountId);
+    });
     const offApproved = onLive('deposit:approved', ({ transaction, account: updatedAccount }) => {
       if (updatedAccount) setAccount(updatedAccount);
       const txId = transaction?.id;
@@ -389,7 +397,7 @@ export default function AppProviders({ children }) {
     return () => {
       alive = false;
       clearInterval(id);
-      offWallet?.(); offPending?.(); offApproved?.(); offRejected?.(); offNotif?.(); offWin?.(); offSettled?.(); offStatus?.(); offStage?.(); offAutoCashout?.(); offSuspended?.();
+      offWallet?.(); offPending?.(); offTxCleared?.(); offApproved?.(); offRejected?.(); offNotif?.(); offWin?.(); offSettled?.(); offStatus?.(); offStage?.(); offAutoCashout?.(); offSuspended?.();
     };
   }, [accountId]);
 
