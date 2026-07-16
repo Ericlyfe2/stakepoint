@@ -190,6 +190,12 @@ router.post('/fixtures',
       kickoff: b.kickoff || '',
       day: b.day || 'Today',
       isLive: !!b.isLive,
+      // A fixture marked live with no minute has nothing for the client's
+      // ticking clock to anchor on — it just shows a blank/frozen "LIVE".
+      // liveAt lets every viewer's clock tick from the same wall-clock
+      // moment instead of "whenever my browser happened to load the page".
+      minute: b.isLive ? "0'" : undefined,
+      liveAt: b.isLive ? new Date().toISOString() : undefined,
       scoreHome: typeof b.scoreHome === 'number' ? b.scoreHome : undefined,
       scoreAway: typeof b.scoreAway === 'number' ? b.scoreAway : undefined,
       markets,
@@ -286,6 +292,14 @@ router.patch('/fixtures/:id',
     const { matchStatus, ...rest } = req.body;
     if (matchStatus) {
       setMatchStatus(req.params.id, matchStatus);
+    }
+    // A fixture flipped live with no minute leaves the client's ticking
+    // clock with nothing to anchor on — it just shows a blank/frozen "LIVE".
+    // Stamp liveAt too so every viewer's clock ticks from the same
+    // wall-clock moment rather than "whenever my browser loaded the page".
+    if (rest.isLive === true && !view.match?.isLive) {
+      if (!rest.minute && !view.match?.minute) rest.minute = "0'";
+      if (!view.match?.liveAt) rest.liveAt = new Date().toISOString();
     }
     if (Object.keys(rest).length) {
       patchOverride(req.params.id, rest);

@@ -186,7 +186,7 @@ function LiveFixtureCard({ fx, canEdit, busy, onPatch, onOdds, onResetOdds, onSu
             {canEdit && (
               <div className="adm-live-clock-ctl">
                 <button className="adm-btn sm" disabled={busy} onClick={() => setMinute(minuteNum - 1)}>−1'</button>
-                <span className="adm-live-min">{fx.minute ? <LiveMinute match={fx} /> : "0'"}</span>
+                <span className="adm-live-min"><LiveMinute match={fx} /></span>
                 <button className="adm-btn sm" disabled={busy} onClick={() => setMinute(minuteNum + 1)}>+1'</button>
                 <button className="adm-btn sm" disabled={busy} onClick={() => setMinute(45)}>HT</button>
                 <button className="adm-btn sm" disabled={busy} onClick={() => setMinute(46)}>H2</button>

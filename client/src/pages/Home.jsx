@@ -1141,7 +1141,7 @@ export default function Home({ initialChip }) {
                     <span className="xb-live-team">{match.away}</span>
                   </div>
 
-                  {(match.scoreHome != null || match.minute) && (
+                  {(match.scoreHome != null || match.minute || match.isLive) && (
                     <div className="xb-live-score">
                       <span>{match.scoreHome ?? 0}-{match.scoreAway ?? 0}</span>
                       <LiveMinute match={match} className="xb-live-minute" />
