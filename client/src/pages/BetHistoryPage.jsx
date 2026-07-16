@@ -7,6 +7,7 @@ import { useAccount, useToast } from '../providers/AccountProvider.jsx';
 import CashoutModal from '../components/CashoutModal.jsx';
 import AutoCashoutPanel from '../components/AutoCashoutPanel.jsx';
 import { toBookingCode } from '../components/BetSuccessModal.jsx';
+import { readHiddenTicketIds, hideTicket } from '../lib/hiddenTickets.js';
 
 const AUTO_TARGETS_KEY = 'bv_auto_cashout_targets';
 const PAGE_SIZE = 20;
@@ -185,7 +186,7 @@ function betHasLiveLeg(bet) {
 }
 
 /* ─────────── Ticket Details Overlay (SportyBet-style) ─────────── */
-function TicketDetails({ bet, onClose, onRemix, onShare }) {
+function TicketDetails({ bet, onClose, onRemix, onShare, onDelete }) {
   const [copiedCode, setCopiedCode] = useState(false);
 
   useEffect(() => {
@@ -374,6 +375,21 @@ function TicketDetails({ bet, onClose, onRemix, onShare }) {
               );
             })}
           </div>
+        </div>
+
+        {/* ── Delete ticket (hides from this device's history only) ── */}
+        <div className="td-footer">
+          <button
+            type="button"
+            className="td-delete-btn"
+            onClick={() => {
+              if (!window.confirm('Remove this ticket from your bet history? It will only be hidden from your view.')) return;
+              onDelete?.(bet);
+            }}
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+            Delete Ticket
+          </button>
         </div>
       </div>
     </div>
@@ -685,6 +701,19 @@ export default function BetHistoryPage() {
   // Ticket details overlay
   const [activeTicket, setActiveTicket] = useState(null);
 
+  // Tickets hidden from this device's history (delete = hide, not a real delete)
+  const [hiddenIds, setHiddenIds] = useState(() => new Set());
+  useEffect(() => {
+    setHiddenIds(readHiddenTicketIds(account?.id));
+  }, [account?.id]);
+  const handleDeleteTicket = useCallback((betToHide) => {
+    if (!account?.id || !betToHide?.id) return;
+    const next = hideTicket(account.id, betToHide.id);
+    setHiddenIds(next);
+    setActiveTicket(null);
+    toast('Ticket removed from your history.', 'success');
+  }, [account?.id, toast]);
+
   // History filter chips
   const historyFilter = 'settled';
 
@@ -771,8 +800,9 @@ export default function BetHistoryPage() {
   // ── Derived Data ──
   // Booked tickets are only reservations (no stake taken) — they live in the
   // Code Hub, not in bet history, and must never render as settled/lost here.
-  const openBets = useMemo(() => bets.filter(b => b.status === 'open'), [bets]);
-  const settledBets = useMemo(() => bets.filter(b => b.status !== 'open' && b.status !== 'booked'), [bets]);
+  const visibleBets = useMemo(() => bets.filter(b => !hiddenIds.has(b.id)), [bets, hiddenIds]);
+  const openBets = useMemo(() => visibleBets.filter(b => b.status === 'open'), [visibleBets]);
+  const settledBets = useMemo(() => visibleBets.filter(b => b.status !== 'open' && b.status !== 'booked'), [visibleBets]);
   const cashoutableBets = useMemo(() => openBets.filter(b => computeOffer(b) > 0), [openBets]);
 
   const filteredBets = useMemo(() => {
@@ -782,7 +812,7 @@ export default function BetHistoryPage() {
     } else {
       if (historyFilter === 'settled') result = settledBets;
       else if (historyFilter === 'unsettled') result = openBets;
-      else result = bets.filter(b => b.status !== 'booked');
+      else result = visibleBets.filter(b => b.status !== 'booked');
     }
 
     if (searchQuery.trim()) {
@@ -796,7 +826,7 @@ export default function BetHistoryPage() {
     }
 
     return result;
-  }, [tab, historyFilter, openBets, settledBets, bets, searchQuery]);
+  }, [tab, historyFilter, openBets, settledBets, visibleBets, searchQuery]);
 
   const paginated = useMemo(() => filteredBets.slice(0, visibleCount), [filteredBets, visibleCount]);
 
@@ -1075,6 +1105,7 @@ export default function BetHistoryPage() {
           bet={activeTicket}
           onClose={() => setActiveTicket(null)}
           onRemix={() => { const bet = activeTicket; setActiveTicket(null); if (bet) onRemixBet(bet); }}
+          onDelete={handleDeleteTicket}
           onShare={(bet) => {
             const code = bet.bookingCode || toBookingCode(bet.id);
             if (navigator.share) {
@@ -1272,6 +1303,11 @@ const XH_CSS = `
 .td-header-back { display: flex; align-items: center; gap: 6px; background: none; border: none; color: #fff; font-size: 14px; font-weight: 700; cursor: pointer; font-family: inherit; }
 .td-header-date { font-size: 12px; color: rgba(255,255,255,.75); font-weight: 500; }
 .td-scroll { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; background: var(--bg); }
+
+/* ── Footer / delete ── */
+.td-footer { flex-shrink: 0; padding: 12px 14px calc(12px + env(safe-area-inset-bottom)); background: var(--bg); border-top: 1px solid var(--line); }
+.td-delete-btn { width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px; padding: 13px 0; border-radius: 10px; border: 1px solid rgba(229,57,53,0.35); background: rgba(229,57,53,0.08); color: #e53935; font-size: 14px; font-weight: 700; cursor: pointer; font-family: inherit; }
+.td-delete-btn:hover { background: rgba(229,57,53,0.14); }
 
 /* ── Info rows ── */
 .td-info { background: var(--surface); border-bottom: 1px solid var(--line); }
