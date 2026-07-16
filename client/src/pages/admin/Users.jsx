@@ -17,7 +17,7 @@ import {
   adminDeleteAllUsers,
   adminCreateUser, adminUserCredentials,
   adminUserAccountStatus, adminBulkAccountStatus,
-  adminUserStage, adminUserBlocked,
+  adminUserStage, adminUserBlocked, adminClearUserTx,
 } from '../../api/adminApi.js';
 
 function toBookingCode(id = '') {
@@ -733,6 +733,14 @@ function UserDrawer({ open, user, tab, setTab, onClose, onUpdate, onDeleted, has
       setCredentials(c);
     } catch (e) { showToast(e.message || 'Could not load credentials.', 'error'); }
   }
+  async function clearTransactions() {
+    try {
+      const r = await adminClearUserTx(user.id);
+      setTx([]);
+      if (r.user) { setDetail(r.user); onUpdate(r.user); }
+      showToast('Transaction history deleted.');
+    } catch (e) { showToast(e.message || 'Could not delete transaction history.', 'error'); }
+  }
 
   if (!open || !user) return null;
 
@@ -784,6 +792,8 @@ function UserDrawer({ open, user, tab, setTab, onClose, onUpdate, onDeleted, has
           onBlocked={doBlocked}
           onTags={saveTags}
           onNotes={saveNotes}
+          onClearTransactions={clearTransactions}
+          txCount={tx.length}
         />
       )}
 
@@ -1099,7 +1109,7 @@ function VerificationStageCard({ user, hasRole, onStage, onBlocked }) {
   );
 }
 
-function ProfileTab({ user, logins = [], hasRole, onKyc, onAccountStatus, onStage, onBlocked, onTags, onNotes }) {
+function ProfileTab({ user, logins = [], hasRole, onKyc, onAccountStatus, onStage, onBlocked, onTags, onNotes, onClearTransactions, txCount = 0 }) {
   const [tagInput, setTagInput] = useState('');
   const [notes, setNotes] = useState(user.notes || '');
   const lastLogin  = logins.find((e) => e.kind === 'login_success' || e.kind === 'login_google');
@@ -1131,6 +1141,24 @@ function ProfileTab({ user, logins = [], hasRole, onKyc, onAccountStatus, onStag
           <Mini label="Deposits" v={moneyFmt(user.stats?.depositTotal)} />
         </div>
       </Card>
+
+      {hasRole('finance_admin') && (
+        <Card title="Transaction History">
+          <div style={{ padding: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+            <div style={{ fontSize: 13, color: 'var(--text-dim)', maxWidth: 380 }}>
+              Permanently deletes this user's deposit and withdrawal history ({txCount} record{txCount === 1 ? '' : 's'}) from their wallet view. Balance and verification stage are not affected.
+            </div>
+            <button
+              type="button"
+              className="adm-btn danger"
+              disabled={txCount === 0}
+              onClick={onClearTransactions}
+            >
+              <IconTrash size={14} /> Delete All Transaction History
+            </button>
+          </div>
+        </Card>
+      )}
 
       <Card
         title="Account Status"

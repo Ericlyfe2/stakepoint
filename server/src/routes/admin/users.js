@@ -346,6 +346,19 @@ router.patch('/:id/wallet',
   })
 );
 
+router.delete('/:id/transactions',
+  requireAdmin, requireRole('finance_admin'),
+  asyncHandler(async (req, res) => {
+    const u = getUserById(req.params.id);
+    if (!u) throw notFound('User not found');
+    const count = (txStore.get(u.id) || []).length;
+    txStore.delete(u.id);
+    audit(req, { action: 'user.transactions.clear', target: u.id, targetType: 'user', severity: 'warning', meta: { count } });
+    emitToUser(u.id, 'wallet:transactions-cleared', {});
+    res.json({ ok: true, cleared: count, user: expandUser(u) });
+  })
+);
+
 router.patch('/:id/tags',
   requireAdmin, requireRole('moderator', 'support'),
   validate(z.object({ tags: z.array(z.string().trim().min(1).max(40)).max(20) })),

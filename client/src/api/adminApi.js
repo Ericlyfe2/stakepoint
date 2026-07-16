@@ -141,6 +141,8 @@ export const adminDeleteUser    = (id, reason) =>
 export const adminBulkDeleteUsers = (ids, reason) => post('/users/bulk-delete', { ids, reason });
 export const adminDeleteAllUsers  = (reason)      => post('/users/delete-all', { reason });
 export const adminUserCredentials = (id) => get(`/users/${encodeURIComponent(id)}/credentials`);
+export const adminClearUserTx     = (id) =>
+  rawFetch(`/users/${encodeURIComponent(id)}/transactions`, { method: 'DELETE' }).then(jsonOrThrow);
 export const adminUserAccountStatus = (id, accountStatus, note) => patch_(`/users/${encodeURIComponent(id)}/account-status`, { accountStatus, note });
 export const adminBulkAccountStatus = (ids, accountStatus, note) => post('/users/bulk-account-status', { ids, accountStatus, note });
 
