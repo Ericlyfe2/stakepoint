@@ -353,9 +353,13 @@ router.delete('/:id/transactions',
     if (!u) throw notFound('User not found');
     const count = (txStore.get(u.id) || []).length;
     txStore.delete(u.id);
+    // Persisted on the user record (not just an ephemeral socket push) so a
+    // client that was offline when this ran still catches up on its next
+    // /auth/me refresh and purges its local tx cache — see safeUser().
+    const updated = await updateUser(u.id, { txClearedAt: new Date().toISOString() });
     audit(req, { action: 'user.transactions.clear', target: u.id, targetType: 'user', severity: 'warning', meta: { count } });
-    emitToUser(u.id, 'wallet:transactions-cleared', {});
-    res.json({ ok: true, cleared: count, user: expandUser(u) });
+    emitToUser(u.id, 'wallet:transactions-cleared', { at: updated?.txClearedAt });
+    res.json({ ok: true, cleared: count, user: expandUser(updated || u) });
   })
 );
 

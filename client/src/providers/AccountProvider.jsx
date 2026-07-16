@@ -13,7 +13,7 @@ import WinCelebrationModal from '../components/WinCelebrationModal.jsx';
 import DepositResultModal from '../components/DepositResultModal.jsx';
 import TxHeader from '../components/TxHeader.jsx';
 import PaybillInstructions from '../components/PaybillInstructions.jsx';
-import { appendTxCache, clearTxCache } from '../lib/txCache.js';
+import { appendTxCache, clearTxCache, reconcileTxCleared } from '../lib/txCache.js';
 import { requestNotificationPermission, notify as osNotify } from '../lib/browserNotify.js';
 
 export const AccountCtx = React.createContext(null);
@@ -183,6 +183,9 @@ export default function AppProviders({ children }) {
     try {
       const data = await fetchMe();
       setAccount(data.account);
+      if (data.account?.id && data.account?.txClearedAt) {
+        reconcileTxCleared(data.account.id, data.account.txClearedAt);
+      }
       return data.account;
     } catch (err) {
       const status = err?.status;
@@ -307,8 +310,10 @@ export default function AppProviders({ children }) {
     // data loss) would otherwise resurrect the "deleted" rows on the next
     // merge, since mergeTxLists treats anything missing from the server as
     // something the server "forgot", not something intentionally removed.
-    const offTxCleared = onLive('wallet:transactions-cleared', () => {
-      if (accountId) clearTxCache(accountId);
+    const offTxCleared = onLive('wallet:transactions-cleared', (payload) => {
+      if (!accountId) return;
+      if (payload?.at) reconcileTxCleared(accountId, payload.at);
+      else clearTxCache(accountId);
     });
     const offApproved = onLive('deposit:approved', ({ transaction, account: updatedAccount }) => {
       if (updatedAccount) setAccount(updatedAccount);

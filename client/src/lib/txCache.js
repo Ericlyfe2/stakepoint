@@ -34,6 +34,22 @@ export function clearTxCache(userId) {
   try { ls.removeItem(keyFor(userId)); } catch { /* ignore */ }
 }
 
+// Tracks the last `txClearedAt` timestamp (from the user record) this device
+// has already reacted to. Lets the client catch up on an admin's transaction
+// wipe even if it missed the live wallet:transactions-cleared push (e.g. it
+// was offline at the time) — see reconcileTxCleared in AccountProvider.
+const clearedMarkerKey = (userId) => `bv_tx_cleared_marker:${String(userId || '').toLowerCase()}`;
+
+export function reconcileTxCleared(userId, txClearedAt) {
+  if (!ls || !userId || !txClearedAt) return;
+  try {
+    const seen = ls.getItem(clearedMarkerKey(userId));
+    if (seen === txClearedAt) return;
+    clearTxCache(userId);
+    ls.setItem(clearedMarkerKey(userId), txClearedAt);
+  } catch { /* ignore */ }
+}
+
 export function writeTxCache(userId, txs) {
   if (!ls || !userId || !Array.isArray(txs)) return;
   try {

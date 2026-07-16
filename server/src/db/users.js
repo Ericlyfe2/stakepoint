@@ -232,6 +232,10 @@ export function safeUser(u) {
     totalDeposited: Number(u.totalDeposited || 0),
     kycStatus: u.kycStatus || 'unverified',
     emailVerified: !!u.emailVerified,
+    // Lets the client purge its local transaction-history cache even if it
+    // missed the live wallet:transactions-cleared push (e.g. it was offline
+    // when an admin cleared this account's history) — see AccountProvider.
+    txClearedAt: u.txClearedAt || null,
   };
 }
 
