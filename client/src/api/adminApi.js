@@ -290,6 +290,7 @@ export const adminSettlementRecordResult = (id, body) => post(`/settlement/fixtu
 export const adminSettlementTrigger = (id) => post(`/settlement/fixtures/${encodeURIComponent(id)}/settle`);
 export const adminSettlementSettleBet = (id, body) => post(`/settlement/bets/${encodeURIComponent(id)}/settle`, body);
 export const adminSettlementBulk = (body) => post('/settlement/bulk', body);
+export const adminSettlementAudit = () => get('/settlement/audit');
 
 /* KYC */
 export const adminListKyc        = (params) => get(`/kyc${qs(params)}`);

@@ -17,9 +17,9 @@
  */
 import crypto from 'crypto';
 import { createStore } from '../db/store.js';
-import { getResult, adminLookupFixture, adminListFixtures } from '../db/sportsAdmin.js';
+import { getResult } from '../db/sportsAdmin.js';
 import { recordAudit } from '../db/audit.js';
-import { updateUser, adjustBalance, getUserById, logActivity } from '../db/users.js';
+import { adjustBalance, getUserById, logActivity } from '../db/users.js';
 import { log } from '../utils/logger.js';
 import { emitToUser, emitAdmin, emitScoreUpdate } from './realtime.js';
 
@@ -132,36 +132,36 @@ function pushTx(userId, tx) {
   return entry;
 }
 
-export async function settleNow() {
-  const fixtures = adminListFixtures();
+/**
+ * Grades a bet against currently-recorded fixture results using legWon().
+ * Shared by settleNow() (auto-settle open bets) and auditSettledBets()
+ * (re-check already-settled bets against the current grading logic) so the
+ * two can never disagree on what "correct" means.
+ *
+ * Returns null if any leg's fixture doesn't have a verified result yet.
+ */
+export function gradeBet(bet) {
+  const legResults = [];
+  for (const leg of bet.legs || []) {
+    const result = getResult(leg.matchId);
+    if (!result || (result.source !== 'manual' && result.source !== 'feed')) return null;
+    const won = legWon(leg, result.scoreHome, result.scoreAway);
+    legResults.push({ leg, res: result, won });
+  }
+  const anyVoid = legResults.some((r) => r.won === null);
+  const allWon  = legResults.every((r) => r.won === true);
+  const status  = anyVoid && legResults.every((r) => r.won !== false) ? 'void'
+                : allWon ? 'won' : 'lost';
+  return { status, legResults };
+}
 
+export async function settleNow() {
   const open = Object.values(betsStore.all() || {}).filter((b) => b.status === 'open');
   let settledWins = 0, settledLoss = 0, settledVoid = 0;
   for (const bet of open) {
-    let allReady = true;
-    const legResults = [];
-    for (const leg of bet.legs || []) {
-      const view = adminLookupFixture(leg.matchId);
-      const sport = view?.sport?.id || view?.sport || 'football';
-      const match = view?.match || view;
-      // Only settle when there's a real authoritative result (manual or feed)
-      const result = getResult(leg.matchId);
-      if (!result || (result.source !== 'manual' && result.source !== 'feed')) {
-        allReady = false;
-        break;
-      }
-      // Use the persisted result scores
-      const scoreHome = result.scoreHome;
-      const scoreAway = result.scoreAway;
-      const won = legWon(leg, scoreHome, scoreAway);
-      legResults.push({ leg, res: result, won });
-    }
-    if (!allReady) continue;
-
-    const anyVoid = legResults.some((r) => r.won === null);
-    const allWon  = legResults.every((r) => r.won === true);
-    const status  = anyVoid && legResults.every((r) => r.won !== false) ? 'void'
-                  : allWon ? 'won' : 'lost';
+    const graded = gradeBet(bet);
+    if (!graded) continue;
+    const { status, legResults } = graded;
 
     const user = getUserById(bet.userId);
     let credit = 0;
@@ -217,6 +217,111 @@ export async function settleNow() {
     if (status === 'void') settledVoid++;
   }
   return { settledWins, settledLoss, settledVoid };
+}
+
+/**
+ * Re-checks every already-settled bet (won/lost/void — never cashed_out,
+ * which pays out on a live offer rather than the original stake) against
+ * legWon() as it stands *right now*, and reports any whose stored status
+ * no longer matches. Exists because settleNow() only ever processes bets
+ * that are still `open` — a bug fix to legWon() has zero effect on bets
+ * that were already (mis-)graded and persisted before the fix shipped.
+ * Read-only: does not change anything, so it's safe to run at any time.
+ */
+export function auditSettledBets() {
+  const all = Object.values(betsStore.all() || {});
+  const candidates = all.filter((b) => ['won', 'lost', 'void'].includes(b.status));
+  const mismatches = [];
+
+  for (const bet of candidates) {
+    const graded = gradeBet(bet);
+    if (!graded) continue; // a leg's fixture result vanished/changed since settlement — skip, don't guess
+    const { status: correctStatus } = graded;
+    if (correctStatus === bet.status) continue;
+
+    const currentPayout = bet.settledPayout ?? bet.totalReturn ?? 0;
+    const correctPayout = correctStatus === 'won' ? (bet.potentialWin || 0)
+                         : correctStatus === 'void' ? (bet.stake || 0)
+                         : 0;
+    mismatches.push({
+      betId: bet.id,
+      bookingCode: bet.bookingCode,
+      userId: bet.userId,
+      legs: (bet.legs || []).map((l) => ({ matchId: l.matchId, home: l.home, away: l.away, market: l.market, outcome: l.outcome })),
+      currentStatus: bet.status,
+      correctStatus,
+      currentPayout: Number(currentPayout.toFixed(2)),
+      correctPayout: Number(correctPayout.toFixed(2)),
+      delta: Number((correctPayout - currentPayout).toFixed(2)),
+      placedAt: bet.placedAt,
+      settledAt: bet.settledAt,
+    });
+  }
+  return { scanned: candidates.length, mismatches };
+}
+
+/**
+ * Single authoritative "manually settle or correct a bet" implementation.
+ * Both admin/bets.js and admin/settlement.js expose a settle-bet route —
+ * they call this instead of each carrying their own copy, specifically so a
+ * fix here can never apply to one route but not the other again.
+ *
+ * A bet already won/lost/void (never cashed_out — that pays out on a live
+ * offer, not the stake) can be *corrected*: only the delta between what was
+ * already paid and what the corrected result actually owes gets credited,
+ * so this never double-pays. Corrections require a reason.
+ *
+ * Returns { ok: true, bet } on success, or { error: 'not_found' | 'cashed_out'
+ * | 'reason_required' | 'bad_result' }.
+ */
+export async function applySettlement(betId, { result, reason, payoutOverride, adminEmail } = {}) {
+  if (!['won', 'lost', 'void'].includes(result)) return { error: 'bad_result' };
+
+  const bet = betsStore.get(betId);
+  if (!bet) return { error: 'not_found' };
+  if (bet.status === 'cashed_out') return { error: 'cashed_out' };
+
+  const isCorrection = bet.status !== 'open';
+  if (isCorrection && !reason?.trim()) return { error: 'reason_required' };
+
+  const newCredit = result === 'won' ? (payoutOverride ?? bet.potentialWin ?? 0)
+                   : result === 'void' ? (bet.stake || 0)
+                   : 0;
+  const previousCredit = isCorrection ? (bet.settledPayout ?? bet.totalReturn ?? 0) : 0;
+  const delta = Number((newCredit - previousCredit).toFixed(2));
+
+  const updated = {
+    ...bet,
+    status: result,
+    settledAt: new Date().toISOString(),
+    settledBy: adminEmail || 'admin',
+    settleReason: reason || null,
+    settledPayout: newCredit,
+    totalReturn: newCredit,
+    wonNotAcknowledged: result === 'won',
+    ...(isCorrection ? { correction: { fromStatus: bet.status, at: new Date().toISOString(), by: adminEmail || 'admin', reason } } : {}),
+  };
+  betsStore.set(betId, updated);
+
+  if (delta !== 0) {
+    const nextUser = await adjustBalance(bet.userId, delta, { allowNegative: true });
+    pushTx(bet.userId, {
+      kind: isCorrection ? 'bet_settlement_correction' : (result === 'won' ? 'bet_won' : 'bet_void_refund'),
+      amount: delta, status: 'completed', balanceAfter: nextUser?.balance, ref: betId,
+    });
+  }
+  logActivity(bet.userId, { kind: `bet_${result}`, betId, credit: delta });
+  emitToUser(bet.userId, 'wallet:update', { balance: null, delta, reason: `bet:${result}`, ref: betId });
+  emitToUser(bet.userId, 'bet:settled', { betId, status: result, payout: newCredit });
+  if (result === 'won') emitToUser(bet.userId, 'bet:won', { betId, payout: newCredit, stake: bet.stake });
+  emitAdmin('bet:settled', { betId, status: result, userId: bet.userId, stake: bet.stake, credit: delta });
+  recordAudit({
+    action: isCorrection ? `bet.correct.${result}` : `bet.settle.${result}`,
+    target: betId, targetType: 'bet', severity: isCorrection ? 'warning' : 'info',
+    meta: { userId: bet.userId, delta, previousStatus: isCorrection ? bet.status : undefined, reason },
+  });
+
+  return { ok: true, bet: updated };
 }
 
 export function startSettlementLoop() {

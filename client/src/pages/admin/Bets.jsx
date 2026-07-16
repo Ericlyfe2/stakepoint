@@ -12,7 +12,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAdmin } from '../../providers/AdminProvider.jsx';
 import {
   adminListBets, adminGetBet, adminSettleBet, adminCancelBet, adminNoteBet, adminBulkBets,
-  adminDeleteBet, adminRestoreBet,
+  adminDeleteBet, adminRestoreBet, adminSettlementAudit,
 } from '../../api/adminApi.js';
 
 function toBookingCode(id = '') {
@@ -41,6 +41,7 @@ export default function BetsPage({ initialStatus = 'all' }) {
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
   const [bulkSettleOpen, setBulkSettleOpen] = useState(false);
+  const [auditOpen, setAuditOpen] = useState(false);
   const debounceRef = useRef(0);
 
   function toggleSelect(id) {
@@ -129,8 +130,19 @@ export default function BetsPage({ initialStatus = 'all' }) {
           )}
           <button className="adm-btn" onClick={load}><IconRefresh size={14} /> Refresh</button>
           <button className="adm-btn" onClick={exportCsv}><IconDownload size={14} /> Export CSV</button>
+          {hasRole('odds_manager', 'finance_admin') && (
+            <button className="adm-btn warn" onClick={() => setAuditOpen(true)}><IconAlert size={14} /> Settlement audit</button>
+          )}
         </div>
       </header>
+
+      {auditOpen && (
+        <SettlementAuditModal
+          onClose={() => setAuditOpen(false)}
+          showToast={showToast}
+          onFixed={load}
+        />
+      )}
 
       <div className="adm-stat-grid">
         <SumTile label="Open"       value={numFmt(data?.summary?.open)}      accent="linear-gradient(135deg,#4f8bff,#22d3ee)" />
@@ -465,6 +477,99 @@ function SettleModal({ open, onClose, onSubmit, busy, bet }) {
           {busy ? 'Working…' : `Confirm ${result}`}
         </button>
       </div>
+    </Modal>
+  );
+}
+
+/**
+ * Re-checks every already-settled bet against the current grading logic and
+ * lists any whose stored status disagrees — the fallout of a legWon() bug
+ * that's since been fixed but never retroactively re-applied (settleNow()
+ * only ever revisits `open` bets). Each row can be corrected individually;
+ * "Fix all" runs them one at a time so a failure on one doesn't block the rest.
+ */
+function SettlementAuditModal({ onClose, showToast, onFixed }) {
+  const [loading, setLoading] = useState(true);
+  const [scanned, setScanned] = useState(0);
+  const [mismatches, setMismatches] = useState([]);
+  const [fixingId, setFixingId] = useState(null);
+  const [fixingAll, setFixingAll] = useState(false);
+
+  async function load() {
+    setLoading(true);
+    try {
+      const r = await adminSettlementAudit();
+      setScanned(r.scanned || 0);
+      setMismatches(r.mismatches || []);
+    } catch (e) {
+      showToast(e.message, 'error');
+    } finally {
+      setLoading(false);
+    }
+  }
+  useEffect(() => { load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function fixOne(m) {
+    setFixingId(m.betId);
+    try {
+      await adminSettleBet(m.betId, {
+        result: m.correctStatus,
+        reason: `Settlement audit correction — ${m.legs?.[0]?.market || 'market'} was mis-graded (stored ${m.currentStatus}, should be ${m.correctStatus}).`,
+      });
+      setMismatches((prev) => prev.filter((x) => x.betId !== m.betId));
+      showToast(`Corrected ${m.bookingCode || m.betId} to ${m.correctStatus}.`);
+      onFixed?.();
+    } catch (e) {
+      showToast(`${m.bookingCode || m.betId}: ${e.message}`, 'error');
+    } finally {
+      setFixingId(null);
+    }
+  }
+
+  async function fixAll() {
+    setFixingAll(true);
+    for (const m of [...mismatches]) {
+      // eslint-disable-next-line no-await-in-loop
+      await fixOne(m);
+    }
+    setFixingAll(false);
+  }
+
+  return (
+    <Modal open title="Settlement audit" onClose={onClose}
+           description={loading ? 'Scanning settled bets…' : `Scanned ${numFmt(scanned)} settled bets — ${mismatches.length} disagree with the current grading logic.`}>
+      {!loading && mismatches.length > 0 && (
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 10 }}>
+          <button className="adm-btn primary" onClick={fixAll} disabled={fixingAll || !!fixingId}>
+            {fixingAll ? 'Fixing…' : `Fix all ${mismatches.length}`}
+          </button>
+        </div>
+      )}
+      {loading ? (
+        <div className="adm-skel" style={{ height: 120, borderRadius: 12 }} />
+      ) : mismatches.length === 0 ? (
+        <Empty title="No mismatches found" subtitle="Every settled bet agrees with the current grading logic." />
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: '55vh', overflowY: 'auto' }}>
+          {mismatches.map((m) => (
+            <div key={m.betId} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '10px 12px', background: 'var(--surface-soft)', border: '1px solid var(--border)', borderRadius: 10 }}>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontWeight: 700, fontSize: 13 }}>
+                  {m.bookingCode || m.betId.slice(0, 14)}
+                  {m.legs?.[0] && <span style={{ color: 'var(--text-soft)', fontWeight: 500 }}> · {m.legs[0].home} — {m.legs[0].away} · {m.legs[0].market} {m.legs[0].outcome}</span>}
+                </div>
+                <div style={{ fontSize: 12.5, color: 'var(--text-soft)', marginTop: 2 }}>
+                  Stored <strong className={`bet-status ${m.currentStatus}`}>{m.currentStatus}</strong> ({moneyFmt(m.currentPayout)}) → should be <strong className={`bet-status ${m.correctStatus}`}>{m.correctStatus}</strong> ({moneyFmt(m.correctPayout)})
+                  {m.delta !== 0 && <> — {m.delta > 0 ? `owes ${moneyFmt(m.delta)} more` : `overpaid ${moneyFmt(Math.abs(m.delta))}`}</>}
+                </div>
+              </div>
+              <button className="adm-btn sm primary" onClick={() => fixOne(m)} disabled={fixingAll || fixingId === m.betId}>
+                {fixingId === m.betId ? 'Fixing…' : 'Fix'}
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
     </Modal>
   );
 }

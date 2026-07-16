@@ -12,6 +12,7 @@ build/
 
 # Runtime data store
 server/data/*.json
+server/data-test*/
 
 # Logs
 *.log

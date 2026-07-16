@@ -16,6 +16,7 @@ import { validate } from '../../middleware/validate.js';
 import { asyncHandler } from '../../utils/asyncHandler.js';
 import { badRequest, conflict, notFound } from '../../utils/httpError.js';
 import * as cashOutEngine from '../../services/cashOutEngine.js';
+import { applySettlement } from '../../services/settlement.js';
 
 const router = Router();
 
@@ -111,31 +112,19 @@ router.post('/:id/settle',
     reason: z.string().max(500).optional(),
   })),
   asyncHandler(async (req, res) => {
-    const bet = betsStore.get(req.params.id);
-    if (!bet) throw notFound('Bet not found');
-    if (bet.status !== 'open') throw conflict('Bet already settled.');
-
-    const user = getUserById(bet.userId);
-    if (!user) throw notFound('Bet owner not found.');
-
     const { result, payoutOverride, reason } = req.body;
-    let credit = 0;
-    if (result === 'won')  credit = payoutOverride ?? bet.potentialWin;
-    if (result === 'void') credit = bet.stake;
-    if (result === 'lost') credit = 0;
+    const outcome = await applySettlement(req.params.id, { result, reason, payoutOverride, adminEmail: req.admin.email });
 
-    const updatedBet = { ...bet, status: result, settledAt: new Date().toISOString(), settledBy: req.admin.email, settleReason: reason || null, settledPayout: credit };
-    betsStore.set(bet.id, updatedBet);
+    if (outcome.error === 'not_found')       throw notFound('Bet not found');
+    if (outcome.error === 'cashed_out')      throw conflict('Bet was cashed out — settle/correct the cash-out amount manually, not the original stake.');
+    if (outcome.error === 'reason_required') throw badRequest('A reason is required to correct an already-settled bet.');
 
-    let updatedUser = user;
-    if (credit > 0) {
-      updatedUser = await adjustBalance(user.id, credit, { allowNegative: true });
-      pushTx(user.id, { kind: result === 'won' ? 'bet_won' : 'bet_void_refund', amount: credit, status: 'completed', balanceAfter: updatedUser.balance, ref: bet.id });
-    }
-    logActivity(user.id, { kind: `bet_${result}`, betId: bet.id, credit });
-    audit(req, { action: `bet.settle.${result}`, target: bet.id, targetType: 'bet', severity: result === 'void' ? 'warning' : 'info', meta: { credit, reason, userId: user.id } });
-
-    res.json({ bet: enrich(updatedBet) });
+    audit(req, {
+      action: outcome.bet.correction ? `bet.correct.${result}` : `bet.settle.${result}`,
+      target: req.params.id, targetType: 'bet', severity: outcome.bet.correction || result === 'void' ? 'warning' : 'info',
+      meta: { reason, userId: outcome.bet.userId },
+    });
+    res.json({ bet: enrich(outcome.bet) });
   })
 );
 
@@ -244,21 +233,10 @@ router.post('/bulk',
         const bet = betsStore.get(id);
         if (!bet) { results.push({ betId: id, status: 'error', error: 'Not found' }); continue; }
         if (action === 'settle') {
-          if (bet.status !== 'open') { results.push({ betId: id, status: 'error', error: `Already ${bet.status}` }); continue; }
-          const user = getUserById(bet.userId);
-          if (!user) { results.push({ betId: id, status: 'error', error: 'User not found' }); continue; }
           const r = result || 'lost';
-          let credit = 0;
-          if (r === 'won')  credit = payoutOverride ?? bet.potentialWin;
-          if (r === 'void') credit = bet.stake;
-          const updatedBet = { ...bet, status: r, settledAt: new Date().toISOString(), settledBy: req.admin.email, settleReason: reason || null, settledPayout: credit };
-          betsStore.set(bet.id, updatedBet);
-          if (credit > 0) {
-            const updatedUser = await adjustBalance(user.id, credit, { allowNegative: true });
-            pushTx(user.id, { kind: r === 'won' ? 'bet_won' : 'bet_void_refund', amount: credit, status: 'completed', balanceAfter: updatedUser.balance, ref: bet.id });
-          }
-          logActivity(user.id, { kind: `bet_${r}`, betId: bet.id, credit });
-          results.push({ betId: id, status: r, credit });
+          const outcome = await applySettlement(id, { result: r, reason, payoutOverride, adminEmail: req.admin.email });
+          if (outcome.error) { results.push({ betId: id, status: 'error', error: outcome.error }); continue; }
+          results.push({ betId: id, status: r, credit: outcome.bet.settledPayout });
         } else if (action === 'cancel') {
           if (bet.status === 'cancelled') { results.push({ betId: id, status: 'error', error: 'Already cancelled' }); continue; }
           if (bet.status === 'cashed_out') { results.push({ betId: id, status: 'error', error: 'Cashed out' }); continue; }

@@ -4,12 +4,9 @@ import { asyncHandler } from '../../utils/asyncHandler.js';
 import { notFound } from '../../utils/httpError.js';
 import { createStore } from '../../db/store.js';
 import { setResult, adminLookupFixture, compiledLeagues } from '../../db/sportsAdmin.js';
-import { settleNow } from '../../services/settlement.js';
-import { adjustBalance, logActivity } from '../../db/users.js';
-import { emitToUser, emitAdmin } from '../../services/realtime.js';
+import { settleNow, auditSettledBets, applySettlement } from '../../services/settlement.js';
 
 const betStore = createStore('bets', {});
-const txStore = createStore('transactions', {});
 const router = Router();
 
 function round2(v) { return Number(Number(v).toFixed(2)); }
@@ -61,6 +58,15 @@ router.get('/queue', requireAdmin, (req, res) => {
     }));
 
   res.json({ pending, awaitingSettle, settled });
+});
+
+// Read-only re-check of every already-settled bet against the current
+// grading logic. Surfaces bets that were mis-graded by a legWon() bug that
+// has since been fixed — settleNow() never revisits a bet once it leaves
+// 'open', so those stay wrong forever unless something explicitly looks.
+router.get('/audit', requireAdmin, requireRole('odds_manager', 'finance_admin'), (req, res) => {
+  const { scanned, mismatches } = auditSettledBets();
+  res.json({ scanned, mismatches });
 });
 
 router.get('/fixtures', requireAdmin, asyncHandler(async (req, res) => {
@@ -117,11 +123,6 @@ router.get('/fixtures', requireAdmin, asyncHandler(async (req, res) => {
   res.json({ fixtures: enriched });
 }));
 
-function pushTx(userId, tx) {
-  const list = txStore.get(userId) || [];
-  txStore.set(userId, [tx, ...list].slice(0, 500));
-}
-
 router.post('/fixtures/:id/result', requireAdmin, requireRole('odds_manager'), asyncHandler(async (req, res) => {
   const matchId = req.params.id;
   const { scoreHome, scoreAway, autoSettle } = req.body;
@@ -148,61 +149,20 @@ router.post('/fixtures/:id/settle', requireAdmin, requireRole('odds_manager'), a
 }));
 
 router.post('/bets/:id/settle', requireAdmin, requireRole('odds_manager'), asyncHandler(async (req, res) => {
-  const betId = req.params.id;
   const { result, reason } = req.body;
-  if (!['won', 'lost', 'void'].includes(result)) return res.status(400).json({ error: 'result must be won, lost, or void' });
+  const outcome = await applySettlement(req.params.id, { result, reason, adminEmail: req.admin?.email });
 
-  const bet = betStore.get(betId);
-  if (!bet) throw notFound('Bet not found');
+  if (outcome.error === 'bad_result')       return res.status(400).json({ error: 'result must be won, lost, or void' });
+  if (outcome.error === 'not_found')        throw notFound('Bet not found');
+  if (outcome.error === 'reason_required')  return res.status(400).json({ error: 'A reason is required to correct an already-settled bet.' });
+  if (outcome.error === 'cashed_out')       return res.status(409).json({ error: 'Bet was cashed out — settle/correct the cash-out amount manually, not the original stake.' });
 
-  // A bet that's already won/lost/void/cashed_out can still be *corrected* —
-  // e.g. the settlement engine mis-graded a market it didn't recognize and
-  // voided a genuine win. Only the delta between what was already paid out
-  // and what the corrected result actually owes gets credited, so this
-  // never double-pays (or double-charges back) the player.
-  const isCorrection = bet.status !== 'open';
-  if (isCorrection && !reason?.trim()) {
-    return res.status(400).json({ error: 'A reason is required to correct an already-settled bet.' });
-  }
-  if (bet.status === 'cashed_out') {
-    return res.status(409).json({ error: 'Bet was cashed out — settle/correct the cash-out amount manually, not the original stake.' });
-  }
-
-  const newCredit = result === 'won' ? (bet.potentialWin || 0) : result === 'void' ? (bet.stake || 0) : 0;
-  const previousCredit = isCorrection ? (bet.settledPayout ?? bet.totalReturn ?? 0) : 0;
-  const delta = round2(newCredit - previousCredit);
-
-  const updated = {
-    ...bet,
-    status: result,
-    settledAt: new Date().toISOString(),
-    settledBy: req.admin?.email || 'admin',
-    settleReason: reason || null,
-    settledPayout: newCredit,
-    totalReturn: newCredit,
-    wonNotAcknowledged: result === 'won',
-    ...(isCorrection ? { correction: { fromStatus: bet.status, at: new Date().toISOString(), by: req.admin?.email || 'admin', reason } } : {}),
-  };
-  betStore.set(betId, updated);
-
-  if (delta !== 0) {
-    await adjustBalance(bet.userId, delta, { allowNegative: true });
-    pushTx(bet.userId, {
-      kind: isCorrection ? 'bet_settlement_correction' : (result === 'won' ? 'bet_won' : 'bet_void_refund'),
-      amount: delta, ref: betId, status: 'completed', at: new Date().toISOString(),
-    });
-  }
-  logActivity(bet.userId, { kind: `bet_${result}`, amount: delta, ref: betId, by: req.admin?.email });
-  emitToUser(bet.userId, 'wallet:update', { balance: null, delta, reason: `bet:${result}`, ref: betId });
-  emitToUser(bet.userId, 'bet:settled', { betId, status: result, payout: newCredit });
-  emitAdmin('bet:settled', { betId, status: result, userId: bet.userId, stake: bet.stake, credit: delta });
   audit(req, {
-    action: isCorrection ? `bet.correct.${result}` : `bet.settle.${result}`,
-    target: betId, targetType: 'bet', severity: isCorrection ? 'warning' : 'info',
-    meta: { userId: bet.userId, delta, previousStatus: isCorrection ? bet.status : undefined, reason },
+    action: outcome.bet.correction ? `bet.correct.${result}` : `bet.settle.${result}`,
+    target: req.params.id, targetType: 'bet', severity: outcome.bet.correction ? 'warning' : 'info',
+    meta: { userId: outcome.bet.userId, reason },
   });
-
-  res.json({ ok: true, bet: updated });
+  res.json({ ok: true, bet: outcome.bet });
 }));
 
 router.post('/bulk', requireAdmin, requireRole('odds_manager'), asyncHandler(async (req, res) => {
@@ -214,34 +174,9 @@ router.post('/bulk', requireAdmin, requireRole('odds_manager'), asyncHandler(asy
   const results = [];
   for (const betId of betIds) {
     try {
-      const bet = betStore.get(betId);
-      if (!bet) { results.push({ betId, error: 'not found' }); continue; }
-      if (bet.status !== 'open') { results.push({ betId, error: `status is ${bet.status}` }); continue; }
-
-      const credit = result === 'won' ? (bet.potentialWin || 0) : result === 'void' ? (bet.stake || 0) : 0;
-      const updated = {
-        ...bet,
-        status: result,
-        settledAt: new Date().toISOString(),
-        settledBy: req.admin?.email || 'admin',
-        settleReason: reason || null,
-        settledPayout: credit,
-        totalReturn: credit,
-        wonNotAcknowledged: result === 'won',
-      };
-      betStore.set(betId, updated);
-
-      if (credit > 0) {
-        await adjustBalance(bet.userId, credit, { allowNegative: false });
-        pushTx(bet.userId, { kind: result === 'won' ? 'bet_won' : 'bet_void_refund', amount: credit, ref: betId, status: 'completed', at: new Date().toISOString() });
-      }
-      logActivity(bet.userId, { kind: `bet_${result}`, amount: credit, ref: betId, by: req.admin?.email });
-      emitToUser(bet.userId, 'wallet:update', { balance: null, delta: credit, reason: `bet:${result}`, ref: betId });
-      emitToUser(bet.userId, 'bet:settled', { betId, status: result, payout: credit });
-      emitAdmin('bet:settled', { betId, status: result, userId: bet.userId, stake: bet.stake, credit });
-      audit(req, { action: `bulk.settle.${result}`, target: betId, targetType: 'bet', severity: 'info', meta: { userId: bet.userId, credit } });
-
-      results.push({ betId, status: result, credit });
+      const outcome = await applySettlement(betId, { result, reason, adminEmail: req.admin?.email });
+      if (outcome.error) { results.push({ betId, error: outcome.error }); continue; }
+      results.push({ betId, status: result, credit: outcome.bet.settledPayout });
     } catch (e) {
       results.push({ betId, error: e.message });
     }
