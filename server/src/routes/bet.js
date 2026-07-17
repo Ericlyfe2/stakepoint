@@ -279,19 +279,27 @@ router.get('/recent-payouts', (req, res) => {
     .sort((a, b) => new Date(b.settledAt) - new Date(a.settledAt))
     .slice(0, limit);
 
-  const payouts = wins.map((b) => {
+  const payouts = [];
+  const seenIds = new Set();
+  const seenAmounts = new Set();
+  for (const b of wins) {
     const user = b.userId ? getUserById(b.userId) : null;
     const firstLeg = b.legs?.[0];
     const view = firstLeg ? adminLookupFixture(firstLeg.matchId) : null;
-    return {
+    const maskedId = maskIdentifier(user?.phone || user?.email || b.userId || b.id);
+    const amount = Number((b.totalReturn ?? b.potentialWin ?? 0).toFixed(2));
+    if (seenIds.has(maskedId) || seenAmounts.has(amount)) continue;
+    seenIds.add(maskedId);
+    seenAmounts.add(amount);
+    payouts.push({
       id: b.id,
-      maskedId: maskIdentifier(user?.phone || user?.email || b.userId || b.id),
-      amount: Number((b.totalReturn ?? b.potentialWin ?? 0).toFixed(2)),
+      maskedId,
+      amount,
       currency: CURRENCY,
       sport: view?.sport?.id || 'football',
       settledAt: b.settledAt,
-    };
-  });
+    });
+  }
   res.json({ updatedAt: new Date().toISOString(), payouts });
 });
 
