@@ -162,8 +162,12 @@ function attachLiveState(bet) {
         finished: !!fx.finished,
         minute: fx.minute || null,
         liveAt: fx.liveAt || null,
-        scoreHome: fx.scoreHome ?? null,
-        scoreAway: fx.scoreAway ?? null,
+        // A live, unfinished match with no score recorded is 0-0, not "no
+        // score" — older admin-created fixtures flipped live without an
+        // explicit score never got scoreHome/scoreAway set, which rendered
+        // as a blank score line here even though the clock was ticking.
+        scoreHome: fx.scoreHome ?? (isLive ? 0 : null),
+        scoreAway: fx.scoreAway ?? (isLive ? 0 : null),
         suspended: !!(fx.suspended || mk?.suspended || sel?.suspended),
         cashoutLocked,
         currentOdds,

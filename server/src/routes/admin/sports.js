@@ -199,8 +199,12 @@ router.post('/fixtures',
       // Cash-out locks automatically the moment a match goes live; an admin
       // unlocks it explicitly afterward via PATCH { cashoutLocked: false }.
       cashoutLocked: b.isLive ? true : undefined,
-      scoreHome: typeof b.scoreHome === 'number' ? b.scoreHome : undefined,
-      scoreAway: typeof b.scoreAway === 'number' ? b.scoreAway : undefined,
+      // A live fixture with no score is 0-0, not "no score" — leaving these
+      // undefined meant the client's live-score line (my-bets, live widget)
+      // rendered nothing at all for a match created live without an explicit
+      // score, even though the match clock was ticking away.
+      scoreHome: typeof b.scoreHome === 'number' ? b.scoreHome : (b.isLive ? 0 : undefined),
+      scoreAway: typeof b.scoreAway === 'number' ? b.scoreAway : (b.isLive ? 0 : undefined),
       markets,
       moreMarkets: Object.keys(markets).length,
       adminCreated: true,
@@ -308,6 +312,12 @@ router.patch('/fixtures/:id',
       // admin can explicitly unlock it (rest.cashoutLocked === false, sent
       // in this same request) but a bare { isLive: true } always locks it.
       if (rest.cashoutLocked === undefined) rest.cashoutLocked = true;
+      // A live fixture with no score is 0-0, not "no score" — without this
+      // a match flipped live via a bare { isLive: true } (no explicit score)
+      // rendered no score line at all on the live widget or my-bets, even
+      // though the match clock was ticking.
+      if (rest.scoreHome === undefined && typeof view.match?.scoreHome !== 'number') rest.scoreHome = 0;
+      if (rest.scoreAway === undefined && typeof view.match?.scoreAway !== 'number') rest.scoreAway = 0;
     }
     if (Object.keys(rest).length) {
       patchOverride(req.params.id, rest);
