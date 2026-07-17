@@ -110,20 +110,20 @@ describe('live open-bet ticket', () => {
     expect(container.querySelector('.xh-live-odds-val')).toBeNull();
   });
 
-  it('renders the minute/half and live score for the in-play leg', () => {
+  it('renders a ticking minute clock and live score for the in-play leg', () => {
     const { container } = renderCard(makeLiveBet());
     fireEvent.click(container.querySelector('.xh-open-mode-row'));
     const status = container.querySelector('.xh-leg-live-status');
-    expect(status.textContent).toContain("65' H2");
+    expect(status.textContent).toContain("65:00'");
     expect(status.textContent).toContain('1:0');
   });
 
-  it('labels first-half minutes as H1', () => {
+  it('ticks the clock forward for first-half minutes too', () => {
     const bet = makeLiveBet();
     bet.legs[0].live.minute = "31'";
     const { container } = renderCard(bet);
     fireEvent.click(container.querySelector('.xh-open-mode-row'));
-    expect(container.querySelector('.xh-leg-live-status').textContent).toContain("31' H1");
+    expect(container.querySelector('.xh-leg-live-status').textContent).toContain("31:00'");
   });
 
   it('renders FT | score for the finished leg', () => {
@@ -139,5 +139,25 @@ describe('live open-bet ticket', () => {
     fireEvent.click(container.querySelector('.xh-open-mode-row'));
     expect(container.textContent).toContain('1,000.00');
     expect(container.textContent).toContain('8,043.84');
+  });
+
+  it('shows an active Cashout button when the match is not locked', () => {
+    const { container } = renderCard(makeLiveBet());
+    fireEvent.click(container.querySelector('.xh-open-mode-row'));
+    const btn = container.querySelector('.xh-open-cashout-btn-full');
+    expect(btn).not.toBeNull();
+    expect(btn.classList.contains('xh-open-cashout-locked')).toBe(false);
+    expect(btn.textContent).toContain('Cashout');
+  });
+
+  it('locks the Cashout button once the match kicks off (cashoutLocked)', () => {
+    const bet = makeLiveBet();
+    bet.legs[0].live.cashoutLocked = true;
+    const { container } = renderCard(bet);
+    fireEvent.click(container.querySelector('.xh-open-mode-row'));
+    const locked = container.querySelector('.xh-open-cashout-btn-full.xh-open-cashout-locked');
+    expect(locked).not.toBeNull();
+    expect(locked.textContent).toBe('Cash-out Locked');
+    expect(container.querySelector('.xh-auto-banner-locked')).not.toBeNull();
   });
 });

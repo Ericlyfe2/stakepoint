@@ -142,6 +142,7 @@ function attachCashoutOffer(bet) {
 function attachLiveState(bet) {
   if (bet.status !== 'open') return bet;
   let anyLive = false;
+  let anyCashoutLocked = false;
   const legs = (bet.legs || []).map((l) => {
     const view = adminLookupFixture(l.matchId);
     const fx = view?.match || view;
@@ -152,15 +153,19 @@ function attachLiveState(bet) {
     const placed = l.odds != null ? Number(l.odds) : null;
     const isLive = !!fx.isLive && !fx.finished;
     if (isLive) anyLive = true;
+    const cashoutLocked = fx.cashoutLocked === true;
+    if (cashoutLocked) anyCashoutLocked = true;
     return {
       ...l,
       live: {
         isLive,
         finished: !!fx.finished,
         minute: fx.minute || null,
+        liveAt: fx.liveAt || null,
         scoreHome: fx.scoreHome ?? null,
         scoreAway: fx.scoreAway ?? null,
         suspended: !!(fx.suspended || mk?.suspended || sel?.suspended),
+        cashoutLocked,
         currentOdds,
         direction: currentOdds != null && placed != null
           ? (currentOdds > placed + 1e-9 ? 'up' : currentOdds < placed - 1e-9 ? 'down' : 'same')
@@ -168,7 +173,7 @@ function attachLiveState(bet) {
       },
     };
   });
-  return { ...bet, legs, anyLive };
+  return { ...bet, legs, anyLive, anyCashoutLocked };
 }
 
 function hasConflictingPicks(selections) {

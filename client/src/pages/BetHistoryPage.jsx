@@ -8,6 +8,7 @@ import CashoutModal from '../components/CashoutModal.jsx';
 import AutoCashoutPanel from '../components/AutoCashoutPanel.jsx';
 import { toBookingCode } from '../components/BetSuccessModal.jsx';
 import { readHiddenTicketIds, hideTicket } from '../lib/hiddenTickets.js';
+import { tickMinuteDisplay } from '../utils/liveClock.js';
 
 const AUTO_TARGETS_KEY = 'bv_auto_cashout_targets';
 const PAGE_SIZE = 20;
@@ -167,15 +168,6 @@ function SvgBall({ size = 13 }) { return (<svg width={size} height={size} viewBo
 /* ── Live leg helpers ── */
 function legLive(l) { return l?.live || null; }
 
-// "73'" → "73' H2"; 40 → "40' H1"; missing → "LIVE"
-function liveMinuteLabel(live) {
-  const raw = String(live?.minute ?? '').replace(/[^0-9]/g, '');
-  if (!raw) return 'LIVE';
-  const m = Number(raw);
-  const half = m <= 45 ? 'H1' : 'H2';
-  return `${m}' ${half}`;
-}
-
 function liveScoreLabel(live) {
   if (live?.scoreHome == null || live?.scoreAway == null) return null;
   return `${live.scoreHome}:${live.scoreAway}`;
@@ -184,6 +176,41 @@ function liveScoreLabel(live) {
 function betHasLiveLeg(bet) {
   if (bet?.anyLive) return true;
   return (bet?.legs || []).some((l) => l?.live?.isLive);
+}
+
+function betCashoutLocked(bet) {
+  if (bet?.anyCashoutLocked) return true;
+  return (bet?.legs || []).some((l) => l?.live?.cashoutLocked);
+}
+
+// Anchor for the ticking clock: a fixture that just went live has no real
+// minute yet, so anchor to the shared server liveAt timestamp (agrees across
+// every viewer) rather than "whenever this browser polled the bet list".
+function liveMinuteAnchor(live, rawMinute) {
+  const useLiveAt = rawMinute === "0'" && live?.liveAt;
+  return { minute: rawMinute, ts: useLiveAt ? new Date(live.liveAt).getTime() : Date.now() };
+}
+
+// Ticks a live leg's match clock forward every second between poll ticks,
+// same simulated-clock approach as the homepage Live Matches widget — the
+// server/admin only push a minute string when it changes, so without this
+// the open-bet card just sits frozen at whatever minute it was on load.
+function LiveMinuteTicker({ live, matchId }) {
+  const rawMinute = live?.minute || (live?.isLive ? "0'" : null);
+  const anchorRef = useRef(liveMinuteAnchor(live, rawMinute));
+  const [, tick] = useState(0);
+
+  if (anchorRef.current.minute !== rawMinute) {
+    anchorRef.current = liveMinuteAnchor(live, rawMinute);
+  }
+
+  useEffect(() => {
+    const id = setInterval(() => tick((n) => n + 1), 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  if (!rawMinute) return 'LIVE';
+  return tickMinuteDisplay(rawMinute, anchorRef.current.ts, matchId);
 }
 
 /* ─────────── Ticket Details Overlay (SportyBet-style) ─────────── */
@@ -430,6 +457,7 @@ export function BetCardView({ bet, onCashout, onRemix, onDetails, copiedCode, on
     const firstLeg = legs[0] || {};
     const matchName = firstLeg.home && firstLeg.away ? `${firstLeg.home} vs ${firstLeg.away}` : firstLeg.match || firstLeg.event || (legs.length > 1 ? `${legs.length} selections` : 'Bet');
     const league = firstLeg.league || firstLeg.competition || '';
+    const cashoutLocked = betCashoutLocked(bet);
 
     return (
       <motion.div
@@ -440,8 +468,13 @@ export function BetCardView({ bet, onCashout, onRemix, onDetails, copiedCode, on
         transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
         className="xh-card xh-card-open"
       >
-        {/* Auto cashout banner */}
-        {cashOutAmount > 0 && (
+        {/* Auto cashout banner / locked notice */}
+        {cashoutLocked ? (
+          <div className="xh-auto-banner xh-auto-banner-locked" onClick={e => e.stopPropagation()}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            <span className="xh-auto-banner-text">Cash-out is <strong>locked</strong> — the match has kicked off.</span>
+          </div>
+        ) : cashOutAmount > 0 && (
           <div className="xh-auto-banner" onClick={e => e.stopPropagation()}>
             <span className="xh-auto-banner-text">Set a rule to <strong>Auto Cashout</strong> your bet.</span>
             <span className="xh-auto-banner-info">
@@ -527,7 +560,7 @@ export function BetCardView({ bet, onCashout, onRemix, onDetails, copiedCode, on
                           )}
                           <div className="xh-open-leg-match"><u>{leg.home || matchLabel}</u> <span className="xh-leg-vs">vs</span> <u>{leg.away || ''}</u></div>
                           {isLegLive ? (
-                            <div className="xh-leg-live-status">{liveMinuteLabel(live)}{score ? <> | <strong>{score}</strong></> : null}</div>
+                            <div className="xh-leg-live-status"><LiveMinuteTicker live={live} matchId={leg.matchId} />{score ? <> | <strong>{score}</strong></> : null}</div>
                           ) : isFT ? (
                             <div className="xh-leg-ft-status">FT{score ? ` | ${score}` : ''}</div>
                           ) : (
@@ -562,13 +595,17 @@ export function BetCardView({ bet, onCashout, onRemix, onDetails, copiedCode, on
                 {/* Cashout button */}
                 {cashOutAmount > 0 && (
                   <div className="xh-open-cashout-wrap">
-                    <button
-                      type="button"
-                      className="xh-open-cashout-btn-full"
-                      onClick={e => { e.stopPropagation(); onCashout?.(bet); }}
-                    >
-                      Cashout GHS {fmt(cashOutAmount)}
-                    </button>
+                    {cashoutLocked ? (
+                      <div className="xh-open-cashout-btn-full xh-open-cashout-locked">Cash-out Locked</div>
+                    ) : (
+                      <button
+                        type="button"
+                        className="xh-open-cashout-btn-full"
+                        onClick={e => { e.stopPropagation(); onCashout?.(bet); }}
+                      >
+                        Cashout GHS {fmt(cashOutAmount)}
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
@@ -581,7 +618,7 @@ export function BetCardView({ bet, onCashout, onRemix, onDetails, copiedCode, on
                   <span className="xh-open-match">{matchName}</span>
                   {legLive(firstLeg)?.isLive && (
                     <span className="xh-leg-live-status">
-                      {liveMinuteLabel(legLive(firstLeg))}
+                      <LiveMinuteTicker live={legLive(firstLeg)} matchId={firstLeg.matchId} />
                       {liveScoreLabel(legLive(firstLeg)) ? <> | <strong>{liveScoreLabel(legLive(firstLeg))}</strong></> : null}
                     </span>
                   )}
@@ -589,13 +626,17 @@ export function BetCardView({ bet, onCashout, onRemix, onDetails, copiedCode, on
                   {league && <span className="xh-open-league-badge">{league}</span>}
                 </div>
                 {cashOutAmount > 0 && (
-                  <button
-                    type="button"
-                    className="xh-open-cashout-btn"
-                    onClick={e => { e.stopPropagation(); onCashout?.(bet); }}
-                  >
-                    Cashout<br />GHS {fmt(cashOutAmount)}
-                  </button>
+                  cashoutLocked ? (
+                    <span className="xh-open-cashout-btn xh-open-cashout-locked">Locked</span>
+                  ) : (
+                    <button
+                      type="button"
+                      className="xh-open-cashout-btn"
+                      onClick={e => { e.stopPropagation(); onCashout?.(bet); }}
+                    >
+                      Cashout<br />GHS {fmt(cashOutAmount)}
+                    </button>
+                  )
                 )}
               </div>
             </motion.div>
@@ -1204,6 +1245,10 @@ const XH_CSS = `
 .xh-auto-banner-text { color: var(--text-soft); font-size: 11.5px; }
 .xh-auto-banner-text strong { color: var(--text); }
 .xh-auto-banner-info { color: var(--text-dim); display: flex; cursor: pointer; }
+.xh-auto-banner-locked { background: rgba(220,38,38,0.08); color: #dc2626; }
+.xh-auto-banner-locked svg { flex-shrink: 0; color: #dc2626; }
+.xh-auto-banner-locked .xh-auto-banner-text { color: #dc2626; }
+.xh-auto-banner-locked .xh-auto-banner-text strong { color: #dc2626; }
 
 /* Mode header row */
 .xh-open-mode-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 13px 6px; cursor: pointer; }
@@ -1220,6 +1265,8 @@ const XH_CSS = `
 .xh-open-stake { color: var(--text-soft); font-size: 12px; font-weight: 600; }
 .xh-open-cashout-btn { flex-shrink: 0; padding: 10px 16px; border: none; border-radius: 8px; background: var(--accent); color: #fff; font-weight: 800; font-size: 12px; font-family: inherit; cursor: pointer; transition: opacity .15s; line-height: 1.35; text-align: center; }
 .xh-open-cashout-btn:hover { opacity: .9; }
+.xh-open-cashout-btn.xh-open-cashout-locked, .xh-open-cashout-btn-full.xh-open-cashout-locked { background: var(--surface-2); color: var(--text-dim); cursor: not-allowed; display: flex; align-items: center; justify-content: center; }
+.xh-open-cashout-btn.xh-open-cashout-locked:hover, .xh-open-cashout-btn-full.xh-open-cashout-locked:hover { opacity: 1; }
 
 /* League badge */
 .xh-open-league-badge { display: inline-block; padding: 3px 10px; border-radius: 5px; border: 1px solid var(--accent); color: var(--accent); font-size: 10.5px; font-weight: 700; margin-top: 2px; }
