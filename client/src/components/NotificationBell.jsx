@@ -1,5 +1,8 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useLayoutEffect } from 'react';
 import { useAccount } from '../providers/AccountProvider.jsx';
+
+const PANEL_WIDTH = 340;
+const VIEWPORT_MARGIN = 8;
 
 function ago(iso) {
   if (!iso) return '';
@@ -23,6 +26,8 @@ export default function NotificationBell() {
   const { notifications, unreadCount, clearNotifications, markNotificationRead } = useAccount();
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
+  const btnRef = useRef(null);
+  const [panelPos, setPanelPos] = useState(null);
 
   useEffect(() => {
     if (!open) return;
@@ -38,11 +43,36 @@ export default function NotificationBell() {
     };
   }, [open]);
 
+  // Position the panel with fixed coordinates clamped to the viewport instead
+  // of `right: 0` relative to the bell — on narrow screens (or a bell sitting
+  // near the left edge of the header) that anchor made the 340px panel grow
+  // straight off the left edge of the screen, clipping every notification.
+  useLayoutEffect(() => {
+    if (!open || !btnRef.current) return;
+    const reposition = () => {
+      const rect = btnRef.current.getBoundingClientRect();
+      const vw = window.innerWidth;
+      const width = Math.min(PANEL_WIDTH, vw - VIEWPORT_MARGIN * 2);
+      let left = rect.right - width;
+      left = Math.min(left, vw - width - VIEWPORT_MARGIN);
+      left = Math.max(left, VIEWPORT_MARGIN);
+      setPanelPos({ top: rect.bottom + 8, left, width });
+    };
+    reposition();
+    window.addEventListener('resize', reposition);
+    window.addEventListener('scroll', reposition, true);
+    return () => {
+      window.removeEventListener('resize', reposition);
+      window.removeEventListener('scroll', reposition, true);
+    };
+  }, [open]);
+
   const recent = notifications.slice(0, 15);
 
   return (
     <div ref={ref} style={{ position: 'relative', display: 'inline-flex' }}>
       <button
+        ref={btnRef}
         type="button"
         onClick={() => setOpen((o) => !o)}
         aria-label={`Notifications${unreadCount ? ` (${unreadCount} unread)` : ''}`}
@@ -69,10 +99,10 @@ export default function NotificationBell() {
         )}
       </button>
 
-      {open && (
+      {open && panelPos && (
         <div style={{
-          position: 'absolute', top: '100%', right: 0, marginTop: 8,
-          width: 340, maxWidth: '90vw',
+          position: 'fixed', top: panelPos.top, left: panelPos.left,
+          width: panelPos.width,
           background: 'var(--surface)', border: '1px solid var(--line)',
           borderRadius: 12, boxShadow: '0 16px 48px rgba(0,0,0,0.3)',
           zIndex: 1000, overflow: 'hidden',
