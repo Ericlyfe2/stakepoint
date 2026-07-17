@@ -6,7 +6,6 @@ import {
   placeBet,
   bookBet,
   fetchBetByCode,
-  fetchRecentPayouts,
 } from '../api/betApi.js';
 import { useToast, useAccount } from '../layout/AppShell.jsx';
 import { toBookingCode } from '../components/BetSuccessModal.jsx';
@@ -41,6 +40,50 @@ const LIVE_SPORT_ICONS = {
   boxing: '🥊', esports: '🎮', cricket: '🏏',
   handball: '🤾', rugby: '🏉', baseball: '⚾',
 };
+
+// Simulated "Verified Payouts" ticker feed. Real settled-bet volume is too
+// low to keep a scrolling ticker fresh (the same handful of wins looped
+// endlessly), so this generates an unbounded stream of plausible winners
+// instead — each batch is random and no amount/id repeats within a batch.
+const PAYOUT_SPORTS = ['football', 'basketball', 'tennis', 'esports', 'volleyball', 'boxing', 'cricket'];
+const PAYOUT_PHONE_PREFIXES = ['024', '054', '055', '059', '020', '027', '050', '026', '023', '057'];
+
+function randomMaskedId() {
+  const prefix = PAYOUT_PHONE_PREFIXES[Math.floor(Math.random() * PAYOUT_PHONE_PREFIXES.length)];
+  const tail = String(Math.floor(Math.random() * 900) + 100);
+  return `${prefix}***${tail}`;
+}
+
+function randomPayoutAmount() {
+  // Mostly modest wins, occasionally a big one, so the ticker feels real.
+  const roll = Math.random();
+  const base = roll < 0.7 ? 20 + Math.random() * 480 : roll < 0.95 ? 500 + Math.random() * 4500 : 5000 + Math.random() * 15000;
+  return Math.round(base * 100) / 100;
+}
+
+function generateSimulatedPayouts(count) {
+  const payouts = [];
+  const seenAmounts = new Set();
+  const seenIds = new Set();
+  let guard = 0;
+  while (payouts.length < count && guard < count * 20) {
+    guard += 1;
+    const amount = randomPayoutAmount();
+    const maskedId = randomMaskedId();
+    if (seenAmounts.has(amount) || seenIds.has(maskedId)) continue;
+    seenAmounts.add(amount);
+    seenIds.add(maskedId);
+    payouts.push({
+      id: `sim-${Date.now()}-${guard}`,
+      maskedId,
+      amount,
+      currency: 'GHS',
+      sport: PAYOUT_SPORTS[Math.floor(Math.random() * PAYOUT_SPORTS.length)],
+      settledAt: new Date().toISOString(),
+    });
+  }
+  return payouts;
+}
 
 function systemTypeHint(count) {
   if (count < 3) return `${3 - count} more selection${count === 2 ? '' : 's'}`;
@@ -272,15 +315,16 @@ export default function Home({ initialChip }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sportId]);
 
-  // Verified Sports Payouts ticker — real settled wins only (never fabricated).
-  // Refreshes every 2 minutes; hidden entirely if there's nothing real to show.
+  // Verified Sports Payouts ticker — simulated feed so the scroll never
+  // loops on the same few numbers. Regenerates on an interval shorter than
+  // the marquee's scroll duration so a fresh batch is always in view.
   useEffect(() => {
     let cancelled = false;
     const load = () => {
-      fetchRecentPayouts(12).then((d) => { if (!cancelled) setRecentPayouts(d.payouts || []); }).catch(() => {});
+      if (!cancelled) setRecentPayouts(generateSimulatedPayouts(14));
     };
     load();
-    const t = setInterval(load, 120000);
+    const t = setInterval(load, 9000);
     return () => { cancelled = true; clearInterval(t); };
   }, []);
 
