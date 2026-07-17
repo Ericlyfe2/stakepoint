@@ -12,6 +12,7 @@ import * as cashOutEngine from '../services/cashOutEngine.js';
 import { LIVE_BETTING, CASHOUT } from '../config/env.js';
 import { uniqueBookingCode, pushBet } from './bet.js';
 import { BONUS_RATE, getMatchById } from '../matchesData.js';
+import { adminLookupFixture } from '../db/sportsAdmin.js';
 
 const router = Router();
 const betsStore = createStore('bets', {});
@@ -72,10 +73,20 @@ function getCurrentOfferForBet(bet) {
   return cashOutEngine.computeInitialOffer(bet);
 }
 
+// Checked directly against the admin-compiled fixture (not the cached offer),
+// since a match can lock after an offer was already computed and cached —
+// trusting the cache alone would let a stale offer slip through as executable.
+function isCashoutLockedForBet(bet) {
+  return (bet.legs || []).some((leg) => adminLookupFixture(leg.matchId)?.match?.cashoutLocked === true);
+}
+
 async function validateAndComputeCashout(betId, userId, acceptedAmount, fraction) {
   const bet = betsStore.get(betId);
   if (!bet || bet.userId !== userId) throw notFound('Bet not found');
   if (bet.status !== 'open') throw conflict('Bet is already settled.', { code: 'ALREADY_SETTLED' });
+  if (isCashoutLockedForBet(bet)) {
+    throw conflict('Cash-out is locked for this match. Please wait for an admin to re-enable it.', { code: 'CASHOUT_LOCKED' });
+  }
 
   const currentOffer = getCurrentOfferForBet(bet);
   if (currentOffer === null || currentOffer === 0) {
@@ -110,8 +121,12 @@ router.post('/offer/:betId',
     if (!bet || bet.userId !== req.user.id) throw notFound('Bet not found');
     if (bet.status !== 'open') throw conflict('Bet is already settled.', { code: 'ALREADY_SETTLED' });
 
+    const locked = isCashoutLockedForBet(bet);
+
     let offer;
-    if (bet.mode === 'system') {
+    if (locked) {
+      offer = 0;
+    } else if (bet.mode === 'system') {
       offer = Number((bet.stake * bet.totalOdds * 0.6).toFixed(2));
     } else {
       const last = cashOutEngine.getLastOffer(bet.id);
@@ -130,6 +145,7 @@ router.post('/offer/:betId',
     res.json({
       ok: true,
       offer: offer !== null ? Number(offer.toFixed(2)) : null,
+      locked,
       potentialWin: bet.potentialWin,
       stake: bet.stake,
       totalOdds: bet.totalOdds,
@@ -153,6 +169,10 @@ router.post('/execute/:betId',
 
     if (delayMs > 0) {
       await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+
+    if (isCashoutLockedForBet(bet)) {
+      throw conflict('Cash-out is locked for this match. Please wait for an admin to re-enable it.', { code: 'CASHOUT_LOCKED' });
     }
 
     const revalidated = getCurrentOfferForBet(bet);

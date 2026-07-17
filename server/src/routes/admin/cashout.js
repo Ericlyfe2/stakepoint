@@ -4,9 +4,21 @@ import { requireAdmin, requireRole, audit } from '../../middleware/adminAuth.js'
 import { validate } from '../../middleware/validate.js';
 import { createStore } from '../../db/store.js';
 import { asyncHandler } from '../../utils/asyncHandler.js';
+import { notFound, conflict } from '../../utils/httpError.js';
+import { getUserById } from '../../db/users.js';
+import * as cashOutEngine from '../../services/cashOutEngine.js';
 
 const store = createStore('cashout_rules', {});
+const betsStore = createStore('bets', {});
 const router = Router();
+
+function currentOfferFor(bet) {
+  if (bet.mode === 'system') return Number((bet.stake * bet.totalOdds * 0.6).toFixed(2));
+  const last = cashOutEngine.getLastOffer(bet.id);
+  if (last) return last.cashOut > 0 ? last.cashOut : 0;
+  if (bet.lastCashOutOffer?.amount != null && bet.lastCashOutOffer.amount > 0) return bet.lastCashOutOffer.amount;
+  return cashOutEngine.computeInitialOffer(bet);
+}
 
 const rulesSchema = z.object({
   enabled: z.boolean().optional(),
@@ -39,15 +51,61 @@ router.get('/rules', requireAdmin, (_req, res) => {
   });
 });
 
-router.put('/rules', requireRole('cashout.configure'), validate(rulesSchema), asyncHandler(async (req, res) => {
+router.put('/rules', requireAdmin, requireRole('finance_admin', 'odds_manager'), validate(rulesSchema), asyncHandler(async (req, res) => {
   Object.entries(req.body).forEach(([k, v]) => store.set(k, v));
   audit(req, { action: 'admin.cashout.rules', target: 'global', targetType: 'config', meta: Object.keys(req.body) });
   res.json({ ok: true });
 }));
 
 router.get('/offers', requireAdmin, (_req, res) => {
-  res.json({ offers: [], totalCount: 0, totalValue: 0 });
+  const open = Object.values(betsStore.all() || {}).filter((b) => b.status === 'open' && b.legs?.length);
+  const offers = open.map((b) => {
+    const value = currentOfferFor(b);
+    const user = b.userId ? getUserById(b.userId) : null;
+    return {
+      betId: b.id,
+      bookingCode: b.bookingCode,
+      userId: b.userId,
+      userLabel: user?.displayName || user?.email || b.userId || 'guest',
+      stake: b.stake,
+      totalOdds: b.totalOdds,
+      value: value != null ? Number(value.toFixed(2)) : null,
+      odds: b.totalOdds,
+      adjustedByAdmin: !!b.lastCashOutOffer?.adminAdjusted,
+    };
+  }).filter((o) => o.value != null && o.value > 0);
+
+  res.json({
+    offers,
+    totalCount: offers.length,
+    totalValue: Number(offers.reduce((s, o) => s + o.value, 0).toFixed(2)),
+  });
 });
+
+router.post('/offers/:betId/adjust',
+  requireAdmin, requireRole('finance_admin', 'odds_manager'),
+  validate(z.object({ amount: z.number().min(0) })),
+  asyncHandler(async (req, res) => {
+    const bet = betsStore.get(req.params.betId);
+    if (!bet) throw notFound('Bet not found');
+    if (bet.status !== 'open') throw conflict('Bet is already settled.', { code: 'ALREADY_SETTLED' });
+
+    const amount = Number(req.body.amount.toFixed(2));
+    const ts = Date.now();
+    cashOutEngine.restoreLastOffer(bet.id, { amount, ts });
+    bet.lastCashOutOffer = { amount, ts, adminAdjusted: true };
+    betsStore.set(bet.id, bet);
+
+    audit(req, {
+      action: 'admin.cashout.adjustOffer',
+      target: bet.id,
+      targetType: 'bet',
+      meta: { amount, bookingCode: bet.bookingCode },
+    });
+
+    res.json({ ok: true, betId: bet.id, offer: amount });
+  })
+);
 
 router.get('/stats', requireAdmin, (_req, res) => {
   res.json({

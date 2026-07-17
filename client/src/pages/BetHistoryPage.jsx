@@ -873,6 +873,7 @@ export default function BetHistoryPage() {
     if (amount <= 0) { toast('Cash-out is not available for this bet.', 'warn'); return; }
     try {
       const res = await fetchCashoutOffer(b.id);
+      if (res.locked) { toast('Cash-out is locked for this match by the admin.', 'warn'); return; }
       // Only accept the server offer when it is plausible for a pending ticket
       // (never worth more than the stake); otherwise keep the fair-value offer.
       if (res.offer > 0 && res.offer <= Number(b.stake || 0) * 1.01) amount = res.offer;
@@ -929,6 +930,8 @@ export default function BetHistoryPage() {
         setCashoutCurrentOffer(e.body.currentOffer);
       } else if (e.body?.code === 'OFFER_UNAVAILABLE') {
         setCashoutError('Cash-out is no longer available. Market may be suspended.');
+      } else if (e.body?.code === 'CASHOUT_LOCKED') {
+        setCashoutError('Cash-out is locked for this match. Please wait for an admin to re-enable it.');
       } else if (e.body?.code === 'OFFER_STALE') {
         setCashoutError('The offer changed. Close and try again.');
         setCashoutCurrentOffer(e.body?.currentOffer || cashoutCurrentOffer);

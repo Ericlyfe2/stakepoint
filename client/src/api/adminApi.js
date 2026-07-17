@@ -334,6 +334,7 @@ export const adminCodeStats   = () => get('/codes/stats');
 export const adminCashoutRules    = () => get('/cashout/rules');
 export const adminUpdateCashoutRules = (body) => put_('/cashout/rules', body);
 export const adminCashoutOffers   = () => get('/cashout/offers');
+export const adminAdjustCashoutOffer = (betId, amount) => post(`/cashout/offers/${encodeURIComponent(betId)}/adjust`, { amount });
 export const adminCashoutStats    = () => get('/cashout/stats');
 
 /* CMS */

@@ -165,12 +165,16 @@ function LiveFixtureCard({ fx, canEdit, busy, onPatch, onOdds, onResetOdds, onSu
             <strong>{fx.home} — {fx.away}</strong>
             <span className="adm-live-league">{fx.leagueName || fx.leagueId} · {fx.sport}</span>
             {fx.suspended && <Badge tone="warn">Match suspended</Badge>}
+            {fx.cashoutLocked && <Badge tone="warn">Cash-out locked</Badge>}
           </div>
           {canEdit && (
             <div className="adm-live-actions">
               {fx.suspended
                 ? <button className="adm-btn sm" disabled={busy} onClick={onUnsuspend}><IconCheck size={12} /> Unsuspend</button>
                 : <button className="adm-btn sm warn" disabled={busy} onClick={() => onSuspend({ all: true }, 'Whole match suspended — all bets blocked.')}><IconBan size={12} /> Suspend match</button>}
+              {fx.cashoutLocked
+                ? <button className="adm-btn sm" disabled={busy} onClick={() => onPatch({ cashoutLocked: false }, 'Cash-out unlocked for this match.')}><IconCheck size={12} /> Unlock cash-out</button>
+                : <button className="adm-btn sm warn" disabled={busy} onClick={() => onPatch({ cashoutLocked: true }, 'Cash-out locked for this match.')}><IconBan size={12} /> Lock cash-out</button>}
               <button className="adm-btn sm" disabled={busy} onClick={onResetOdds}><IconRefresh size={12} /> Reset odds</button>
               <button className="adm-btn sm" disabled={busy} onClick={() => onPatch({ isLive: false }, 'Match taken off live.')}>Off live</button>
               <button className="adm-btn sm primary" disabled={busy} onClick={onFinish}><IconSettle size={12} /> Full time & settle</button>

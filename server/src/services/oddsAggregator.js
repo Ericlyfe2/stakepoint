@@ -328,6 +328,9 @@ async function liveLoop() {
       // official data source confirms full time.
       if (kinds.includes('kick_off')) {
         setMatchStatus(fx.key, 'live');
+        // Cash-out locks automatically the instant a match kicks off; an
+        // admin unlocks it explicitly via PATCH { cashoutLocked: false }.
+        patchOverride(fx.key, { cashoutLocked: true });
         emitFixtureStatusChanged({ fixtureId: fx.key, status: 'live', scoreHome: fx.scoreHome, scoreAway: fx.scoreAway, minute: fx.minute, sport: fx.sport });
       }
       if (kinds.includes('half_time')) {

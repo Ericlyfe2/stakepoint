@@ -274,15 +274,23 @@ function maskIdentifier(raw) {
 // masked and only amount/sport/settledAt are exposed.
 router.get('/recent-payouts', (req, res) => {
   const limit = Math.min(Math.max(Number(req.query.limit) || 12, 1), 30);
-  const wins = Object.values(betsStore.all() || {})
-    .filter((b) => b.status === 'won' && b.settledAt && Number(b.totalReturn ?? b.potentialWin ?? 0) > 0)
-    .sort((a, b) => new Date(b.settledAt) - new Date(a.settledAt))
-    .slice(0, limit);
+  // Shuffle the *full* eligible pool before selecting, rather than sorting
+  // by recency and slicing to `limit` first — sorting-then-slicing meant the
+  // same handful of most-recently-settled wins (often sharing an amount)
+  // were the only candidates dedup ever saw, so the ticker kept surfacing
+  // the same few entries on every page load instead of rotating.
+  const pool = Object.values(betsStore.all() || {})
+    .filter((b) => b.status === 'won' && b.settledAt && Number(b.totalReturn ?? b.potentialWin ?? 0) > 0);
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [pool[i], pool[j]] = [pool[j], pool[i]];
+  }
 
   const payouts = [];
   const seenIds = new Set();
   const seenAmounts = new Set();
-  for (const b of wins) {
+  for (const b of pool) {
+    if (payouts.length >= limit) break;
     const user = b.userId ? getUserById(b.userId) : null;
     const firstLeg = b.legs?.[0];
     const view = firstLeg ? adminLookupFixture(firstLeg.matchId) : null;

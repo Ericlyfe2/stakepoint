@@ -16,7 +16,7 @@ import {
   adminListBonuses, adminCreateBonus, adminUpdateBonus, adminDeleteBonus, adminIssueBonus, adminClawbackBonus, adminBonusStats,
   adminReferralStats, adminReferralPayouts, adminCreateReferralPayout,
   adminListCodes, adminCreateCode, adminBulkCreateCodes, adminUpdateCode, adminDeleteCode, adminCodeStats,
-  adminCashoutRules, adminUpdateCashoutRules, adminCashoutOffers, adminCashoutStats,
+  adminCashoutRules, adminUpdateCashoutRules, adminCashoutOffers, adminAdjustCashoutOffer, adminCashoutStats,
   adminListPages, adminCreatePage, adminUpdatePage, adminDeletePage,
   adminListBanners, adminCreateBanner, adminUpdateBanner, adminDeleteBanner,
   adminListAnnouncements, adminCreateAnnouncement, adminDeleteAnnouncement,
@@ -1077,6 +1077,53 @@ function BulkCodeModal({ open, onClose, onCreated, showToast }) {
   );
 }
 
+/* One open bet's live cash-out offer, with admin ± / direct-set controls. */
+function OfferRow({ offer, canEdit, busy, onAdjust }) {
+  const [val, setVal] = useState(String(offer.value ?? ''));
+  useEffect(() => { setVal(String(offer.value ?? '')); }, [offer.value]);
+
+  const commit = (v) => {
+    const n = Number(v);
+    if (!Number.isFinite(n) || n < 0) { setVal(String(offer.value ?? '')); return; }
+    if (n !== Number(offer.value)) onAdjust(Number(n.toFixed(2)));
+  };
+  const nudge = (d) => {
+    const n = Math.max(0, Number((Number(offer.value || 0) + d).toFixed(2)));
+    onAdjust(n);
+  };
+
+  return (
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid var(--border)', gap: 12 }}>
+      <div>
+        <div style={{ fontWeight: 600 }}>{offer.bookingCode || offer.betId?.slice(0, 16)}</div>
+        <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>
+          {offer.userLabel} · Stake {moneyFmt(offer.stake)}
+          {offer.adjustedByAdmin && <Badge tone="warn" style={{ marginLeft: 6 }}>Admin-adjusted</Badge>}
+        </div>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        {canEdit ? (
+          <>
+            <button type="button" className="adm-btn sm" disabled={busy} onClick={() => nudge(-10)}>−10</button>
+            <input
+              className="adm-input"
+              type="number" min="0" step="0.01"
+              style={{ width: 100, textAlign: 'right' }}
+              value={val} disabled={busy}
+              onChange={(e) => setVal(e.target.value)}
+              onBlur={() => commit(val)}
+              onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+            />
+            <button type="button" className="adm-btn sm" disabled={busy} onClick={() => nudge(10)}>+10</button>
+          </>
+        ) : (
+          <Badge tone="info">{moneyFmt(offer.value)}</Badge>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export function CashoutPage() {
   const { hasRole, showToast } = useAdmin();
   const [rules, setRules] = useState(null);
@@ -1084,6 +1131,8 @@ export function CashoutPage() {
   const [stats, setStats] = useState(null);
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState({});
+  const [adjustingId, setAdjustingId] = useState(null);
+  const canAdjustOffers = hasRole('finance_admin', 'odds_manager');
 
   async function load() {
     try {
@@ -1103,7 +1152,18 @@ export function CashoutPage() {
     catch (e) { showToast(e.message, 'error'); }
   }
 
-  const canEdit = hasRole('cashout.configure');
+  async function adjustOffer(betId, amount) {
+    if (!(amount >= 0)) return;
+    setAdjustingId(betId);
+    try {
+      await adminAdjustCashoutOffer(betId, amount);
+      showToast('Cash-out offer updated.');
+      await load();
+    } catch (e) { showToast(e.message, 'error'); }
+    finally { setAdjustingId(null); }
+  }
+
+  const canEdit = hasRole('finance_admin', 'odds_manager');
 
   return (
     <>
@@ -1142,14 +1202,8 @@ export function CashoutPage() {
         <Card title="Active offers" subtitle={offers ? `${offers.totalCount} offers, ${moneyFmt(offers.totalValue)} total value` : '—'}>
           {!offers && <Spinner />}
           {offers && offers.offers?.length === 0 && <Empty title="No active offers" subtitle="Offers appear when players place eligible bets." />}
-          {offers?.offers?.map((o, i) => (
-            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
-              <div>
-                <div style={{ fontWeight: 600 }}>{o.betId?.slice(0, 16)}…</div>
-                <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>{moneyFmt(o.value)} cash-out value</div>
-              </div>
-              <Badge tone="info">{o.odds?.toFixed(2)}×</Badge>
-            </div>
+          {offers?.offers?.map((o) => (
+            <OfferRow key={o.betId} offer={o} canEdit={canAdjustOffers} busy={adjustingId === o.betId} onAdjust={(amount) => adjustOffer(o.betId, amount)} />
           ))}
         </Card>
       </div>

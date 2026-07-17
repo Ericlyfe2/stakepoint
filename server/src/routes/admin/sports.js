@@ -196,6 +196,9 @@ router.post('/fixtures',
       // moment instead of "whenever my browser happened to load the page".
       minute: b.isLive ? "0'" : undefined,
       liveAt: b.isLive ? new Date().toISOString() : undefined,
+      // Cash-out locks automatically the moment a match goes live; an admin
+      // unlocks it explicitly afterward via PATCH { cashoutLocked: false }.
+      cashoutLocked: b.isLive ? true : undefined,
       scoreHome: typeof b.scoreHome === 'number' ? b.scoreHome : undefined,
       scoreAway: typeof b.scoreAway === 'number' ? b.scoreAway : undefined,
       markets,
@@ -285,6 +288,7 @@ router.patch('/fixtures/:id',
     scoreAway: z.number().optional(),
     minute: z.string().optional(),
     matchStatus: z.string().optional(),
+    cashoutLocked: z.boolean().optional(),
   })),
   (req, res, next) => {
     const view = adminLookupFixture(req.params.id);
@@ -300,6 +304,10 @@ router.patch('/fixtures/:id',
     if (rest.isLive === true && !view.match?.isLive) {
       if (!rest.minute && !view.match?.minute) rest.minute = "0'";
       if (!view.match?.liveAt) rest.liveAt = new Date().toISOString();
+      // Cash-out locks automatically the instant a match goes live — an
+      // admin can explicitly unlock it (rest.cashoutLocked === false, sent
+      // in this same request) but a bare { isLive: true } always locks it.
+      if (rest.cashoutLocked === undefined) rest.cashoutLocked = true;
     }
     if (Object.keys(rest).length) {
       patchOverride(req.params.id, rest);
