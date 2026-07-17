@@ -183,12 +183,13 @@ function betCashoutLocked(bet) {
   return (bet?.legs || []).some((l) => l?.live?.cashoutLocked);
 }
 
-// Anchor for the ticking clock: a fixture that just went live has no real
-// minute yet, so anchor to the shared server liveAt timestamp (agrees across
-// every viewer) rather than "whenever this browser polled the bet list".
+// Anchor for the ticking clock: liveAt is the wall-clock instant the current
+// `minute` value became true (stamped server-side on go-live and on every
+// minute change), so anchor to it whenever present — that's what keeps this
+// ticket and the admin panel's own clock agreeing instead of each side
+// simulating elapsed time from "whenever it happened to poll/load".
 function liveMinuteAnchor(live, rawMinute) {
-  const useLiveAt = rawMinute === "0'" && live?.liveAt;
-  return { minute: rawMinute, ts: useLiveAt ? new Date(live.liveAt).getTime() : Date.now() };
+  return { minute: rawMinute, ts: live?.liveAt ? new Date(live.liveAt).getTime() : Date.now() };
 }
 
 // Ticks a live leg's match clock forward every second between poll ticks,

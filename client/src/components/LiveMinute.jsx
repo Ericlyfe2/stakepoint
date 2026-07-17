@@ -2,12 +2,14 @@ import { useEffect, useRef, useState } from 'react';
 import { tickMinuteDisplay } from '../utils/liveClock.js';
 
 function anchorFor(match, rawMinute) {
-  // A fixture just gone live with no real minute yet ticks from "0'". Anchor
-  // it to the server's liveAt timestamp (shared by every viewer) rather than
-  // "whenever this browser happened to load the page" so admin and user
-  // screens agree — falling back to now for legacy fixtures with no liveAt.
-  const useLiveAt = rawMinute === "0'" && match?.liveAt;
-  return { minute: rawMinute, ts: useLiveAt ? new Date(match.liveAt).getTime() : Date.now() };
+  // liveAt is the wall-clock instant the current `minute` value became true
+  // (stamped server-side on go-live and on every minute change/step). Anchor
+  // to it whenever present so every viewer — admin panel, a player's ticket —
+  // simulates the elapsed clock from the same shared starting point instead
+  // of "whenever this browser happened to render this minute string", which
+  // made the same match show a different running time on different screens.
+  // Fall back to now only for legacy fixtures with no liveAt at all.
+  return { minute: rawMinute, ts: match?.liveAt ? new Date(match.liveAt).getTime() : Date.now() };
 }
 
 /**

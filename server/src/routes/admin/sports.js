@@ -319,6 +319,18 @@ router.patch('/fixtures/:id',
       if (rest.scoreHome === undefined && typeof view.match?.scoreHome !== 'number') rest.scoreHome = 0;
       if (rest.scoreAway === undefined && typeof view.match?.scoreAway !== 'number') rest.scoreAway = 0;
     }
+    // Every viewer's clock simulates elapsed time locally from `liveAt`
+    // rather than polling every second, so `liveAt` must mean "wall-clock
+    // instant the current `minute` value became true" — not just "kickoff".
+    // Whenever an admin steps the minute (+1'/-1', manual set, "go live"
+    // with a non-zero starting minute), re-stamp liveAt to now too, or
+    // every open tab (admin panel, a player's My Bets) keeps ticking from
+    // whatever moment *it* first happened to render that minute string —
+    // which is why the same match showed a different running time on the
+    // admin screen than on the player's ticket.
+    if (rest.minute && rest.liveAt === undefined) {
+      rest.liveAt = new Date().toISOString();
+    }
     if (Object.keys(rest).length) {
       patchOverride(req.params.id, rest);
     }
@@ -495,9 +507,12 @@ router.post('/fixtures/:id/status',
       // We'll handle this via the overrides mechanism
     }
 
-    // Apply minute override if provided
+    // Apply minute override if provided. Re-stamp liveAt in lockstep — every
+    // viewer's clock ticks locally from that timestamp, so it must always
+    // mean "wall-clock instant the current minute became true" or admin and
+    // player screens simulate the elapsed time from different starting points.
     if (minute) {
-      patchOverride(req.params.id, { minute });
+      patchOverride(req.params.id, { minute, liveAt: new Date().toISOString() });
     }
 
     // Emit real-time status change
