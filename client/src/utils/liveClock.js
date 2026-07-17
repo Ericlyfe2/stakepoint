@@ -24,8 +24,8 @@ export function parseMinuteStr(raw) {
   return { base, extra };
 }
 
-export function stoppageMinutesFor(fixtureId) {
-  const s = String(fixtureId || '');
+export function stoppageMinutesFor(fixtureId, half = 1) {
+  const s = `${fixtureId || ''}::h${half}`;
   let h = 0;
   for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
   return 1 + (h % 4); // 1..4, stable per fixture
@@ -46,15 +46,27 @@ export function tickMinuteDisplay(rawMinute, anchorTs, fixtureId, now = Date.now
   if (!parsed) return rawMinute || '';
 
   const elapsedSec = Math.max(0, Math.floor((now - anchorTs) / 1000));
-  let totalSec = (parsed.base + parsed.extra) * 60 + elapsedSec;
+  const reportedSec = (parsed.base + parsed.extra) * 60;
+  let totalSec = reportedSec + elapsedSec;
 
   // First-half stoppage: freeze the clock once it fills the allotted
   // added time instead of ticking straight into "46:00".
   if (parsed.base < 46) {
-    const cap = stoppageMinutesFor(fixtureId);
+    const cap = stoppageMinutesFor(fixtureId, 1);
     const maxSec = (45 + cap) * 60 + 59;
     if (totalSec > 45 * 60) totalSec = Math.min(totalSec, maxSec);
   }
+
+  // Full-match sanity cap: a fixture still ticking well past 90' almost
+  // always means nobody ever finished it on the admin side (a forgotten
+  // test/live match), not that it's genuinely 150 minutes into a football
+  // game. Freeze the simulated clock at 90' + a stable per-fixture
+  // stoppage allowance instead of climbing into triple digits forever —
+  // but never clamp below whatever minute was actually reported (e.g. an
+  // admin who deliberately set extra time in a cup match).
+  const cap2 = stoppageMinutesFor(fixtureId, 2);
+  const maxFullTimeSec = (90 + cap2) * 60 + 59;
+  if (totalSec > maxFullTimeSec) totalSec = Math.max(maxFullTimeSec, reportedSec);
 
   const minute = Math.floor(totalSec / 60);
   const second = totalSec % 60;
