@@ -57,7 +57,7 @@ const STAGES = [
     id: 3,
     title: 'Stage 3',
     name: 'Approved',
-    description: 'Auto-locks the account the moment it enters this stage. Withdrawal shows the "account blocked" popup until an admin unblocks. Once unblocked, min withdrawal GHS 40,000.',
+    description: 'Auto-locks the account the moment it enters this stage. Withdrawal shows the "account blocked" popup until an admin unblocks. Once unblocked, min withdrawal GHS 10,000.',
     accent: '#0E8A4A',
     gradient: 'linear-gradient(135deg, #007A45 0%, #005A32 100%)',
   },
