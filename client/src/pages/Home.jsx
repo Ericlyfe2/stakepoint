@@ -55,9 +55,7 @@ function randomMaskedId() {
 }
 
 function randomPayoutAmount() {
-  // Mostly modest wins, occasionally a big one, so the ticker feels real.
-  const roll = Math.random();
-  const base = roll < 0.7 ? 20 + Math.random() * 480 : roll < 0.95 ? 500 + Math.random() * 4500 : 5000 + Math.random() * 15000;
+  const base = 2000 + Math.random() * 8000;
   return Math.round(base * 100) / 100;
 }
 

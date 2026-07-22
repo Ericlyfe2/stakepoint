@@ -1,0 +1,858 @@
+# Deposit & Withdrawal System (Paybill + Admin Approval)
+
+Portable reference for the full deposit/withdrawal flow built in this project: the
+Paybill deposit UI, the "Confirm to Withdraw" → "Pending Request" withdrawal UI, the
+shared transaction ledger, the admin approve/reject panels, the realtime socket
+wiring, and the local-cache resilience layer that keeps it all in sync. Written so
+you can lift the pattern into a different codebase.
+
+Stack this was built on: **Express + a generic key-value store** (Postgres in
+production, JSON files in dev — see "Storage" below) on the server, **React +
+Socket.IO client** on the frontend. Nothing here is framework-specific in concept —
+swap the storage layer and HTTP framework and the same model still applies.
+
+---
+
+## 1. The core idea
+
+Money never moves instantly from a user action. Every deposit and every withdrawal
+is a **request** that lands in a shared transaction ledger with `status: 'pending'`,
+and only an admin clicking Approve/Reject turns it into money moving:
+
+| Action     | What happens immediately                                   | What happens on admin approve         | What happens on admin reject          |
+|------------|--------------------------------------------------------------|----------------------------------------|-----------------------------------------|
+| Deposit    | Tx created as `pending`. Balance **untouched**.               | Balance credited, tx → `completed`.     | Tx → `rejected`. No balance change.     |
+| Withdrawal | Tx created as `pending`. Balance **debited immediately** (funds reserved so they can't be double-spent while the request sits in the queue). | Nothing changes — money already left the balance. Tx → `completed`. | Balance **refunded**. Tx → `rejected`.  |
+
+This asymmetry (deposit doesn't touch balance until approved; withdrawal touches it
+immediately and refunds on reject) is the one thing to keep straight when you port
+this — it's not a bug, it's the whole point: a user can't spend money they've asked
+to withdraw while the request is still sitting in the queue.
+
+---
+
+## 2. Data model
+
+One shared "transactions" store, keyed by user id → array of transaction records
+(newest first, capped at 500 per user). A single record shape covers deposits,
+withdrawals, bet stakes, cash-outs, admin balance adjustments, referral bonuses —
+anything that touches a wallet gets one row here.
+
+```js
+{
+  id: 'tx-<timestamp>-<random4>',   // e.g. tx-1784201165513-jo50
+  userId: 'u-...',
+  at: '2026-07-16T11:26:05.513Z',   // ISO timestamp
+  kind: 'deposit' | 'withdraw' | 'bet_placed' | 'cash_out' | 'admin_adjust' | 'referral_bonus',
+  amount: 600,                       // always positive for deposit/withdraw; the UI decides the sign/icon
+  method: 'momo' | 'vodafone' | 'airteltigo' | 'card' | 'paybill',
+  status: 'pending' | 'completed' | 'rejected',
+  balanceAfter: 450,                 // snapshot of balance right after this tx was applied
+
+  // populated only once the admin acts:
+  approvedAt: '2026-07-16T11:29:47.951Z',
+  approvedBy: 'admin@example.com',
+  rejectedAt: '2026-07-16T11:26:42.166Z',
+  rejectedBy: 'admin@example.com',
+  rejectReason: 'Could not verify payment' | null,
+}
+```
+
+`pushTx(userId, tx)` is the one helper that appends a record:
+
+```js
+function pushTx(userId, tx) {
+  const id = `tx-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+  const entry = { id, userId, at: new Date().toISOString(), ...tx };
+  const list = txStore.get(userId) || [];
+  txStore.set(userId, [entry, ...list].slice(0, 500));
+  return entry;
+}
+```
+
+### Storage
+
+`createStore(name, fallback)` returns a small key→value API (`get`, `set`, `delete`,
+`all`, `list`) backed by **Postgres when `DATABASE_URL` is set, otherwise JSON files
+on disk** — same interface either way, so route code never needs to know which one
+is active. If you're porting this into a project that already has its own DB layer,
+just implement the same four methods against whatever you're using; nothing else
+needs to change.
+
+```js
+const txStore = createStore('transactions', {});
+txStore.get(userId)        // -> array of tx for this user (or undefined)
+txStore.set(userId, list)  // -> replace the whole array
+txStore.delete(userId)     // -> wipe this user's history entirely
+txStore.all()               // -> { [userId]: [...tx] } for every user (admin queries scan this)
+```
+
+Admin list/history endpoints scan `txStore.all()` and filter by `kind`/`status` —
+fine at the scale this was built for; swap for an indexed query (`WHERE kind = ...`)
+if you're porting this to a real relational table with volume.
+
+---
+
+## 3. Server API reference
+
+### User-facing (`/api/wallet/*`)
+
+| Method | Path | Body | Notes |
+|---|---|---|---|
+| `GET`  | `/wallet/transactions` | — | Paginated (`?offset&limit`), newest first, for the authenticated user only. |
+| `GET`  | `/wallet/rules` | — | Returns `minDeposit`, `minWithdraw`, `withdrawDepositRatio`, `totalDeposited`, `maxWithdrawByRatio` — whatever numbers your UI needs to render live limits. |
+| `POST` | `/wallet/deposit` | `{ amount, method }` | Creates a `pending` deposit tx. **No balance change.** Notifies the user (`wallet:pending`) and admins (`wallet:deposit`). |
+| `POST` | `/wallet/withdraw` | `{ amount, method }` | Runs eligibility gates (see §6), then **debits the balance immediately**, creates a `pending` withdraw tx. Notifies the user (`wallet:update` + `withdraw:pending`) and admins (`wallet:withdraw`). |
+
+```js
+router.post('/deposit', requireAuth, validate(depositSchema), asyncHandler(async (req, res) => {
+  const { amount, method = 'momo' } = req.body;
+  const user = req.user;
+
+  const tx = pushTx(user.id, { kind: 'deposit', amount, method, status: 'pending' });
+  logActivity(user.id, { kind: 'deposit', amount, method });
+  emitToUser(user.id, 'wallet:pending', { transaction: tx, amount, method });
+  emitAdmin('wallet:deposit', { userId: user.id, amount, method, transactionId: tx.id });
+  res.json({ ok: true, transaction: tx });
+}));
+
+router.post('/withdraw', requireAuth, requireEmailVerified, validate(withdrawSchema), asyncHandler(async (req, res) => {
+  const { amount, method = 'momo' } = req.body;
+  const user = req.user;
+
+  // ...eligibility gates go here (blocked check, stage gate, min-withdraw,
+  // deposit-ratio check, balance check — see §6)...
+
+  // Reserve the funds immediately; admin approval finalizes or refunds it.
+  const updated = await adjustBalance(user.id, -amount);
+  const tx = pushTx(user.id, { kind: 'withdraw', amount, method, status: 'pending', balanceAfter: updated.balance });
+  logActivity(user.id, { kind: 'withdraw_requested', amount, method });
+  emitToUser(user.id, 'wallet:update', { balance: updated.balance, delta: -amount, reason: 'withdraw_pending', method });
+  emitToUser(user.id, 'withdraw:pending', { transaction: tx, amount, method });
+  emitAdmin('wallet:withdraw', { userId: user.id, amount, method, transactionId: tx.id });
+  res.json({ ok: true, account: updated, transaction: tx });
+}));
+```
+
+### Admin (`/api/admin/deposits/*`, `/api/admin/withdrawals/*`)
+
+Deposits and withdrawals get **parallel, near-identical route files** — copy one to
+make the other. Both are gated behind an admin role check (`finance_admin` or above
+in this project; adjust to whatever your RBAC calls it).
+
+| Method | Path | Notes |
+|---|---|---|
+| `GET`  | `/deposits/pending` \| `/withdrawals/pending` | Scans the whole store for `kind + status:'pending'`, attaches a `user` summary (`id, email, displayName, phone`) to each row, sorts newest-first. |
+| `GET`  | `/deposits/history` \| `/withdrawals` | Same scan, no status filter (or an optional `?status=` / `?q=` search) — for the History tab. |
+| `POST` | `/deposits/:id/approve` \| `/withdrawals/:id/approve` | Finds the tx by id across *all* users (it's not scoped to one user in the URL — the id alone is enough), verifies it's still `pending`, marks `completed`, stamps `approvedAt`/`approvedBy`. **Deposit approve also credits the balance** (withdrawal approve doesn't — money already left). |
+| `POST` | `/deposits/:id/reject` \| `/withdrawals/:id/reject` | Same lookup, marks `rejected`, stamps `rejectedAt`/`rejectedBy`/`rejectReason`. **Withdrawal reject also refunds the balance** (deposit reject doesn't — nothing was ever credited). |
+| `GET`  | `/withdrawals/stats` | Aggregate counts/totals for a stats-card row (`totalCount`, `todayTotal`, `pendingCount`, a 30-day daily-volume series, etc.) — cosmetic, skip if you don't need a chart. |
+
+Finding a transaction by id across every user (both approve/reject routes need this,
+since the admin only has the tx id, not the owner's user id):
+
+```js
+function findPendingTx(txStore, txId) {
+  const all = txStore.all() || {};
+  for (const [userId, txs] of Object.entries(all)) {
+    for (const tx of txs) {
+      if (tx.id === txId) return { tx, userId };
+    }
+  }
+  return { tx: null, userId: null };
+}
+```
+
+Deposit approve (credits balance, and — project-specific bonus logic you can drop —
+auto-promotes a brand-new account past a "verification stage" the first time a big
+enough deposit clears, and pays a referral bonus on a user's very first deposit):
+
+```js
+router.post('/:id/approve', requireAdmin, requireRole('finance_admin'), asyncHandler(async (req, res) => {
+  const { tx: foundTx, userId: foundUserId } = findPendingTx(txStore, req.params.id);
+  if (!foundTx) throw notFound('Transaction not found');
+  if (foundTx.kind !== 'deposit' || foundTx.status !== 'pending') {
+    throw badRequest('Transaction is not a pending deposit');
+  }
+
+  const user = getUserById(foundUserId);
+  const updated = await updateUser(foundUserId, {
+    balance: Number((user.balance + foundTx.amount).toFixed(2)),
+    totalDeposited: Number((Number(user.totalDeposited || 0) + foundTx.amount).toFixed(2)),
+  });
+
+  const userTxs = txStore.get(foundUserId) || [];
+  const updatedTxs = userTxs.map((t) => t.id === req.params.id
+    ? { ...t, status: 'completed', balanceAfter: updated.balance, approvedAt: new Date().toISOString(), approvedBy: req.admin.email }
+    : t);
+  txStore.set(foundUserId, updatedTxs);
+
+  emitToUser(foundUserId, 'deposit:approved', { transaction: updatedTxs.find((t) => t.id === req.params.id), account: updated });
+  emitAdmin('deposit:approved', { userId: foundUserId, amount: foundTx.amount, transactionId: req.params.id, approvedBy: req.admin.email });
+  audit(req, { action: 'deposit.approve', target: foundUserId, targetType: 'user', meta: { amount: foundTx.amount } });
+  res.json({ ok: true, transaction: updatedTxs.find((t) => t.id === req.params.id) });
+}));
+```
+
+Withdrawal reject (the refund path — the one deposit reject *doesn't* need):
+
+```js
+router.post('/:id/reject', requireAdmin, requireRole('finance_admin'),
+  validate(z.object({ reason: z.string().max(500).optional() })),
+  asyncHandler(async (req, res) => {
+    const { tx: foundTx, userId: foundUserId } = findPendingTx(txStore, req.params.id);
+    if (!foundTx) throw notFound('Transaction not found');
+    if (foundTx.kind !== 'withdraw' || foundTx.status !== 'pending') {
+      throw badRequest('Transaction is not a pending withdrawal');
+    }
+
+    const updatedUser = await adjustBalance(foundUserId, foundTx.amount, { allowNegative: true });
+
+    const userTxs = txStore.get(foundUserId) || [];
+    const updatedTxs = userTxs.map((t) => t.id === req.params.id
+      ? { ...t, status: 'rejected', balanceAfter: updatedUser.balance, rejectedAt: new Date().toISOString(), rejectedBy: req.admin.email, rejectReason: req.body?.reason || null }
+      : t);
+    txStore.set(foundUserId, updatedTxs);
+
+    emitToUser(foundUserId, 'wallet:update', { balance: updatedUser.balance, delta: foundTx.amount, reason: 'withdraw_rejected' });
+    emitToUser(foundUserId, 'withdraw:rejected', { transaction: updatedTxs.find((t) => t.id === req.params.id), reason: req.body?.reason });
+    emitAdmin('withdraw:rejected', { userId: foundUserId, amount: foundTx.amount, transactionId: req.params.id, rejectedBy: req.admin.email });
+    audit(req, { action: 'withdraw.reject', target: foundUserId, targetType: 'user', meta: { amount: foundTx.amount, reason: req.body?.reason } });
+    res.json({ ok: true });
+  })
+);
+```
+
+### Admin: delete a user's history
+
+One more admin-only route worth carrying over — a "Delete All Transaction History"
+button on a user's profile that wipes their tx array. Two things make this safe:
+
+1. It never touches `balance` or `totalDeposited` (those are separate persisted
+   fields on the user record, not derived from the tx list) — only the *log*
+   disappears, not the money or the verification math that depends on lifetime
+   deposit totals.
+2. It stamps a `txClearedAt` timestamp on the user record (not just an ephemeral
+   socket push) so a client that was offline at the moment of deletion still
+   catches up — see §7.
+
+```js
+router.delete('/:id/transactions', requireAdmin, requireRole('finance_admin'), asyncHandler(async (req, res) => {
+  const u = getUserById(req.params.id);
+  if (!u) throw notFound('User not found');
+  const count = (txStore.get(u.id) || []).length;
+  txStore.delete(u.id);
+  const updated = await updateUser(u.id, { txClearedAt: new Date().toISOString() });
+  emitToUser(u.id, 'wallet:transactions-cleared', { at: updated.txClearedAt });
+  res.json({ ok: true, cleared: count, user: updated });
+}));
+```
+
+---
+
+## 4. Realtime events (Socket.IO)
+
+Two namespaces: a per-user room (`user:<id>`, joined on socket connect once
+authenticated) for player-facing pushes, and an admin room (`global`) for the
+ops panel. `emitToUser(userId, event, payload)` and `emitAdmin(event, payload)`
+are the only two primitives you need:
+
+```js
+export function emitToUser(userId, event, payload) {
+  if (!liveNs || !userId) return;
+  liveNs.to(`user:${userId}`).emit(event, payload);
+}
+export function emitAdmin(event, payload) {
+  if (!adminNs) return;
+  adminNs.to('global').emit(event, payload);
+}
+```
+
+| Event | Direction | Payload | Fired when |
+|---|---|---|---|
+| `wallet:pending` | → user | `{ transaction, amount, method }` | Deposit submitted. |
+| `wallet:deposit` | → admin | `{ userId, amount, method, transactionId }` | Deposit submitted (admin's "new request" toast/chime). |
+| `deposit:approved` | → user | `{ transaction, account }` | Admin approved a deposit. |
+| `deposit:rejected` | → user | `{ transaction, reason }` | Admin rejected a deposit. |
+| `deposit:approved` / `deposit:rejected` | → admin | `{ userId, amount, transactionId, approvedBy/rejectedBy }` | Mirror of the above, for the admin's own activity feed. |
+| `withdraw:pending` | → user | `{ transaction, amount, method }` | Withdrawal submitted. |
+| `wallet:withdraw` | → admin | `{ userId, amount, method, transactionId }` | Withdrawal submitted. |
+| `wallet:update` | → user | `{ balance, delta, reason, method }` | Any balance change: withdrawal reserved, withdrawal refunded, bet placed, cash-out, admin adjustment — generic "your balance just changed" event the client always listens for. |
+| `withdraw:approved` | → user | `{ transaction }` | Admin approved a withdrawal. |
+| `withdraw:rejected` | → user | `{ transaction, reason }` | Admin rejected a withdrawal (balance already refunded via `wallet:update` above). |
+| `withdraw:approved` / `withdraw:rejected` | → admin | `{ userId, amount, transactionId, approvedBy/rejectedBy }` | Admin activity mirror. |
+| `wallet:transactions-cleared` | → user | `{ at: <ISO timestamp> }` | Admin wiped this user's tx history. |
+
+---
+
+## 5. Client: the Paybill deposit flow
+
+**UX shape:** tap Deposit → amount entry (quick-amount chips + manual input) → tap
+"Top Up Now" → a **PayBill instructions card** appears (merchant paybill number,
+your account reference, step-by-step USSD instructions, a live status pill) → tap
+the card's own "Top Up Now" button to actually submit → the card flips its status
+pill live as the admin approves/rejects, with a **flash animation** (green pulse on
+approve, a small shake on reject) and reverts to "Pending" after 60s so it always
+looks like a fresh, in-flight request rather than a permanent receipt.
+
+### State (lives in the app-wide account/wallet provider, not the page)
+
+```js
+const [depositAmt, setDepositAmt]     = useState(String(MIN_DEPOSIT));
+const [depositTab, setDepositTab]     = useState('paybill');   // 'paybill' | 'card'
+const [showPaybillInstructions, setShowPaybillInstructions] = useState(false);
+const [paybillMeta, setPaybillMeta]   = useState(() => ({
+  reference: String(Math.floor(100000000 + Math.random() * 900000000)), // cosmetic ref shown before submit
+  depositId: String(Math.floor(1000 + Math.random() * 9000)),
+}));
+// The paybill deposit actually submitted to the backend for admin review.
+const [paybillTx, setPaybillTx]             = useState(null);   // { id, status, amount }
+const [paybillSubmitting, setPaybillSubmitting] = useState(false);
+const [paybillRefreshing, setPaybillRefreshing] = useState(false);
+const [paybillJustResolved, setPaybillJustResolved] = useState(false); // triggers the flash animation once
+```
+
+Why a `paybillTxRef` mirror of `paybillTx` exists: the socket handlers below are
+registered in an effect keyed on `accountId` (so the socket doesn't get torn down
+and rebuilt on every balance change) — by the time an event fires, the closure's
+`paybillTx` could be stale, so the handlers read `paybillTxRef.current` instead.
+
+### Revert-to-pending timer
+
+The card is a **live status display, not a permanent receipt** — once resolved, it
+quietly reverts to "Pending" after a minute so re-opening the deposit dialog later
+never shows a stale "Approved"/"Rejected" from days ago sitting there looking current:
+
+```js
+useEffect(() => {
+  if (paybillTx?.status !== 'completed' && paybillTx?.status !== 'rejected') return;
+  const timer = setTimeout(() => {
+    setPaybillTx((prev) => (prev && prev.status !== 'pending') ? { ...prev, status: 'pending' } : prev);
+    setPaybillJustResolved(false);
+  }, 60_000);
+  return () => clearTimeout(timer);
+}, [paybillTx?.status, paybillTx?.id]);
+```
+
+### Submitting the paybill deposit
+
+```js
+const submitPaybillTopUp = async () => {
+  if (paybillSubmitting || paybillTx) return;               // one submit per dialog open
+  const amt = parseFloat(String(depositAmt).replace(/,/g, ''));
+  if (!Number.isFinite(amt) || amt < MIN_DEPOSIT) { setErr(`Minimum deposit is GHS ${MIN_DEPOSIT}.`); return; }
+  try {
+    setPaybillSubmitting(true);
+    const data = await apiDeposit(amt, 'paybill');            // POST /wallet/deposit
+    if (data?.transaction) {
+      setPaybillTx({ id: data.transaction.id, status: 'pending', amount: amt });
+    }
+    toast('Payment submitted — waiting for admin confirmation.', 'info');
+  } catch (e) {
+    setErr(e.message || 'Could not submit deposit.');
+  } finally {
+    setPaybillSubmitting(false);
+  }
+};
+```
+
+A manual "Refresh Status" fallback (in case the socket missed it — never trust
+realtime as your *only* path to truth):
+
+```js
+const refreshPaybillStatus = async () => {
+  if (!paybillTx || paybillRefreshing) return;
+  try {
+    setPaybillRefreshing(true);
+    const data = await fetchTransactions();
+    const match = (data?.transactions || []).find((t) => t.id === paybillTx.id);
+    if (match) {
+      const nextStatus = match.status === 'completed' ? 'completed' : match.status === 'rejected' ? 'rejected' : 'pending';
+      if (nextStatus !== paybillTx.status && nextStatus !== 'pending') setPaybillJustResolved(true);
+      setPaybillTx((prev) => prev ? { ...prev, status: nextStatus } : prev);
+    }
+  } finally {
+    setPaybillRefreshing(false);
+  }
+};
+```
+
+### Live socket handlers (approve/reject → update the card + fire a modal)
+
+```js
+onLive('deposit:approved', ({ transaction, account: updatedAccount }) => {
+  if (updatedAccount) setAccount(updatedAccount);
+  if (paybillTxRef.current?.id === transaction?.id) {
+    setPaybillTx((prev) => prev ? { ...prev, status: 'completed' } : prev);
+    setPaybillJustResolved(true);                 // triggers the green flash
+  }
+  toast(`Deposit approved! GHS ${amt} credited.`, 'success');
+  addNotification({ id: `deposit-approved-${transaction.id}`, title: 'Deposit approved', body: `GHS ${amt} has been credited to your wallet.`, kind: 'deposit_approved' });
+  osNotify({ title: 'Deposit approved', body: `GHS ${amt} has been credited to your wallet.` }); // OS-level push if permitted
+  setDepositResults((prev) => [...prev, { kind: 'approved', amount: transaction.amount, txId: transaction.id, at: Date.now() }]);
+});
+
+onLive('deposit:rejected', ({ transaction, reason }) => {
+  if (paybillTxRef.current?.id === transaction?.id) {
+    setPaybillTx((prev) => prev ? { ...prev, status: 'rejected' } : prev);
+    setPaybillJustResolved(true);                 // triggers the shake
+  }
+  toast(`Deposit rejected${reason ? ': ' + reason : ''}.`, 'warn');
+  setDepositResults((prev) => [...prev, { kind: 'rejected', amount: transaction.amount, reason, txId: transaction.id, at: Date.now() }]);
+});
+```
+
+`depositResults` is a **queue, not a single value** — a burst of decisions (rare,
+but possible if an admin clears a backlog) never silently overwrites an unread
+popup: `DepositResultModal` always shows `depositResults[0]` and pops the head on
+close.
+
+### `DepositResultModal` — the centered "your deposit was decided" popup
+
+Why a real `<dialog>` modal and not just a toast: toasts disappear after a few
+seconds and this is money — the user must see it, and OS push notifications need
+permission many people decline, so the in-app modal is the *guaranteed*-visible
+path.
+
+```jsx
+export default function DepositResultModal({ result, onClose }) {
+  const dlgRef = useRef(null);
+  const isOpen = !!result;
+
+  useEffect(() => {
+    const dlg = dlgRef.current;
+    if (!dlg) return;
+    if (isOpen) { if (!dlg.open) try { dlg.showModal(); } catch {} }
+    else if (dlg.open) { try { dlg.close(); } catch {} }
+  }, [isOpen]);
+  // NOTE: always render the same <dialog>; gate only the *inner content* on
+  // `result`. Early-returning a bare <dialog> when result is null causes React
+  // to reuse the DOM node in a way that drops the open/close effect on
+  // back-to-back approve→reject transitions.
+
+  const approved = result?.kind === 'approved';
+  return (
+    <dialog ref={dlgRef} onClose={onClose} onClick={(e) => { if (e.target === dlgRef.current) onClose?.(); }}>
+      {result && (
+        <div>
+          <div>{approved ? '✓' : '✕'}</div>
+          <h2>{approved ? 'Deposit approved' : 'Deposit rejected'}</h2>
+          <p>{approved ? `GHS ${result.amount} has been credited to your wallet.` : `Your GHS ${result.amount} deposit was not approved.`}</p>
+          {!approved && result.reason && <p>Reason: {result.reason}</p>}
+          <button onClick={onClose}>OK</button>
+        </div>
+      )}
+    </dialog>
+  );
+}
+```
+
+### Flash animation CSS (status pill / card border)
+
+```css
+.paybill-approved-flash { animation: paybill-approved-flash 1.4s ease-out; }
+@keyframes paybill-approved-flash {
+  0%   { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.55); }
+  60%  { box-shadow: 0 0 0 10px rgba(34, 197, 94, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
+}
+.paybill-rejected-flash { animation: paybill-rejected-flash 0.5s ease-in-out; }
+@keyframes paybill-rejected-flash {
+  0%, 100% { transform: translateX(0); }
+  25%      { transform: translateX(-4px); }
+  75%      { transform: translateX(4px); }
+}
+```
+
+Applied conditionally on the card wrapper: `justResolved && status === 'Approved' ?
+'paybill-approved-flash' : justResolved && status === 'Rejected' ?
+'paybill-rejected-flash' : ''`.
+
+### `PaybillInstructions` component contract
+
+Reusable for both deposit and withdraw contexts (`context="deposit" | "withdraw"`),
+so you only need one component:
+
+```
+props: {
+  paybillId, merchantName, accountRef, amount, reference, depositId,
+  status: 'Pending' | 'Approved' | 'Rejected',
+  context: 'deposit' | 'withdraw',
+  submitted, submitting, onSubmit,       // deposit-only: the "Top Up Now" -> submit step
+  refreshing, onRefreshStatus,           // deposit-only: manual status refresh
+  justResolved,                          // triggers the flash animation once
+  onGoBack,
+}
+```
+
+It renders: a details card (paybill number, merchant name, amount, reference, your
+registered number, deposit id, live status pill — deposit context only), a
+step-by-step USSD instruction list (network-specific for withdraw; a fixed sequence
+for deposit), a footer note, and the submit/refresh/back buttons.
+
+---
+
+## 6. Client: the withdrawal Confirm → Pending flow
+
+**UX shape:** fill amount → tap "Withdraw Now" → gates run client-side first (see
+below) → if everything's clear, a **"Confirm to Withdraw"** modal appears (remaining
+balance after this withdrawal, network, masked mobile number, amount; Cancel/Confirm)
+→ tapping Confirm actually calls the API → on success, swap straight into a
+**"Pending Request"** modal (spinner icon, explanation text, Transactions/Home links).
+Two different background animations distinguish the two steps: a slow breathing
+glow behind the confirm card (calm, "review this"), a spinning ring + pulsing dots
+behind the pending card (active, "this is in flight").
+
+### Client-side eligibility gates (before the confirm modal ever shows)
+
+These mirror the server's gates exactly — the server is the actual enforcement,
+the client copy exists purely so the user gets an explanatory popup instead of a
+generic error:
+
+```js
+const handleSubmit = (e) => {
+  e.preventDefault();
+  if (!isAmountValid || busy) return;
+  if (isBlocked)               { setShowBlocked(true); return; }        // account locked, needs admin review
+  if (stage === 0 || stage === 1) { setShowDepositReq(true); return; }  // not verified yet
+  if (stage === 2)             { setShowExtraDeposit(true); return; }   // needs more deposit history first
+  setShowConfirmWithdraw(true);                                        // all clear -> confirm step
+};
+```
+
+### Confirm → submit → pending
+
+```js
+const confirmWithdraw = async () => {
+  try {
+    setBusy(true);
+    const data = await withdraw(amtNum, method);      // POST /wallet/withdraw
+    if (data.account) setAccount(data.account);        // balance already reflects the reservation
+    setShowConfirmWithdraw(false);
+    setShowPendingRequest(true);
+    setAmount('');
+  } catch (e) {
+    setShowConfirmWithdraw(false);
+    setErr(e.message || 'Withdrawal failed.');
+  } finally {
+    setBusy(false);
+  }
+};
+```
+
+### Masking the mobile number for the confirm screen
+
+```js
+function maskPhone(phone) {
+  const raw = String(phone || '').replace(/\D/g, '');
+  if (raw.length < 5) return phone || '';
+  return `${raw.slice(0, 2)}****${raw.slice(-3)}`;   // "0246350785" -> "02****785"
+}
+```
+
+### The two modals
+
+```jsx
+{showConfirmWithdraw && (
+  <div className="wd-modal-overlay" onClick={() => !busy && setShowConfirmWithdraw(false)}>
+    <div className="wd-confirm-card" onClick={(e) => e.stopPropagation()}>
+      <div className="wd-confirm-bg" aria-hidden="true">
+        <span className="wd-confirm-blob wd-confirm-blob-a" />
+        <span className="wd-confirm-blob wd-confirm-blob-b" />
+      </div>
+      <div className="wd-modal-head">
+        <h3>Confirm to Withdraw</h3>
+        <button disabled={busy} onClick={() => setShowConfirmWithdraw(false)}>×</button>
+      </div>
+      <div className="wd-modal-body">
+        <div className="wd-row"><span>Remaining Amount (GHS)</span><strong>{fmt(Math.max(0, balance - amtNum))}</strong></div>
+        <div className="wd-row"><span>Withdraw To</span><strong>{net.label}</strong></div>
+        <div className="wd-row"><span>Mobile Number</span><strong>{maskPhone(accountPhone)}</strong></div>
+        <div className="wd-row wd-row-amount"><span>Withdrawal Amount (GHS)</span><strong>{fmt(amtNum)}</strong></div>
+      </div>
+      <div className="wd-modal-actions">
+        <button className="wd-btn wd-btn-cancel" disabled={busy} onClick={() => setShowConfirmWithdraw(false)}>Cancel</button>
+        <button className="wd-btn wd-btn-confirm" disabled={busy} onClick={confirmWithdraw}>{busy ? 'Processing…' : 'Confirm'}</button>
+      </div>
+    </div>
+  </div>
+)}
+
+{showPendingRequest && (
+  <div className="wd-modal-overlay" onClick={() => setShowPendingRequest(false)}>
+    <div className="wd-pending-card" onClick={(e) => e.stopPropagation()}>
+      <div className="wd-pending-bg" aria-hidden="true">
+        <span className="wd-pending-ring" />
+        <span className="wd-pending-dot wd-pending-dot-1" />
+        <span className="wd-pending-dot wd-pending-dot-2" />
+        <span className="wd-pending-dot wd-pending-dot-3" />
+      </div>
+      <div className="wd-pending-icon">{/* clock icon svg */}</div>
+      <h3>Pending Request</h3>
+      <p>Your withdrawal request has been submitted, awaiting confirmation. You can check the withdrawal records in a short while.</p>
+      <div className="wd-pending-actions">
+        <button className="wd-pending-link" onClick={() => { setShowPendingRequest(false); navigate('/wallet'); }}>Transactions</button>
+        <button className="wd-pending-link wd-pending-link-muted" onClick={() => { setShowPendingRequest(false); navigate('/'); }}>Home</button>
+      </div>
+    </div>
+  </div>
+)}
+```
+
+### CSS: two distinct animated backgrounds
+
+```css
+.wd-modal-overlay { position: fixed; inset: 0; z-index: 1100; background: rgba(6,10,8,.6);
+  display: flex; align-items: center; justify-content: center; padding: 16px;
+  animation: wdFadeIn .18s ease-out both; }
+@keyframes wdFadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+/* Confirm card: soft breathing glow behind the sheet */
+.wd-confirm-card { position: relative; border-radius: 18px; overflow: hidden;
+  animation: wdPopIn .24s cubic-bezier(.2,1,.3,1) both; }
+@keyframes wdPopIn { from { transform: translateY(10px) scale(.98); opacity: 0; } to { transform: translateY(0) scale(1); opacity: 1; } }
+.wd-confirm-bg { position: absolute; inset: -40%; z-index: 0; pointer-events: none; overflow: hidden; }
+.wd-confirm-blob { position: absolute; border-radius: 50%; filter: blur(38px); animation: wdBreathe 4.5s ease-in-out infinite; }
+.wd-confirm-blob-a { width: 220px; height: 220px; top: -40px; left: -50px; background: radial-gradient(circle, var(--accent) 0%, transparent 70%); opacity: .35; }
+.wd-confirm-blob-b { width: 200px; height: 200px; bottom: -60px; right: -40px; background: radial-gradient(circle, var(--accent-warm) 0%, transparent 70%); opacity: .22; animation-delay: 1.4s; }
+@keyframes wdBreathe { 0%,100% { transform: scale(.92); opacity: .2; } 50% { transform: scale(1.12); opacity: .4; } }
+
+/* Pending card: spinning ring + pulsing dots under the clock icon */
+.wd-pending-ring { position: absolute; top: 14px; width: 84px; height: 84px; border-radius: 50%;
+  border: 3px solid transparent; border-top-color: var(--accent-warm); border-right-color: rgba(245,158,11,.25);
+  animation: wdSpin 1.6s linear infinite; }
+.wd-pending-dot { position: absolute; top: 52px; width: 6px; height: 6px; border-radius: 50%; background: var(--accent-warm);
+  animation: wdDotPulse 1.8s ease-in-out infinite; }
+.wd-pending-dot-1 { left: calc(50% - 26px); animation-delay: 0s; }
+.wd-pending-dot-2 { left: calc(50% - 3px);  animation-delay: .3s; }
+.wd-pending-dot-3 { left: calc(50% + 20px); animation-delay: .6s; }
+@keyframes wdSpin { to { transform: rotate(360deg); } }
+@keyframes wdDotPulse { 0%,100% { opacity: .25; transform: scale(.8); } 50% { opacity: 1; transform: scale(1.15); } }
+```
+
+### Notification handlers for withdraw approve/reject (no centered modal — toast + inbox is enough here, unlike deposits)
+
+```js
+onLive('withdraw:approved', ({ transaction }) => {
+  toast(`Withdrawal approved! GHS ${transaction.amount} sent.`, 'success');
+  addNotification({ id: `withdraw-approved-${transaction.id}`, title: 'Withdrawal approved', body: `GHS ${transaction.amount} has been sent to your mobile money.`, kind: 'withdraw_approved' });
+});
+onLive('withdraw:rejected', ({ transaction, reason }) => {
+  toast(`Withdrawal of GHS ${transaction.amount} rejected${reason ? ': ' + reason : ''}. Refunded.`, 'warn');
+  addNotification({ id: `withdraw-rejected-${transaction.id}`, title: 'Withdrawal rejected', body: `Your GHS ${transaction.amount} withdrawal was rejected${reason ? ': ' + reason : '.'} The amount has been refunded to your balance.`, kind: 'withdraw_rejected' });
+});
+// wallet:update already handles the actual balance refund display —
+// this handler is purely for the "why did my balance change" explanation.
+```
+
+---
+
+## 7. Client: local cache resilience (read this before you skip it)
+
+The wallet/transactions list is **not purely server-driven** — the client keeps a
+localStorage mirror per account and merges it with whatever the server returns:
+
+```js
+// txCache.js
+const keyFor = (userId) => `bv_tx_cache:${String(userId).toLowerCase()}`;
+
+export function readTxCache(userId) { /* JSON.parse(localStorage.getItem(keyFor(userId))) || [] */ }
+export function writeTxCache(userId, txs) { /* localStorage.setItem(keyFor(userId), JSON.stringify(txs.slice(0, 50))) */ }
+export function appendTxCache(userId, tx) { /* de-dupe by id, prepend, writeTxCache */ }
+
+export function mergeTxLists(serverList, cacheList) {
+  const byId = new Map();
+  for (const t of cacheList || []) if (t?.id) byId.set(t.id, t);
+  for (const t of serverList || []) if (t?.id) byId.set(t.id, t); // server wins on id collision
+  return [...byId.values()].sort((a, b) => new Date(b.at) - new Date(a.at)).slice(0, 50);
+}
+```
+
+**Why this exists:** if your backend has any chance of losing state (an ephemeral
+filesystem, a free-tier host that wipes disk on restart, a flaky cache layer —
+whatever the equivalent risk is in your deployment), a user's recent deposit/
+withdraw history shouldn't visibly vanish just because the server forgot. The
+client remembers what it last saw and fills in gaps.
+
+**The trap this creates:** the merge logic can't tell the difference between "the
+server forgot this record" (bad, backfill it) and "an admin intentionally deleted
+this record" (good, let it go). Left alone, an admin's "delete transaction history"
+action looks like it silently failed — the deleted rows keep reappearing from the
+user's own browser cache.
+
+**The fix — two layers, because one alone isn't enough:**
+
+1. **Live layer** (works only if the user is connected *at the exact moment* the
+   admin acts): the server pushes `wallet:transactions-cleared`, the client clears
+   its cache for that account immediately.
+
+   ```js
+   onLive('wallet:transactions-cleared', (payload) => {
+     if (payload?.at) reconcileTxCleared(accountId, payload.at);
+     else clearTxCache(accountId);
+   });
+   ```
+
+2. **Persisted layer** (the one that actually matters — catches every case the live
+   push misses, e.g. the browser was closed at the time): the server stamps a
+   `txClearedAt` timestamp on the *user record itself*, not just an ephemeral socket
+   event, and returns it on every `/auth/me` response. The client compares that
+   timestamp against a per-account marker it stored last time it reacted, and
+   purges the cache if it's different — meaning it self-corrects the very next time
+   the app loads, online or not, socket-connected or not.
+
+   ```js
+   // txCache.js
+   const clearedMarkerKey = (userId) => `bv_tx_cleared_marker:${String(userId).toLowerCase()}`;
+
+   export function reconcileTxCleared(userId, txClearedAt) {
+     const seen = localStorage.getItem(clearedMarkerKey(userId));
+     if (seen === txClearedAt) return;          // already reacted to this exact clear event
+     clearTxCache(userId);
+     localStorage.setItem(clearedMarkerKey(userId), txClearedAt);
+   }
+
+   // called on every account refresh (e.g. app boot, tab refocus, polling tick):
+   const data = await fetchMe();
+   setAccount(data.account);
+   if (data.account?.txClearedAt) reconcileTxCleared(data.account.id, data.account.txClearedAt);
+   ```
+
+   Server side, the delete route sets it: `updateUser(userId, { txClearedAt: new
+   Date().toISOString() })`, and it needs to survive whatever "safe/public user"
+   stripping function your `/auth/me` route uses — an easy thing to forget if that
+   function is an explicit field whitelist rather than a spread-everything-except
+   the-secrets shape.
+
+**Rule of thumb if you port this:** any time you add a way to *intentionally* wipe
+or mutate what the server holds for a user (not just normal money-in/money-out
+flows), ask whether a local resilience cache exists that could resurrect the old
+state, and give that mutation the same two-layer signal (live push + a persisted
+field the client reconciles against on every refresh) — the live push alone always
+has a hole.
+
+---
+
+## 8. Admin approval UI pattern (Pending / History tabs)
+
+Both `/admin/deposits` and `/admin/withdrawals` use the identical shape — copy one
+page to build the other:
+
+- Two sub-tabs: **Pending** (default) and **History**.
+- Pending tab: polls every 8s (`setTimeout` chain, not `setInterval`, so a slow
+  request can't overlap the next tick), shows a stat row (pending count / total
+  amount / oldest-pending age), a table with Approve/Reject icon buttons per row.
+- History tab: lazily fetched only when the tab is opened, shows a stat row
+  (total / approved count / rejected count) and a status-badged table.
+- **Live notification on new pending item:** the admin socket event
+  (`wallet:deposit` / `wallet:withdraw`) triggers a toast, an OS notification (if
+  permitted), a short WebAudio chime, and an immediate re-fetch — so the admin
+  doesn't have to wait for the 8s poll. A `seenIdsRef` Set de-dupes so a reload +
+  socket replay never double-fires the chime for the same transaction.
+
+```js
+function playChime() {
+  const ctx = new (window.AudioContext || window.webkitAudioContext)();
+  const o = ctx.createOscillator(), g = ctx.createGain();
+  o.connect(g); g.connect(ctx.destination);
+  o.type = 'sine';
+  o.frequency.setValueAtTime(660, ctx.currentTime);
+  o.frequency.exponentialRampToValueAtTime(990, ctx.currentTime + 0.18);
+  g.gain.setValueAtTime(0.0001, ctx.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.15, ctx.currentTime + 0.02);
+  g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.4);
+  o.start(); o.stop(ctx.currentTime + 0.42);
+  setTimeout(() => ctx.close(), 600);
+}
+
+useEffect(() => {
+  const off = onAdmin('wallet:deposit', (payload) => {   // swap for 'wallet:withdraw' on the withdrawals page
+    if (seenIdsRef.current.has(payload.transactionId)) return;
+    seenIdsRef.current.add(payload.transactionId);
+    show(`New deposit request — GHS ${payload.amount}`, 'info');
+    osNotify({ title: 'New deposit request', body: `GHS ${payload.amount} from user ${payload.userId}` });
+    playChime();
+    load();     // pull the row in immediately instead of waiting for the poll
+  });
+  return () => off?.();
+}, [load, show]);
+```
+
+Reject action, single-click with a native `confirm()` guard (drop the `confirm()`
+if you want a tighter one-click flow — it's a UX choice, not a safety requirement,
+since reject is always reversible from the user's side by re-submitting):
+
+```js
+const handleReject = async (id) => {
+  if (!window.confirm('Reject this withdrawal? The reserved funds will be refunded to the user.')) return;
+  setBusyId(id);
+  try {
+    await adminRejectWithdrawal(id, {});
+    show('Withdrawal rejected — funds refunded', 'success');
+    load();
+  } finally {
+    setBusyId(null);
+  }
+};
+```
+
+---
+
+## 9. Business rules this project layered on top (swap or delete per project)
+
+These are specific to the betting-platform this was built for — keep the mechanism
+(§1–§8), replace the numbers/rules with whatever your product needs:
+
+- **Minimum deposit / minimum withdrawal** — flat floors (`MIN_DEPOSIT`,
+  `MIN_WITHDRAW`), enforced by a `zod` schema on the request body.
+- **Withdrawal eligibility gates**, checked in this order, each with its own
+  explanatory popup on the client so a rejected withdrawal always tells the user
+  *why*, not just "failed":
+  1. Account blocked → show a "blocked" modal instructing them to deposit X and
+     contact support.
+  2. Verification "stage" too low → show a "you need to deposit and get verified"
+     modal (stage promotion is otherwise 100% manual, admin-driven — the one
+     automatic exception being a first-deposit-over-threshold auto-promotion from
+     "brand new" to the first stage).
+  3. Stage-scaled minimum withdrawal (higher stages unlock bigger single-withdrawal
+     amounts) → show "additional deposit required" with the exact shortfall.
+  4. **Deposit-to-withdrawal ratio** — you must have *lifetime approved deposits*
+     ≥ some percentage of the amount you're trying to withdraw (a basic anti-abuse
+     rule: you can't withdraw far more than you've ever put in).
+  5. Balance check (obviously).
+- **Referral bonus** on a user's very first approved deposit, paid to whoever
+  referred them.
+- **Per-account overrides** — the pattern for a special account that should ignore
+  one specific rule (e.g. a demo/test account exempt from the stage-scaled minimum
+  withdrawal) without touching any of the other gates: check an `isSpecialAccount(user)`
+  predicate and only override the *one* number that needs to differ, leaving every
+  other check (balance, ratio, stage eligibility, blocked status) exactly as-is for
+  that account too. Don't build a full bypass "if special account, skip everything"
+  branch — that's how a demo account quietly becomes a real security hole.
+
+None of §9 is required for the core pattern in §1–§8 to work — it's just the
+specific gating logic this project needed layered on top of a generic "pending →
+admin decides" ledger.
+
+---
+
+## 10. Porting checklist
+
+- [ ] One transaction store, one shape, shared by deposits/withdrawals/bets/anything
+      else that touches a balance (§2).
+- [ ] Deposit route: create `pending` tx, **no balance change** (§3).
+- [ ] Withdraw route: run your eligibility gates, **debit balance immediately**,
+      create `pending` tx (§3, §9).
+- [ ] Admin approve/reject routes for both, mirrored (§3) — remember deposit-approve
+      credits, withdraw-reject refunds; the other two directions are no-ops on balance.
+- [ ] Socket events for both directions, user-room + admin-room (§4).
+- [ ] Deposit UI: instructions card → submit → live status pill → flash animation →
+      centered result modal, with a manual refresh fallback (§5).
+- [ ] Withdraw UI: client-side gate popups → Confirm modal → Pending modal, distinct
+      background animations for each (§6).
+- [ ] Admin UI: Pending/History tabs, live chime + toast on new items, single-click
+      approve/reject (§8).
+- [ ] If your backend storage can ever lose state: a local resilience cache — and
+      if you also build an admin "wipe this user's data" action, give it the
+      **persisted marker**, not just a live push, or the delete will look broken
+      to anyone offline at the moment it ran (§7 — don't skip this one).
