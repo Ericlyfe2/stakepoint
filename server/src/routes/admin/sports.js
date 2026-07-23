@@ -488,6 +488,14 @@ router.post('/fixtures/:id/status',
 
     setMatchStatus(req.params.id, status);
 
+    // Mirror the automated provider feed: the instant a fixture goes live,
+    // cash-out locks automatically. An admin unlocks it explicitly via
+    // PATCH { cashoutLocked: false }. Without this, a manually-flipped
+    // fixture (no live provider feed) never locked cash-out at kickoff.
+    if (status === 'live' || status === 'ht' || status === '2h') {
+      patchOverride(req.params.id, { cashoutLocked: true });
+    }
+
     // When marking as FT, also auto-set the result if scores provided
     if (status === 'ft' && scoreHome != null && scoreAway != null) {
       setResult(req.params.id, scoreHome, scoreAway, 'manual');

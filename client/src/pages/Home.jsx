@@ -1196,7 +1196,14 @@ export default function Home({ initialChip }) {
                   </div>
 
                   <div className="xb-live-odds">
-                    {cols ? cols.selections.map((s) => {
+                    {match.suspended || match.isLive ? (
+                      ['HOME', 'DRAW', 'AWAY'].map((k) => (
+                        <span key={k} className="xb-live-odd locked">
+                          <span className="xb-live-odd-label">{k}</span>
+                          <span className="xb-live-odd-val">Locked</span>
+                        </span>
+                      ))
+                    ) : cols ? cols.selections.map((s) => {
                       const isSel = myPicks.some((p) => p.outcome === s.key);
                       return (
                         <button
@@ -1459,6 +1466,8 @@ export default function Home({ initialChip }) {
                                 <span className="sb-odd disabled sb-odd-closed">CLOSED</span>
                               ) : match.suspended ? (
                                 <span className="sb-odd disabled sb-odd-suspended">SUSP</span>
+                              ) : match.isLive ? (
+                                <span className="sb-odd disabled sb-odd-suspended">LIVE</span>
                               ) : cols ? (
                                 cols.selections.map((s) => {
                                   const isSel = myPicks.some((p) => p.outcome === s.key);
