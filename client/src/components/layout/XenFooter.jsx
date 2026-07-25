@@ -38,11 +38,6 @@ export default function XenFooter({ className = '' }) {
       <p className="sporty-footer-tagline">The world&apos;s sharper betting platform</p>
 
       <div className="sporty-footer-section">
-        <div className="sporty-footer-label">Payroll</div>
-        <div className="sporty-footer-code">*711*222#</div>
-      </div>
-
-      <div className="sporty-footer-section">
         <div className="sporty-footer-label">Payment methods</div>
         <div className="sporty-payment-row">
           <span className="sporty-pay-chip">AT</span>

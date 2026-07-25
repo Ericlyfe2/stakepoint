@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import trophyImg from '../assets/win-trophy.png';
 
 function fmt(n) {
   return Number(n || 0).toLocaleString('en-GH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -100,7 +101,7 @@ function Sparkles() {
 }
 
 /* ───────────────────────────────────────────────
-   Trophy SVG with classical flanking figures
+   Trophy artwork (user-supplied image)
    ─────────────────────────────────────────────── */
 function TrophyGraphic() {
   return (
@@ -117,96 +118,13 @@ function TrophyGraphic() {
         />
 
         {/* Floating idle animation */}
-        <motion.div
-          className="wcm-trophy-group"
+        <motion.img
+          src={trophyImg}
+          alt="Winner's trophy"
+          className="wcm-trophy-img"
           animate={{ y: [-8, 8, -8] }}
           transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
-        >
-          {/* Left figure */}
-          <svg className="wcm-figure wcm-figure-left" viewBox="0 0 40 100" width="36" height="90" fill="none">
-            <defs>
-              <linearGradient id="figL" x1="0" y1="0" x2="1" y2="1">
-                <stop offset="0" stopColor="#ffe28a" />
-                <stop offset=".6" stopColor="#d4891a" />
-                <stop offset="1" stopColor="#7a4400" />
-              </linearGradient>
-            </defs>
-            {/* Head */}
-            <circle cx="20" cy="10" r="8" fill="url(#figL)" />
-            {/* Torso */}
-            <path d="M12 18 Q8 18 6 22 L6 50 Q10 55 14 50 L16 36 Q18 34 20 38 L22 36 Q24 34 26 36 L28 50 Q30 55 34 50 L34 22 Q32 18 28 18 Z" fill="url(#figL)" />
-            {/* Left arm (up lifting) */}
-            <path d="M8 22 Q2 16 4 8 Q5 6 8 8 Q10 14 12 20" fill="url(#figL)" />
-            {/* Right arm (up lifting) */}
-            <path d="M32 22 Q38 16 36 8 Q35 6 32 8 Q30 14 28 20" fill="url(#figL)" />
-            {/* Legs */}
-            <path d="M14 50 L10 94 L16 94 L18 56 Z" fill="url(#figL)" />
-            <path d="M26 50 L30 94 L24 94 L22 56 Z" fill="url(#figL)" />
-            {/* Leaf crown */}
-            <path d="M12 4 Q16 0 20 3 Q24 0 28 4" fill="#007A45" opacity="0.35" />
-          </svg>
-
-          {/* Center trophy */}
-          <div className="wcm-trophy-center">
-            <svg viewBox="0 0 80 90" width="72" height="81" fill="none">
-              <defs>
-                <linearGradient id="trophyBody" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0" stopColor="#fff7cc" />
-                  <stop offset=".35" stopColor="#ffdb5c" />
-                  <stop offset=".7" stopColor="#e8a317" />
-                  <stop offset="1" stopColor="#8b5e00" />
-                </linearGradient>
-                <linearGradient id="trophyBase" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0" stopColor="#c4861a" />
-                  <stop offset="1" stopColor="#5c3700" />
-                </linearGradient>
-              </defs>
-              {/* Handles */}
-              <path d="M6 28 Q-4 40 6 56" stroke="url(#trophyBody)" strokeWidth="5" strokeLinecap="round" fill="none" />
-              <path d="M74 28 Q84 40 74 56" stroke="url(#trophyBody)" strokeWidth="5" strokeLinecap="round" fill="none" />
-              {/* Cup body */}
-              <path d="M12 20 H68 V44 Q68 60 54 68 H26 Q12 60 12 44 Z" fill="url(#trophyBody)" />
-              {/* Rim */}
-              <ellipse cx="40" cy="20" rx="30" ry="6" fill="#fff7cc" />
-              <ellipse cx="40" cy="20" rx="28" ry="4.5" fill="#ffe066" />
-              {/* BetXentra shield mark on cup */}
-              <g transform="translate(28,28) scale(0.36)">
-                <path d="M32 6L54 16L54 36C54 50 32 60 32 60C32 60 10 50 10 36L10 16Z" fill="#1a0e00" fillOpacity="0.35"/>
-                <path d="M22 22L22 43L33 43C38 43 42 40 42 35.5C42 33 40.5 31 38.5 30C40 29 41 27.5 41 25.5C41 23 38 22 34 22ZM26.5 26L33 26C35.5 26 37 27 37 29C37 31 35.5 32 33 32L26.5 32ZM26.5 35.5L33.5 35.5C36.5 35.5 37.5 37 37.5 39C37.5 41 35.5 39.5 33.5 39.5L26.5 39.5Z" fill="#1a0e00" fillOpacity="0.55"/>
-              </g>
-              {/* Highlight */}
-              <ellipse cx="34" cy="32" rx="10" ry="16" fill="white" opacity="0.12" />
-              {/* Stem */}
-              <rect x="34" y="68" width="12" height="8" rx="2" fill="url(#trophyBase)" />
-              {/* Foot */}
-              <path d="M22 76 H58 A6 6 0 0 1 64 82 L64 82 A4 4 0 0 1 60 86 H20 A4 4 0 0 1 16 82 L16 82 A6 6 0 0 1 22 76 Z" fill="url(#trophyBase)" />
-            </svg>
-          </div>
-
-          {/* Right figure */}
-          <svg className="wcm-figure wcm-figure-right" viewBox="0 0 40 100" width="36" height="90" fill="none">
-            <defs>
-              <linearGradient id="figR" x1="0" y1="0" x2="1" y2="1">
-                <stop offset="0" stopColor="#ffe28a" />
-                <stop offset=".6" stopColor="#d4891a" />
-                <stop offset="1" stopColor="#7a4400" />
-              </linearGradient>
-            </defs>
-            {/* Head */}
-            <circle cx="20" cy="10" r="8" fill="url(#figR)" />
-            {/* Torso */}
-            <path d="M12 18 Q8 18 6 22 L6 50 Q10 55 14 50 L16 36 Q18 34 20 38 L22 36 Q24 34 26 36 L28 50 Q30 55 34 50 L34 22 Q32 18 28 18 Z" fill="url(#figR)" />
-            {/* Left arm (up lifting) */}
-            <path d="M8 22 Q2 16 4 8 Q5 6 8 8 Q10 14 12 20" fill="url(#figR)" />
-            {/* Right arm (up lifting) */}
-            <path d="M32 22 Q38 16 36 8 Q35 6 32 8 Q30 14 28 20" fill="url(#figR)" />
-            {/* Legs */}
-            <path d="M14 50 L10 94 L16 94 L18 56 Z" fill="url(#figR)" />
-            <path d="M26 50 L30 94 L24 94 L22 56 Z" fill="url(#figR)" />
-            {/* Leaf crown */}
-            <path d="M12 4 Q16 0 20 3 Q24 0 28 4" fill="#007A45" opacity="0.35" />
-          </svg>
-        </motion.div>
+        />
 
         <Sparkles />
       </div>
@@ -331,6 +249,9 @@ export default function WinCelebrationModal({
 
             <MarketTags markets={markets} />
 
+            {/* Brand wordmark */}
+            <div className="wcm-brand">Bet<em>X</em>entra</div>
+
             {/* Action buttons */}
             <div className="wcm-actions">
               <motion.button
@@ -439,11 +360,11 @@ const STYLES = `
 }
 .wcm-trophy-arena {
   position: relative;
-  width: 180px;
-  height: 120px;
+  width: 220px;
+  height: 200px;
   display: flex;
   justify-content: center;
-  align-items: flex-end;
+  align-items: center;
 }
 .wcm-trophy-glow {
   position: absolute;
@@ -456,28 +377,15 @@ const STYLES = `
   background: radial-gradient(circle, rgba(255, 215, 100, 0.35) 0%, rgba(255, 215, 100, 0) 70%);
   pointer-events: none;
 }
-.wcm-trophy-group {
-  display: flex;
-  align-items: flex-end;
-  gap: 0;
+.wcm-trophy-img {
   position: relative;
   z-index: 2;
-}
-.wcm-trophy-center {
-  position: relative;
-  z-index: 2;
-  margin-bottom: -4px;
-}
-.wcm-figure {
-  flex-shrink: 0;
-}
-.wcm-figure-left {
-  margin-right: -6px;
-  margin-bottom: -2px;
-}
-.wcm-figure-right {
-  margin-left: -6px;
-  margin-bottom: -2px;
+  width: 220px;
+  height: auto;
+  display: block;
+  margin: 0;
+  border: none;
+  background: none;
 }
 
 /* ── Sparkles layer ── */
@@ -569,6 +477,19 @@ const STYLES = `
   letter-spacing: 0.02em;
 }
 
+/* ── Brand wordmark ── */
+.wcm-brand {
+  margin: 14px 0 2px;
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: #ffffff;
+}
+.wcm-brand em {
+  font-style: normal;
+  color: #26d97a;
+}
+
 /* ── Action buttons ── */
 .wcm-actions {
   display: flex;
@@ -613,16 +534,11 @@ const STYLES = `
     border-radius: 22px;
   }
   .wcm-trophy-arena {
-    width: 150px;
-    height: 100px;
+    width: 180px;
+    height: 160px;
   }
-  .wcm-figure {
-    width: 28px;
-    height: 70px;
-  }
-  .wcm-trophy-center svg {
-    width: 56px;
-    height: 63px;
+  .wcm-trophy-img {
+    width: 160px;
   }
   .wcm-actions {
     flex-direction: column;
