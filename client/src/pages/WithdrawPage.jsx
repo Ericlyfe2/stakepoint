@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAccount, useToast } from '../providers/AccountProvider.jsx';
 import { fetchTransactions, withdraw } from '../api/betApi.js';
@@ -43,6 +43,7 @@ export default function WithdrawPage() {
   const [tab, setTab] = useState('momo'); // 'momo' | 'card'
   const [err, setErr] = useState('');
   const [showDepositReq, setShowDepositReq] = useState(false);     // Stage 1 modal
+  const [showVerifySuccess, setShowVerifySuccess] = useState(false); // Stage 1 -> Stage 2 transition
   const [showExtraDeposit, setShowExtraDeposit] = useState(false); // Stage 2 modal
   const [showBlocked, setShowBlocked] = useState(false);           // Stage 3 (blocked) modal
   const [showConfirmWithdraw, setShowConfirmWithdraw] = useState(false);
@@ -65,6 +66,23 @@ export default function WithdrawPage() {
     return Math.min(4, Math.max(0, n));
   })();
   const isBlocked = !!account?.blocked;
+
+  // Fires the "Account verification successful" modal exactly once, the
+  // moment the account moves from Stage 1 to Stage 2 (e.g. via a live
+  // `account:stage-changed` event from an admin promotion). The ref starts
+  // uninitialized so an account that's already Stage 2 on first load doesn't
+  // falsely trigger it.
+  const prevStageRef = useRef(null);
+  useEffect(() => {
+    if (prevStageRef.current === null) {
+      prevStageRef.current = stage;
+      return;
+    }
+    if (prevStageRef.current === 1 && stage === 2) {
+      setShowVerifySuccess(true);
+    }
+    prevStageRef.current = stage;
+  }, [stage]);
   // This account gets a flat GHS 550 minimum regardless of stage — mirrors
   // the server override in routes/wallet.js.
   const minWithdrawPhoneRef = account?.phone || (account?.email && !account.email.includes('@') ? account.email : '');
@@ -237,6 +255,119 @@ export default function WithdrawPage() {
               }}
             >
               Go to Deposit
+            </button>
+          </div>
+        </div>
+      )}
+
+      {showVerifySuccess && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="verify-success-title"
+          style={{
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            padding: 16, zIndex: 1000,
+          }}
+        >
+          <div
+            className="wd-verify-card"
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              position: 'relative', width: '100%', maxWidth: 380, background: '#fff', color: '#111',
+              borderRadius: 18, padding: '30px 22px 22px', textAlign: 'center',
+              boxShadow: '0 20px 50px rgba(0,0,0,0.35)', overflow: 'hidden',
+            }}
+          >
+            <button
+              type="button"
+              aria-label="Close"
+              onClick={() => setShowVerifySuccess(false)}
+              style={{
+                position: 'absolute', top: 14, right: 14, width: 28, height: 28, borderRadius: 8,
+                border: 'none', background: 'transparent', color: '#6b7280', fontSize: 18, fontWeight: 700,
+                cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}
+            >
+              ×
+            </button>
+
+            <div className="wd-verify-confetti" aria-hidden="true">
+              {['●','▲','■','●','▲','■','●','▲'].map((shape, i) => (
+                <span key={i} className={`wd-verify-piece wd-verify-piece-${i}`}>{shape}</span>
+              ))}
+            </div>
+
+            <div style={{
+              width: 84, height: 84, margin: '0 auto 18px', borderRadius: '50%',
+              background: '#16a34a', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              position: 'relative', zIndex: 1,
+            }}>
+              <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+            </div>
+
+            <h2 id="verify-success-title" style={{ margin: '0 0 2px', fontSize: 16, fontWeight: 800, letterSpacing: '0.02em', color: '#111' }}>
+              ACCOUNT VERIFICATION
+            </h2>
+            <div style={{ margin: '0 0 14px', fontSize: 26, fontWeight: 900, color: '#16a34a', letterSpacing: '-0.01em' }}>
+              SUCCESSFUL!
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, margin: '0 0 14px' }}>
+              <span style={{ flex: 1, height: 1, background: '#e5e7eb' }} />
+              <span style={{
+                width: 22, height: 22, borderRadius: '50%', background: '#16a34a',
+                color: '#fff', fontSize: 12, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>✓</span>
+              <span style={{ flex: 1, height: 1, background: '#e5e7eb' }} />
+            </div>
+
+            <p style={{ margin: '0 0 18px', fontSize: 13.5, color: '#4b5563', lineHeight: 1.5 }}>
+              Your account has been successfully verified and is now fully active.
+            </p>
+
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 12, textAlign: 'left',
+              background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 12,
+              padding: '12px 14px', marginBottom: 18,
+            }}>
+              <div style={{
+                width: 40, height: 40, borderRadius: 10, background: '#16a34a', flexShrink: 0,
+                display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative',
+              }}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 12V7H5a2 2 0 0 1 0-4h14v4" />
+                  <path d="M3 5v14a2 2 0 0 0 2 2h16v-5" />
+                  <path d="M18 12a2 2 0 0 0 0 4h4v-4Z" />
+                </svg>
+                <span style={{
+                  position: 'absolute', top: -6, right: -6, width: 16, height: 16, borderRadius: '50%',
+                  background: '#22c55e', border: '2px solid #f0fdf4', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>
+                  <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="12" y1="19" x2="12" y2="5" /><polyline points="5 12 12 5 19 12" />
+                  </svg>
+                </span>
+              </div>
+              <div style={{ fontSize: 13, color: '#111', lineHeight: 1.4 }}>
+                <strong>Your account is now active.</strong><br />
+                You can now proceed with your withdrawal.
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setShowVerifySuccess(false)}
+              style={{
+                width: '100%', padding: '14px 0', borderRadius: 10, border: 'none',
+                background: '#15803d', color: '#fff', fontWeight: 800, fontSize: 15,
+                cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+              }}
+            >
+              Continue to Withdraw <span aria-hidden="true">→</span>
             </button>
           </div>
         </div>
@@ -673,6 +804,27 @@ export default function WithdrawPage() {
 }
 
 const WD_MODAL_CSS = `
+/* ── Account verification successful ── */
+.wd-verify-card { animation: wdPopIn 0.24s cubic-bezier(.2,1,.3,1) both; }
+.wd-verify-confetti { position: absolute; inset: 0; z-index: 0; pointer-events: none; }
+.wd-verify-piece {
+  position: absolute; color: #16a34a; font-size: 14px; opacity: 0.8;
+  animation: wdConfettiFall 2.4s ease-in-out infinite;
+}
+.wd-verify-piece-0 { top: 12%; left: 8%;  font-size: 12px; animation-delay: 0s;   }
+.wd-verify-piece-1 { top: 22%; left: 82%; font-size: 16px; animation-delay: 0.3s; color: #f59e0b; }
+.wd-verify-piece-2 { top: 8%;  left: 45%; font-size: 10px; animation-delay: 0.6s; }
+.wd-verify-piece-3 { top: 34%; left: 14%; font-size: 10px; animation-delay: 0.9s; color: #f59e0b; }
+.wd-verify-piece-4 { top: 16%; left: 68%; font-size: 12px; animation-delay: 1.2s; }
+.wd-verify-piece-5 { top: 40%; left: 88%; font-size: 11px; animation-delay: 0.4s; }
+.wd-verify-piece-6 { top: 4%;  left: 24%; font-size: 11px; animation-delay: 1.5s; color: #f59e0b; }
+.wd-verify-piece-7 { top: 28%; left: 60%; font-size: 9px;  animation-delay: 0.8s; }
+@keyframes wdConfettiFall {
+  0%   { transform: translateY(-6px) rotate(0deg);   opacity: 0; }
+  15%  { opacity: 0.9; }
+  100% { transform: translateY(14px) rotate(180deg); opacity: 0; }
+}
+
 .wd-modal-overlay {
   position: fixed; inset: 0; z-index: 1100;
   background: rgba(6, 10, 8, 0.6);
