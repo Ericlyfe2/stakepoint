@@ -155,10 +155,31 @@ export function gradeBet(bet) {
   return { status, legResults };
 }
 
-export async function settleNow() {
+// settleNow() can be triggered from three places (the periodic timer, a
+// manual admin result post, and a manual admin "settle now" button) that can
+// overlap in time. Two overlapping calls would both snapshot the same open
+// bets before either finished crediting the first one, double-paying it.
+// This lock forces overlapping calls to run strictly one after another, and
+// a per-bet re-check (bet.status is re-read from the store, not the stale
+// snapshot, right before crediting) closes the same gap defensively.
+let settleChain = Promise.resolve({ settledWins: 0, settledLoss: 0, settledVoid: 0 });
+
+export function settleNow() {
+  const run = settleChain.then(() => settleNowUnlocked());
+  // Swallow rejections in the chain itself so one failed run doesn't wedge
+  // every subsequent caller; callers still see their own run's rejection.
+  settleChain = run.catch(() => {});
+  return run;
+}
+
+async function settleNowUnlocked() {
   const open = Object.values(betsStore.all() || {}).filter((b) => b.status === 'open');
   let settledWins = 0, settledLoss = 0, settledVoid = 0;
-  for (const bet of open) {
+  for (const bet0 of open) {
+    // Re-read from the store: another settle pass earlier in this same
+    // chain (or, pre-fix, an overlapping one) may have already settled it.
+    const bet = betsStore.get(bet0.id);
+    if (!bet || bet.status !== 'open') continue;
     const graded = gradeBet(bet);
     if (!graded) continue;
     const { status, legResults } = graded;
