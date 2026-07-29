@@ -64,7 +64,7 @@ export function Drawer({ open, title, onClose, children, footer, width }) {
           <button className="adm-icon-btn" onClick={onClose} aria-label="Close"><IconClose /></button>
         </header>
         <div className="adm-drawer-body">{children}</div>
-        {footer && <div style={{ padding: 16, borderTop: '1px solid var(--border)', display: 'flex', gap: 8, justifyContent: 'flex-end' }}>{footer}</div>}
+        {footer && <div style={{ padding: 16, borderTop: '1px solid var(--border)', display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>{footer}</div>}
       </aside>
     </div>
   );
