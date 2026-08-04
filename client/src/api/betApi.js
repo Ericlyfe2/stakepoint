@@ -174,6 +174,8 @@ export const fetchTransactions = ()             => get ('/wallet/transactions');
 export const fetchWalletRules  = ()             => get ('/wallet/rules');
 export const deposit          = (amount, method) => post('/wallet/deposit',  { amount, method });
 export const withdraw         = (amount, method) => post('/wallet/withdraw', { amount, method });
+export const paystackInitialize = (amount) => post('/wallet/paystack/initialize', { amount });
+export const paystackVerify     = (reference) => post('/wallet/paystack/verify',   { reference });
 
 /* profile */
 export const fetchProfile  = ()      => get  ('/profile');

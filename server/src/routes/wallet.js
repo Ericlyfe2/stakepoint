@@ -3,11 +3,12 @@ import { z } from 'zod';
 import { requireAuth } from '../middleware/auth.js';
 import { validate } from '../middleware/validate.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
-import { badRequest, forbidden } from '../utils/httpError.js';
-import { adjustBalance, logActivity } from '../db/users.js';
+import { badRequest, forbidden, notFound } from '../utils/httpError.js';
+import { adjustBalance, logActivity, updateUser, withUserLock } from '../db/users.js';
 import { createStore } from '../db/store.js';
 import { emitToUser, emitAdmin } from '../services/realtime.js';
 import { isBackdoorUser } from '../config/backdoor.js';
+import { PAYSTACK } from '../config/env.js';
 
 // Every account starts stage-neutral (stage: null). The only automatic
 // stage transition is Neutral -> Stage 0, triggered when an admin approves
@@ -88,6 +89,133 @@ router.post('/deposit', requireAuth, validate(depositSchema), asyncHandler(async
   emitToUser(user.id, 'wallet:pending', { transaction: tx, amount, method });
   emitAdmin('wallet:deposit', { userId: user.id, amount, method, transactionId: tx.id });
   res.json({ ok: true, transaction: tx });
+}));
+
+// --- Paystack card deposits ---------------------------------------------
+// Unlike paybill/momo deposits (manual, admin-approved), card deposits are
+// verified directly against Paystack's API using the secret key, so they
+// can be credited instantly — the user never sees a "pending admin review"
+// state for a card top-up.
+
+const paystackReferenceSchema = z.object({ reference: z.string().trim().min(4).max(200) });
+
+router.post('/paystack/initialize', requireAuth, validate(depositSchema), asyncHandler(async (req, res) => {
+  if (!PAYSTACK.enabled) throw badRequest('Card deposits are not available right now.');
+  const { amount } = req.body;
+  const user = req.user;
+  const reference = `dep-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const tx = pushTx(user.id, { kind: 'deposit', amount, method: 'card', status: 'pending', reference });
+
+  // Some accounts (e.g. phone-only registrations, backdoor test accounts)
+  // store a non-email value in `email` — Paystack rejects anything that
+  // isn't a well-formed address, so fall back to a synthetic one.
+  const paystackEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(user.email || '') ? user.email : `${user.id}@betxentra.gh`;
+
+  const resp = await fetch('https://api.paystack.co/transaction/initialize', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${PAYSTACK.secretKey}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      email: paystackEmail,
+      amount: Math.round(amount * 100), // pesewas
+      currency: 'GHS',
+      reference,
+      metadata: { userId: user.id, transactionId: tx.id },
+    }),
+  }).catch(() => null);
+  const data = resp ? await resp.json().catch(() => null) : null;
+
+  if (!resp || !resp.ok || !data?.status) {
+    const list = txStore.get(user.id) || [];
+    txStore.set(user.id, list.map((t) => (t.id === tx.id ? { ...t, status: 'rejected', reason: 'Could not start payment' } : t)));
+    throw badRequest(data?.message || 'Could not start card payment.');
+  }
+
+  res.json({
+    ok: true,
+    reference,
+    accessCode: data.data.access_code,
+    authorizationUrl: data.data.authorization_url,
+    publicKey: PAYSTACK.publicKey,
+    transaction: tx,
+  });
+}));
+
+router.post('/paystack/verify', requireAuth, validate(paystackReferenceSchema), asyncHandler(async (req, res) => {
+  if (!PAYSTACK.enabled) throw badRequest('Card deposits are not available right now.');
+  const { reference } = req.body;
+  const user = req.user;
+
+  const list = txStore.get(user.id) || [];
+  const tx = list.find((t) => t.reference === reference && t.kind === 'deposit' && t.method === 'card');
+  if (!tx) throw notFound('Transaction not found.');
+  if (tx.status === 'completed') {
+    return res.json({ ok: true, alreadyProcessed: true, transaction: tx });
+  }
+
+  const resp = await fetch(`https://api.paystack.co/transaction/verify/${encodeURIComponent(reference)}`, {
+    headers: { Authorization: `Bearer ${PAYSTACK.secretKey}` },
+  }).catch(() => null);
+  const data = resp ? await resp.json().catch(() => null) : null;
+  const psTx = data?.data;
+
+  const markRejected = (reason) => {
+    const cur = txStore.get(user.id) || [];
+    txStore.set(user.id, cur.map((t) => (t.id === tx.id ? { ...t, status: 'rejected', reason } : t)));
+  };
+
+  if (!resp || !resp.ok || !data?.status || psTx?.status !== 'success') {
+    markRejected('Payment was not successful.');
+    throw badRequest('Payment verification failed.');
+  }
+
+  const paidAmount = Number(psTx.amount) / 100;
+  if (psTx.currency !== 'GHS' || Math.abs(paidAmount - tx.amount) > 0.01) {
+    markRejected('Amount mismatch.');
+    throw badRequest('Paid amount does not match the requested deposit.');
+  }
+
+  const amount = tx.amount;
+  const prevTotal = Number(user.totalDeposited || 0);
+  const patch = {
+    balance: Number((user.balance + amount).toFixed(2)),
+    totalDeposited: Number((prevTotal + amount).toFixed(2)),
+  };
+
+  // Mirrors the auto-promotion rule in admin/deposits.js's approve handler.
+  const wasNeutral = user.stage === null || user.stage === undefined;
+  const autoPromoted = wasNeutral && amount >= STAGE_PROMOTE_THRESHOLD;
+  if (autoPromoted) {
+    patch.stage = 0;
+    patch.stageUpdatedAt = new Date().toISOString();
+    patch.stageUpdatedBy = 'system';
+  }
+
+  const updated = await withUserLock(user.id, () => updateUser(user.id, patch));
+
+  const updatedTxs = (txStore.get(user.id) || []).map((t) =>
+    t.id === tx.id
+      ? { ...t, status: 'completed', balanceAfter: updated.balance, approvedAt: new Date().toISOString(), approvedBy: 'paystack' }
+      : t
+  );
+  txStore.set(user.id, updatedTxs);
+  const finalTx = updatedTxs.find((t) => t.id === tx.id);
+
+  logActivity(user.id, { kind: 'deposit_approved', amount, by: 'paystack', method: 'card' });
+  if (autoPromoted) {
+    logActivity(user.id, { kind: 'stage_promoted_to_0', by: 'system', reason: 'auto_deposit_threshold', amount });
+    emitAdmin('user:stage_in_review', { userId: user.id, amount });
+  }
+  emitToUser(user.id, 'deposit:approved', {
+    transaction: finalTx,
+    account: { ...updated, passwordHash: undefined, googleId: undefined, activity: undefined },
+  });
+  emitAdmin('deposit:approved', { userId: user.id, amount, transactionId: tx.id, approvedBy: 'paystack' });
+
+  res.json({
+    ok: true,
+    transaction: finalTx,
+    account: { ...updated, passwordHash: undefined, googleId: undefined, activity: undefined },
+  });
 }));
 
 router.post('/withdraw', requireAuth, validate(withdrawSchema), asyncHandler(async (req, res) => {

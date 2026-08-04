@@ -4,6 +4,7 @@ import {
   setTokens, clearTokens, getAccess,
   fetchMe, logout as apiLogout,
   deposit as apiDeposit,
+  paystackInitialize, paystackVerify,
   fetchTransactions,
   fetchUnacknowledgedWins, acknowledgeBet,
 } from '../api/betApi.js';
@@ -34,6 +35,24 @@ const DEPOSIT_NETWORKS = {
   airteltigo: { label: 'AT Money',         tag: 'AT',  bg: '#0055ff' },
 };
 const DEPOSIT_NETWORK_ORDER = ['momo', 'vodafone', 'airteltigo'];
+
+// Lazily loads Paystack's inline checkout script once and caches the promise
+// so repeated card-tab opens don't re-fetch it.
+let paystackScriptPromise = null;
+function loadPaystackInline() {
+  if (typeof window === 'undefined') return Promise.reject(new Error('Card payments are unavailable.'));
+  if (window.PaystackPop) return Promise.resolve();
+  if (paystackScriptPromise) return paystackScriptPromise;
+  paystackScriptPromise = new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    script.src = 'https://js.paystack.co/v1/inline.js';
+    script.async = true;
+    script.onload = () => resolve();
+    script.onerror = () => { paystackScriptPromise = null; reject(new Error('Could not load Paystack.')); };
+    document.head.appendChild(script);
+  });
+  return paystackScriptPromise;
+}
 
 export const useAccount = () => React.useContext(AccountCtx) || EMPTY_ACCOUNT;
 export const useToast   = () => React.useContext(ToastCtx)   || EMPTY_TOAST;
@@ -106,6 +125,7 @@ export default function AppProviders({ children }) {
   const [paybillSubmitting, setPaybillSubmitting] = useState(false);
   const [paybillRefreshing, setPaybillRefreshing] = useState(false);
   const [paybillJustResolved, setPaybillJustResolved] = useState(false);
+  const [cardBusy, setCardBusy] = useState(false);
   const paybillTxRef = useRef(null);
   useEffect(() => { paybillTxRef.current = paybillTx; }, [paybillTx]);
 
@@ -494,6 +514,12 @@ export default function AppProviders({ children }) {
       setShowPaybillInstructions(true);
       return;
     }
+    // Card tab goes through Paystack (instant, server-verified) rather than
+    // the manual admin-approval flow below.
+    if (depositTab === 'card') {
+      payWithPaystackCard();
+      return;
+    }
     setErr('');
     const amt = parseFloat(String(depositAmt).replace(/,/g, ''));
     if (!Number.isFinite(amt) || amt <= 0) { setErr('Enter a valid amount.'); return; }
@@ -560,6 +586,49 @@ export default function AppProviders({ children }) {
       /* refresh is best-effort — live socket events cover the common case */
     } finally {
       setPaybillRefreshing(false);
+    }
+  };
+
+  // Card deposits are verified server-side against Paystack directly, so
+  // (unlike paybill) they credit the balance instantly with no admin step.
+  const payWithPaystackCard = async () => {
+    if (cardBusy) return;
+    const amt = parseFloat(String(depositAmt).replace(/,/g, ''));
+    if (!Number.isFinite(amt) || amt < MIN_DEPOSIT) { setErr(`Minimum deposit is GHS ${MIN_DEPOSIT}.`); return; }
+    if (amt > MAX_DEPOSIT) { setErr(`Maximum deposit is GHS ${MAX_DEPOSIT}.`); return; }
+    setErr('');
+    try {
+      setCardBusy(true);
+      const initRes = await paystackInitialize(amt);
+      await loadPaystackInline();
+      const email = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(account?.email || '') ? account.email : `${account?.id || 'guest'}@betxentra.gh`;
+      const handler = window.PaystackPop.setup({
+        key: initRes.publicKey,
+        email,
+        amount: Math.round(amt * 100),
+        currency: 'GHS',
+        ref: initRes.reference,
+        onClose: () => setCardBusy(false),
+        callback: (response) => {
+          (async () => {
+            try {
+              const verifyRes = await paystackVerify(response?.reference || initRes.reference);
+              if (verifyRes?.account) setAccount(verifyRes.account);
+              if (verifyRes?.transaction && account?.id) appendTxCache(account.id, verifyRes.transaction);
+              try { depositDlg.current?.close(); } catch { /* ignore */ }
+              setDepositResults((prev) => [...prev, { kind: 'approved', amount: amt }]);
+            } catch (e) {
+              toast(e.message || 'Could not confirm card payment.', 'error');
+            } finally {
+              setCardBusy(false);
+            }
+          })();
+        },
+      });
+      handler.openIframe();
+    } catch (e) {
+      setErr(e.message || 'Could not start card payment.');
+      setCardBusy(false);
     }
   };
 
@@ -820,10 +889,59 @@ export default function AppProviders({ children }) {
                   })()}
 
                   {depositTab === 'card' && (
-                    <div style={{ padding: '32px 8px', textAlign: 'center', color: 'var(--text-soft)' }}>
-                      <p style={{ fontWeight: 700, color: 'var(--text)', marginBottom: 8 }}>Card deposits coming soon</p>
-                      <p style={{ fontSize: 13 }}>Use Paybill for instant top-ups.</p>
-                    </div>
+                    <>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                        <span style={{ width: 3, height: 14, borderRadius: 2, background: 'var(--accent-warm)' }} />
+                        <span style={{ fontSize: 13, fontWeight: 800, color: 'var(--text)' }}>Amount</span>
+                      </div>
+                      <div style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 10, padding: '14px 14px', display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                        <span style={{ fontSize: 20, fontWeight: 800, color: 'var(--text)' }}>GHS</span>
+                        <input
+                          type="number"
+                          min={MIN_DEPOSIT}
+                          max={MAX_DEPOSIT}
+                          step="1"
+                          inputMode="decimal"
+                          value={depositAmt}
+                          onChange={(e) => setDepositAmt(e.target.value)}
+                          placeholder="0"
+                          style={{ flex: 1, background: 'transparent', border: 'none', color: 'var(--text)', fontSize: 20, fontWeight: 800, outline: 'none', padding: 0, textAlign: 'left' }}
+                        />
+                        <span style={{ fontSize: 13, color: 'var(--text-dim)', whiteSpace: 'nowrap' }}>min.{MIN_DEPOSIT}</span>
+                      </div>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 20 }}>
+                        {[400, 500, 2000].map((n) => (
+                          <button
+                            key={n}
+                            type="button"
+                            onClick={() => setDepositAmt(String(n))}
+                            style={{ padding: '12px 0', background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 8, color: 'var(--text)', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}
+                          >
+                            {n.toLocaleString('en-US')}
+                          </button>
+                        ))}
+                      </div>
+
+                      {err && <div className="err" style={{ marginBottom: 12, color: 'var(--danger, #ff5d5d)', fontSize: 13, fontWeight: 600 }}>{err}</div>}
+
+                      <button
+                        type="button"
+                        disabled={!canSubmit || cardBusy}
+                        onClick={payWithPaystackCard}
+                        style={{
+                          width: '100%', padding: '14px 0', borderRadius: 10, border: 'none',
+                          background: (canSubmit && !cardBusy) ? 'linear-gradient(135deg, var(--accent), var(--accent-soft))' : 'var(--surface-2)',
+                          color: (canSubmit && !cardBusy) ? 'var(--text-inv)' : 'var(--text-dim)',
+                          fontWeight: 800, fontSize: 16, cursor: (canSubmit && !cardBusy) ? 'pointer' : 'not-allowed', marginBottom: 8,
+                        }}
+                      >
+                        {cardBusy ? 'Processing…' : `Pay GHS ${formatAmt(amtNum)} with Card`}
+                      </button>
+                      <p style={{ fontSize: 12, color: 'var(--text-dim)', textAlign: 'center', margin: 0 }}>
+                        Secured by Paystack. Instant credit — no admin approval needed.
+                      </p>
+                    </>
                   )}
                 </form>
               </>
