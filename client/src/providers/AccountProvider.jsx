@@ -750,7 +750,7 @@ export default function AppProviders({ children }) {
                       type="button"
                       className="tx-tab"
                       aria-selected={depositTab === k}
-                      onClick={() => { setDepositTab(k); if (k !== 'paybill') setShowPaybillInstructions(false); }}
+                      onClick={() => { setDepositTab(k); setErr(''); if (k !== 'paybill') setShowPaybillInstructions(false); }}
                     >
                       {lbl}
                     </button>
