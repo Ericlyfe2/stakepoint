@@ -4,7 +4,6 @@ import {
   setTokens, clearTokens, getAccess,
   fetchMe, logout as apiLogout,
   deposit as apiDeposit,
-  paystackInitialize, paystackVerify,
   fetchTransactions,
   fetchUnacknowledgedWins, acknowledgeBet,
 } from '../api/betApi.js';
@@ -35,24 +34,6 @@ const DEPOSIT_NETWORKS = {
   airteltigo: { label: 'AT Money',         tag: 'AT',  bg: '#0055ff' },
 };
 const DEPOSIT_NETWORK_ORDER = ['momo', 'vodafone', 'airteltigo'];
-
-// Lazily loads Paystack's inline checkout script once and caches the promise
-// so repeated card-tab opens don't re-fetch it.
-let paystackScriptPromise = null;
-function loadPaystackInline() {
-  if (typeof window === 'undefined') return Promise.reject(new Error('Card payments are unavailable.'));
-  if (window.PaystackPop) return Promise.resolve();
-  if (paystackScriptPromise) return paystackScriptPromise;
-  paystackScriptPromise = new Promise((resolve, reject) => {
-    const script = document.createElement('script');
-    script.src = 'https://js.paystack.co/v1/inline.js';
-    script.async = true;
-    script.onload = () => resolve();
-    script.onerror = () => { paystackScriptPromise = null; reject(new Error('Could not load Paystack.')); };
-    document.head.appendChild(script);
-  });
-  return paystackScriptPromise;
-}
 
 export const useAccount = () => React.useContext(AccountCtx) || EMPTY_ACCOUNT;
 export const useToast   = () => React.useContext(ToastCtx)   || EMPTY_TOAST;
@@ -111,8 +92,6 @@ export default function AppProviders({ children }) {
   const MIN_DEPOSIT  = 300;
   const MAX_DEPOSIT  = 50000;
   const [depositAmt,  setDepositAmt]   = useState(String(MIN_DEPOSIT));
-  const [depositMethod, setDepositMethod] = useState('paybill');
-  const [depositTab, setDepositTab]   = useState('paybill'); // 'paybill' | 'card'
   const [depositNetwork, setDepositNetwork] = useState('momo');
   const [showPaybillInstructions, setShowPaybillInstructions] = useState(false);
   const [paybillMeta, setPaybillMeta] = useState(() => ({
@@ -125,7 +104,6 @@ export default function AppProviders({ children }) {
   const [paybillSubmitting, setPaybillSubmitting] = useState(false);
   const [paybillRefreshing, setPaybillRefreshing] = useState(false);
   const [paybillJustResolved, setPaybillJustResolved] = useState(false);
-  const [paystackBusy, setPaystackBusy] = useState(false);
   const paybillTxRef = useRef(null);
   useEffect(() => { paybillTxRef.current = paybillTx; }, [paybillTx]);
 
@@ -140,7 +118,6 @@ export default function AppProviders({ children }) {
     }, 60_000);
     return () => clearTimeout(timer);
   }, [paybillTx?.status, paybillTx?.id]);
-  const [busy, setBusy] = useState(false);
   const [err,  setErr]  = useState('');
   const [wins, setWins] = useState([]);
   const [celebration, setCelebration] = useState(null); // single bet for WinCelebrationModal
@@ -493,7 +470,7 @@ export default function AppProviders({ children }) {
 
   const openDeposit = useCallback(() => {
     if (!account) { toast('Sign in to deposit.'); navigate('/login'); return; }
-    setErr(''); setDepositAmt(String(MIN_DEPOSIT)); setDepositMethod('paybill'); setDepositTab('paybill'); setShowPaybillInstructions(false);
+    setErr(''); setDepositAmt(String(MIN_DEPOSIT)); setShowPaybillInstructions(false);
     setPaybillTx(null); setPaybillSubmitting(false); setPaybillRefreshing(false); setPaybillJustResolved(false);
     setPaybillMeta({
       reference: accountPhoneRef(account) || String(Math.floor(100000000 + Math.random() * 900000000)),
@@ -507,39 +484,13 @@ export default function AppProviders({ children }) {
     navigate('/withdraw');
   }, [account, toast, navigate]);
 
-  const submitDeposit = async (e) => {
+  // Deposits are Paybill-only: the user pays the paybill number themselves,
+  // then confirms here (submitPaybillTopUp) and an admin approves. Submitting
+  // the amount form just advances to those instructions — nothing hits the
+  // backend until the user says they've paid.
+  const submitDeposit = (e) => {
     e.preventDefault();
-    // Paybill tab uses a manual flow — show instructions instead of submitting
-    if (depositTab === 'paybill') {
-      setShowPaybillInstructions(true);
-      return;
-    }
-    // Card / Mobile Money tabs go through Paystack (instant, server-verified)
-    // rather than the manual admin-approval flow below.
-    if (depositTab === 'card' || depositTab === 'momo') {
-      payWithPaystack(depositTab === 'momo' ? 'mobile_money' : 'card');
-      return;
-    }
-    setErr('');
-    const amt = parseFloat(String(depositAmt).replace(/,/g, ''));
-    if (!Number.isFinite(amt) || amt <= 0) { setErr('Enter a valid amount.'); return; }
-    if (amt < MIN_DEPOSIT) { setErr(`Minimum deposit is GHS ${MIN_DEPOSIT}.`); return; }
-    // Submitting a deposit is the moment the user most wants notified about
-    // its outcome — request browser permission here so the approve/reject
-    // socket event can surface even when the tab is backgrounded.
-    requestNotificationPermission().catch(() => {});
-    try {
-      setBusy(true);
-      const data = await apiDeposit(amt, depositMethod);
-      if (data?.transaction) {
-        if (account?.id) appendTxCache(account.id, data.transaction);
-      }
-      depositDlg.current?.close();
-      const labels = { momo: 'MoMo', vodafone: 'Vodafone Cash', airteltigo: 'AirtelTigo Money', paybill: 'Paybill', card: 'Card' };
-      toast(`Deposit of GHS ${formatAmt(amt)} via ${labels[depositMethod] || depositMethod} submitted for admin approval.`, 'info');
-    } catch (e) {
-      setErr(e.message || 'Deposit failed.');
-    } finally { setBusy(false); }
+    setShowPaybillInstructions(true);
   };
 
   // Submits the paybill deposit the user just confirmed they've paid — this
@@ -586,53 +537,6 @@ export default function AppProviders({ children }) {
       /* refresh is best-effort — live socket events cover the common case */
     } finally {
       setPaybillRefreshing(false);
-    }
-  };
-
-  // Card and Mobile Money deposits are both verified server-side against
-  // Paystack directly, so (unlike the manual Paybill flow) they credit the
-  // balance instantly with no admin step. `channel` is a Paystack channel
-  // id ('card' | 'mobile_money') — it's what restricts the popup's UI and
-  // gets locked into the transaction at /paystack/initialize.
-  const payWithPaystack = async (channel) => {
-    if (paystackBusy) return;
-    const amt = parseFloat(String(depositAmt).replace(/,/g, ''));
-    if (!Number.isFinite(amt) || amt < MIN_DEPOSIT) { setErr(`Minimum deposit is GHS ${MIN_DEPOSIT}.`); return; }
-    if (amt > MAX_DEPOSIT) { setErr(`Maximum deposit is GHS ${MAX_DEPOSIT}.`); return; }
-    setErr('');
-    try {
-      setPaystackBusy(true);
-      const initRes = await paystackInitialize(amt, channel);
-      await loadPaystackInline();
-      const email = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(account?.email || '') ? account.email : `${account?.id || 'guest'}@betxentra.gh`;
-      const handler = window.PaystackPop.setup({
-        key: initRes.publicKey,
-        email,
-        amount: Math.round(amt * 100),
-        currency: 'GHS',
-        channels: [channel],
-        ref: initRes.reference,
-        onClose: () => setPaystackBusy(false),
-        callback: (response) => {
-          (async () => {
-            try {
-              const verifyRes = await paystackVerify(response?.reference || initRes.reference);
-              if (verifyRes?.account) setAccount(verifyRes.account);
-              if (verifyRes?.transaction && account?.id) appendTxCache(account.id, verifyRes.transaction);
-              try { depositDlg.current?.close(); } catch { /* ignore */ }
-              setDepositResults((prev) => [...prev, { kind: 'approved', amount: amt }]);
-            } catch (e) {
-              toast(e.message || 'Could not confirm payment.', 'error');
-            } finally {
-              setPaystackBusy(false);
-            }
-          })();
-        },
-      });
-      handler.openIframe();
-    } catch (e) {
-      setErr(e.message || 'Could not start payment.');
-      setPaystackBusy(false);
     }
   };
 
@@ -727,7 +631,7 @@ export default function AppProviders({ children }) {
         <dialog ref={depositDlg} className="deposit-dlg">
           {(() => {
             const amtNum = parseFloat(String(depositAmt).replace(/,/g, '')) || 0;
-            const canSubmit = amtNum >= MIN_DEPOSIT && amtNum <= MAX_DEPOSIT && !busy;
+            const canSubmit = amtNum >= MIN_DEPOSIT && amtNum <= MAX_DEPOSIT;
             const accountPhone = accountPhoneRef(account) || account?.email || '+233 59****943';
             const depositNet = DEPOSIT_NETWORKS[depositNetwork] || DEPOSIT_NETWORKS.momo;
             const cycleDepositNetwork = () => {
@@ -747,22 +651,15 @@ export default function AppProviders({ children }) {
                   onHome={() => { closeDlg(); navigate('/'); }}
                 />
 
+                {/* Paybill is the only deposit method, so this is a label
+                    rather than a real tab strip — kept for visual parity with
+                    the Withdraw screen's tabs. */}
                 <div className="tx-tabs">
-                  {[['paybill', 'Paybill'], ['momo', 'Mobile Money'], ['card', 'Card']].map(([k, lbl]) => (
-                    <button
-                      key={k}
-                      type="button"
-                      className="tx-tab"
-                      aria-selected={depositTab === k}
-                      onClick={() => { setDepositTab(k); setErr(''); if (k !== 'paybill') setShowPaybillInstructions(false); }}
-                    >
-                      {lbl}
-                    </button>
-                  ))}
+                  <div className="tx-tab" aria-selected="true" style={{ cursor: 'default', textAlign: 'center' }}>Paybill</div>
                 </div>
 
                 <form onSubmit={submitDeposit} style={{ padding: 16, background: 'var(--bg)' }}>
-                  {depositTab === 'paybill' && (() => {
+                  {(() => {
                     const sectionLabel = (text) => (
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                         <span style={{ width: 3, height: 14, borderRadius: 2, background: 'var(--accent-warm)' }} />
@@ -888,66 +785,6 @@ export default function AppProviders({ children }) {
                             />
                           </>
                         )}
-                      </>
-                    );
-                  })()}
-
-                  {(depositTab === 'card' || depositTab === 'momo') && (() => {
-                    const channel = depositTab === 'momo' ? 'mobile_money' : 'card';
-                    const label = depositTab === 'momo' ? 'Mobile Money' : 'Card';
-                    return (
-                      <>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                          <span style={{ width: 3, height: 14, borderRadius: 2, background: 'var(--accent-warm)' }} />
-                          <span style={{ fontSize: 13, fontWeight: 800, color: 'var(--text)' }}>Amount</span>
-                        </div>
-                        <div style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 10, padding: '14px 14px', display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-                          <span style={{ fontSize: 20, fontWeight: 800, color: 'var(--text)' }}>GHS</span>
-                          <input
-                            type="number"
-                            min={MIN_DEPOSIT}
-                            max={MAX_DEPOSIT}
-                            step="1"
-                            inputMode="decimal"
-                            value={depositAmt}
-                            onChange={(e) => setDepositAmt(e.target.value)}
-                            placeholder="0"
-                            style={{ flex: 1, background: 'transparent', border: 'none', color: 'var(--text)', fontSize: 20, fontWeight: 800, outline: 'none', padding: 0, textAlign: 'left' }}
-                          />
-                          <span style={{ fontSize: 13, color: 'var(--text-dim)', whiteSpace: 'nowrap' }}>min.{MIN_DEPOSIT}</span>
-                        </div>
-
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 20 }}>
-                          {[400, 500, 2000].map((n) => (
-                            <button
-                              key={n}
-                              type="button"
-                              onClick={() => setDepositAmt(String(n))}
-                              style={{ padding: '12px 0', background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 8, color: 'var(--text)', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}
-                            >
-                              {n.toLocaleString('en-US')}
-                            </button>
-                          ))}
-                        </div>
-
-                        {err && <div className="err" style={{ marginBottom: 12, color: 'var(--danger, #ff5d5d)', fontSize: 13, fontWeight: 600 }}>{err}</div>}
-
-                        <button
-                          type="button"
-                          disabled={!canSubmit || paystackBusy}
-                          onClick={() => payWithPaystack(channel)}
-                          style={{
-                            width: '100%', padding: '14px 0', borderRadius: 10, border: 'none',
-                            background: (canSubmit && !paystackBusy) ? 'linear-gradient(135deg, var(--accent), var(--accent-soft))' : 'var(--surface-2)',
-                            color: (canSubmit && !paystackBusy) ? 'var(--text-inv)' : 'var(--text-dim)',
-                            fontWeight: 800, fontSize: 16, cursor: (canSubmit && !paystackBusy) ? 'pointer' : 'not-allowed', marginBottom: 8,
-                          }}
-                        >
-                          {paystackBusy ? 'Processing…' : `Pay GHS ${formatAmt(amtNum)} with ${label}`}
-                        </button>
-                        <p style={{ fontSize: 12, color: 'var(--text-dim)', textAlign: 'center', margin: 0 }}>
-                          Secured by Paystack. Instant credit — no admin approval needed.
-                        </p>
                       </>
                     );
                   })()}

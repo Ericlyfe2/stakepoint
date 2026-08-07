@@ -45,12 +45,6 @@ export const RATE_LIMITS = {
 
 export const ODDS_API_KEY = env.ODDS_API_KEY || '';
 
-export const PAYSTACK = {
-  secretKey: env.PAYSTACK_SECRET_KEY || '',
-  publicKey: env.PAYSTACK_PUBLIC_KEY || '',
-  enabled: !!env.PAYSTACK_SECRET_KEY,
-};
-
 // Comma-separated list of allowed origins for CORS in production.
 // Example: "https://oddsify-client.vercel.app,https://www.example.com"
 // In development, localhost is always allowed.
@@ -127,7 +121,4 @@ if (!SMTP.enabled) {
 }
 if (!GOOGLE.enabled) {
   console.warn('[env] GOOGLE_CLIENT_ID not set — Google sign-in is disabled until you provide one.');
-}
-if (!PAYSTACK.enabled) {
-  console.warn('[env] PAYSTACK_SECRET_KEY not set — card deposits are disabled until you provide one.');
 }

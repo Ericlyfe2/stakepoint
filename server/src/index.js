@@ -17,7 +17,6 @@ import authRouter    from './routes/auth.js';
 import betRouter     from './routes/bet.js';
 import cashoutRouter from './routes/cashout.js';
 import walletRouter  from './routes/wallet.js';
-import paystackWebhookRouter from './routes/paystackWebhook.js';
 import profileRouter from './routes/profile.js';
 import supportRouter from './routes/support.js';
 import adminAuthRouter           from './routes/admin/auth.js';
@@ -85,10 +84,6 @@ app.use(cors({
   },
   credentials: true,
 }));
-// Mounted BEFORE express.json() so the handler sees the raw request body —
-// Paystack's x-paystack-signature is an HMAC over the exact raw bytes, and
-// a pre-parsed-then-reserialized JSON body would hash differently.
-app.use('/api/wallet/paystack/webhook', paystackWebhookRouter);
 app.use(express.json({ limit: '256kb' }));
 app.use(metricsMiddleware);
 app.use(generalLimiter);
