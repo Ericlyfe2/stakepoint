@@ -10,6 +10,7 @@ import { isProd, PORT, GOOGLE, SMTP, CORS_ORIGINS, CORS_ALLOW_VERCEL } from './c
 import { buildOriginAllowlist } from './utils/corsOrigin.js';
 import { generalLimiter } from './middleware/rateLimit.js';
 import { errorHandler, notFoundHandler } from './middleware/error.js';
+import { maintenanceGate } from './middleware/maintenance.js';
 import { log } from './utils/logger.js';
 import { metricsMiddleware } from './services/metrics.js';
 
@@ -114,6 +115,11 @@ app.get('/api/settings/public', (_req, res) => {
   const s = getSettings();
   res.json({ maintenance: s.maintenance, maintenanceMessage: s.maintenanceMessage, signupsOpen: s.signupsOpen, minDeposit: s.minDeposit, minWithdraw: s.minWithdraw });
 });
+
+// Maintenance gate. Mounted after /api/health and /api/settings/public are
+// declared and before every other route, but it also allowlists both by path
+// so the ordering here isn't load-bearing. Reads the flag per request.
+app.use(maintenanceGate);
 
 app.use('/api/auth',     authRouter);
 app.use('/api/bet',      betRouter);

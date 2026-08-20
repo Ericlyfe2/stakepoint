@@ -1,5 +1,6 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import AppProviders from './providers/AccountProvider.jsx';
+import MaintenanceGate from './providers/MaintenanceGate.jsx';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
 import ScrollRestoration from './components/ScrollRestoration.jsx';
 import NotFoundPage from './pages/NotFoundPage.jsx';
@@ -108,7 +109,10 @@ export default function App() {
       <ScrollRestoration />
       <Routes>
         <Route path="/admin/*" element={<AdminApp />} />
+        {/* The gate wraps only the player-facing branch — /admin/* above is
+            deliberately outside it so maintenance can always be turned off. */}
         <Route path="/*" element={
+          <MaintenanceGate>
           <AppProviders>
             <Routes>
               <Route path="/login"            element={<LoginPage />} />
@@ -143,6 +147,7 @@ export default function App() {
               </Route>
             </Routes>
           </AppProviders>
+          </MaintenanceGate>
         } />
       </Routes>
     </ErrorBoundary>
