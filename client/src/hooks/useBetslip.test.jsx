@@ -24,6 +24,10 @@ describe('useBetslip', () => {
   let hook;
 
   beforeEach(() => {
+    // useBetslip persists the slip to localStorage and rehydrates from it on
+    // mount, so without this each test would start with the previous test's
+    // selections, betMode and stakes already loaded.
+    localStorage.clear();
     hook = renderHook(() => useBetslip());
   });
 
