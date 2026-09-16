@@ -365,10 +365,15 @@ function TicketDetails({ bet, onClose, onRemix, onShare, onDelete }) {
               const odds = leg.odds ? `@${Number(leg.odds).toFixed(2)}` : '';
 
               // Only ever show a real actual-outcome from legsResolved (written by
-              // the settlement engine off a verified result) — never invent one.
-              const actualOutcome = (lost && bet.legsResolved?.[i]?.actualOutcome)
-                ? bet.legsResolved[i].actualOutcome
-                : pick;
+              // the settlement engine off a verified result) — never the bettor's
+              // own pick, which for a lost leg is exactly the wrong result. When
+              // the market has no single-token outcome (e.g. handicap markets),
+              // fall back to the real score line rather than the pick; only use
+              // the pick when the leg has no resolved data at all (e.g. pending).
+              const resolvedLeg = bet.legsResolved?.[i];
+              const actualOutcome = resolvedLeg?.actualOutcome
+                || (score ? score.replace(' : ', '-') : null)
+                || pick;
               const isPending = res === 'pending';
 
               return (

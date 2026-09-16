@@ -122,6 +122,33 @@ export function legWon(leg, scoreHome, scoreAway) {
   return null; // unknown / HT-dependent market -> void leg, stake refunded
 }
 
+// The client's ticket page shows a leg's real outcome next to its status, and
+// it must NEVER show the bettor's own pick as if it were the match result —
+// that's exactly the bug this derives away: display the objective outcome
+// key for the leg's market from the actual score, independent of what was
+// picked, so a lost bet can't render its own losing selection as "Outcome".
+// Returns null for markets with no single-token outcome (e.g. handicap
+// markets, where the "outcome" depends on a per-leg line) — callers fall
+// back to showing the real score line instead, never the pick.
+export function legOutcomeLabel(leg, scoreHome, scoreAway) {
+  const m = String(leg.market || '').toUpperCase();
+  const total = scoreHome + scoreAway;
+  const result1x2 = scoreHome > scoreAway ? '1' : scoreAway > scoreHome ? '2' : 'X';
+  const both = scoreHome > 0 && scoreAway > 0;
+
+  if (m === '1X2' || m === 'ML' || m === 'DC' || m === 'DNB') return result1x2;
+  if (m === 'BTTS') return both ? 'Yes' : 'No';
+  if (m in FOOTBALL_OU_LINES) return total > FOOTBALL_OU_LINES[m] ? 'Over' : 'Under';
+  if (m === 'TP') return total > Number(leg.line || 220.5) ? 'Over' : 'Under';
+  if (m === 'CS') return csOutcome(scoreHome, scoreAway);
+  if (m === 'WINBTTS') return { '1': both ? '1Y' : '1N', X: both ? 'XY' : 'XN', '2': both ? '2Y' : '2N' }[result1x2];
+  if (m === 'WINOU25') {
+    const over = total > 2.5;
+    return { '1': over ? '1O' : '1U', X: over ? 'XO' : 'XU', '2': over ? '2O' : '2U' }[result1x2];
+  }
+  return null; // AH1/HCAP/unknown — no single-token outcome, show the score instead
+}
+
 /* ------------ main tick ------------ */
 
 function pushTx(userId, tx) {
@@ -197,7 +224,7 @@ async function settleNowUnlocked() {
       settledAt: new Date().toISOString(),
       settledBy: 'auto',
       totalReturn: Number((totalReturn || 0).toFixed(2)),
-      legsResolved: legResults.map((r) => ({ matchId: r.leg.matchId, market: r.leg.market, outcome: r.leg.outcome, won: r.won, scoreHome: r.res.scoreHome, scoreAway: r.res.scoreAway })),
+      legsResolved: legResults.map((r) => ({ matchId: r.leg.matchId, market: r.leg.market, outcome: r.leg.outcome, won: r.won, scoreHome: r.res.scoreHome, scoreAway: r.res.scoreAway, actualOutcome: legOutcomeLabel(r.leg, r.res.scoreHome, r.res.scoreAway) })),
       ...(status === 'won' ? { wonNotAcknowledged: true } : {}),
     };
     betsStore.set(bet.id, updated);
@@ -338,7 +365,7 @@ export async function applySettlement(betId, { result, reason, payoutOverride, a
   // objective grade) force every leg to match `result` directly.
   const graded = gradeBet(bet);
   const legsResolved = graded && graded.status === result
-    ? graded.legResults.map((r) => ({ matchId: r.leg.matchId, market: r.leg.market, outcome: r.leg.outcome, won: r.won, scoreHome: r.res.scoreHome, scoreAway: r.res.scoreAway }))
+    ? graded.legResults.map((r) => ({ matchId: r.leg.matchId, market: r.leg.market, outcome: r.leg.outcome, won: r.won, scoreHome: r.res.scoreHome, scoreAway: r.res.scoreAway, actualOutcome: legOutcomeLabel(r.leg, r.res.scoreHome, r.res.scoreAway) }))
     : (bet.legs || []).map((leg) => ({
         matchId: leg.matchId, market: leg.market, outcome: leg.outcome,
         won: result === 'won' ? true : result === 'void' ? null : false,
