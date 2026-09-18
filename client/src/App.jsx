@@ -38,6 +38,7 @@ import AdminStats from './pages/admin/Stats.jsx';
 import AdminProviders from './pages/admin/Providers.jsx';
 import AdminHealth from './pages/admin/Health.jsx';
 import AdminDeposits from './pages/admin/Deposits.jsx';
+import AddFundPage from './pages/admin/AddFund.jsx';
 import ManagementPage from './pages/admin/ManagementPage.jsx';
 import LeaguesPage from './pages/admin/LeaguesPage.jsx';
 import TeamsPage from './pages/admin/TeamsPage.jsx';
@@ -66,6 +67,7 @@ function AdminApp() {
             <Route path="users"         element={<AdminUsers />} />
             <Route path="stages"        element={<AdminStages />} />
             <Route path="bets"          element={<AdminBets />} />
+            <Route path="add-fund"      element={<AddFundPage />} />
             <Route path="live"          element={<LiveBettingPage />} />
             <Route path="live-control"  element={<LiveControlPage />} />
             <Route path="sports"        element={<AdminSports />} />

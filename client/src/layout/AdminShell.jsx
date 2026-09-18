@@ -31,6 +31,7 @@ const NAV = [
     { to: '/admin/users', label: 'Users', icon: <IconUsers />, perm: 'users.view' },
     { to: '/admin/stages', label: 'Player stages', icon: <IconActivity />, perm: 'users.view' },
     { to: '/admin/bets', label: 'Bets', icon: <IconReceipt />, perm: 'bets.view' },
+    { to: '/admin/add-fund', label: 'Add Fund', icon: <IconCash />, perm: 'finance.adjustments' },
     { to: '/admin/finance', label: 'Finance', icon: <IconCash />, perm: 'finance.view' },
     { to: '/admin/deposits', label: 'Deposits', icon: <IconCash />, perm: 'finance.deposits.approve' },
     { to: '/admin/withdrawals', label: 'Withdrawals', icon: <IconSend />, perm: 'finance.withdrawals.approve' },
