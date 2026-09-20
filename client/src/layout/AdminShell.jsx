@@ -242,11 +242,8 @@ export default function AdminShell() {
 
 const ADMIN_ROLE_LABEL = {
   super_admin: 'Super Admin',
-  trader: 'Trader',
-  risk_manager: 'Risk Manager',
   finance_admin: 'Finance Admin',
-  compliance_officer: 'Compliance Officer',
-  support_agent: 'Support Agent',
-  marketing_manager: 'Marketing Manager',
-  readonly_auditor: 'Read-Only Auditor',
+  odds_manager: 'Odds Manager',
+  moderator: 'Moderator',
+  support: 'Support',
 };

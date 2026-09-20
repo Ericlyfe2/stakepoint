@@ -3,12 +3,17 @@ import bcrypt from 'bcrypt';
 import speakeasy from 'speakeasy';
 import qrcode from 'qrcode';
 import { z } from 'zod';
-import { requireAdmin, audit } from '../../middleware/adminAuth.js';
+import { requireAdmin, requireRole, audit } from '../../middleware/adminAuth.js';
 import { signAdminAccessToken, verifyAccessToken, issueRefreshToken, rotateRefreshToken, revokeRefreshToken, revokeAllForAccount } from '../../services/token.js';
-import { getAdminByEmail, getAdminById, verifyAdminPassword, recordAdminLogin, setAdminPassword } from '../../db/adminAccounts.js';
+import { getAdminByEmail, getAdminById, verifyAdminPassword, recordAdminLogin, setAdminPassword, createAdmin } from '../../db/adminAccounts.js';
+import {
+  ADMIN_INVITE_ROLES, listAdminInvites, createAdminInvite,
+  findInviteByToken, consumeInvite, revokeAdminInvite,
+} from '../../db/adminInvites.js';
 import { createStore } from '../../db/store.js';
 import { emitAdmin } from '../../services/realtime.js';
-import { badRequest, unauthorized, forbidden } from '../../utils/httpError.js';
+import { badRequest, unauthorized, forbidden, notFound, conflict } from '../../utils/httpError.js';
+import { passwordIssues } from '../../services/password.js';
 import { ROLE_PERMISSIONS } from '../../lib/permissions.js';
 
 const router = Router();
@@ -245,6 +250,124 @@ router.post('/change-password', requireAdmin, (req, res, next) => {
     revokeAllForAccount(req.admin.id);
     emitAdmin('admin:logout', { adminId: req.admin.id });
     res.json({ ok: true, message: 'Password changed. Please sign in again.' });
+  } catch (e) {
+    if (e instanceof z.ZodError) return next(badRequest('Invalid input', e.errors));
+    next(e);
+  }
+});
+
+/* ---------- Invite-only admin sign-up ----------
+ * A super admin issues a single-use, role-scoped invite link; the recipient
+ * consumes it at /admin/signup?token=... (client/src/pages/admin/AdminSignup.jsx)
+ * to set a password and create their own account. Preview + consume are
+ * intentionally public (no requireAdmin) — the token itself is the auth.
+ */
+
+function resolveSignupOrigin(req) {
+  // Prefer the browser's own Origin header (the admin SPA's real URL, dev or
+  // prod) so no extra env var is needed; fall back to the first configured
+  // CORS origin, then to this API's own host as a last resort.
+  return req.get('origin')
+    || (process.env.CORS_ORIGIN || '').split(',').map((s) => s.trim()).filter(Boolean)[0]
+    || `${req.protocol}://${req.get('host')}`;
+}
+
+router.get('/invites', requireAdmin, requireRole(), (req, res) => {
+  res.json({ invites: listAdminInvites() });
+});
+
+const createInviteSchema = z.object({
+  email: z.string().email(),
+  adminRole: z.enum(ADMIN_INVITE_ROLES),
+  displayName: z.string().trim().max(60).optional(),
+  ttlDays: z.number().min(1).max(30).optional(),
+});
+
+router.post('/invites', requireAdmin, requireRole(), (req, res, next) => {
+  try {
+    const { email, adminRole, displayName, ttlDays } = createInviteSchema.parse(req.body);
+    if (getAdminByEmail(email)) return next(conflict('An admin with this email already exists.'));
+    const { invite, token } = createAdminInvite({
+      email, adminRole, displayName,
+      createdBy: req.admin.id,
+      ttlMs: ttlDays ? ttlDays * 24 * 60 * 60 * 1000 : undefined,
+    });
+    const signupUrl = `${resolveSignupOrigin(req)}/admin/signup?token=${encodeURIComponent(token)}`;
+    audit(req, { action: 'admin.invite.create', severity: 'warning', target: invite.id, targetType: 'admin_invite', meta: { email, adminRole } });
+    res.status(201).json({ invite, token, signupUrl });
+  } catch (e) {
+    if (e instanceof z.ZodError) return next(badRequest('Invalid input', e.errors));
+    next(e);
+  }
+});
+
+router.delete('/invites/:id', requireAdmin, requireRole(), (req, res, next) => {
+  const revoked = revokeAdminInvite(req.params.id, req.admin.id);
+  if (!revoked) return next(notFound('Invite not found, or already used/revoked.'));
+  audit(req, { action: 'admin.invite.revoke', severity: 'info', target: req.params.id, targetType: 'admin_invite' });
+  res.json({ ok: true, invite: revoked });
+});
+
+router.get('/signup/:token', (req, res, next) => {
+  const invite = findInviteByToken(req.params.token);
+  if (!invite) return next(notFound('Invite link is invalid, expired, or already used.'));
+  res.json({ email: invite.email, adminRole: invite.adminRole, displayName: invite.displayName, expiresAt: invite.expiresAt });
+});
+
+const signupSchema = z.object({
+  token: z.string().min(1),
+  displayName: z.string().trim().min(2).max(60),
+  password: z.string().min(8).max(128),
+});
+
+router.post('/signup', (req, res, next) => {
+  try {
+    const { token, displayName, password } = signupSchema.parse(req.body);
+    const invite = findInviteByToken(token);
+    if (!invite) return next(notFound('Invite link is invalid, expired, or already used.'));
+
+    const issues = passwordIssues(password);
+    if (issues.length) return next(badRequest(issues[0], { issues }));
+
+    let admin;
+    try {
+      admin = createAdmin({
+        email: invite.email,
+        password,
+        name: displayName,
+        adminRole: invite.adminRole,
+        createdBy: invite.createdBy,
+      });
+    } catch (e) {
+      if (e.status === 409) return next(conflict(e.message));
+      throw e;
+    }
+
+    consumeInvite(token, admin.id);
+    recordAdminLogin(admin.id, req.ip, req.get('user-agent'));
+
+    const accessToken = signAdminAccessToken(admin);
+    const refreshToken = issueRefreshToken(admin.id, { ip: req.ip, userAgent: req.get('user-agent') });
+    const session = {
+      id: refreshToken.id,
+      adminId: admin.id,
+      createdAt: new Date().toISOString(),
+      lastActivity: new Date().toISOString(),
+      ip: req.ip,
+      userAgent: req.get('user-agent'),
+      active: true,
+    };
+    sessionStore.set(session.id, session);
+
+    audit(req, { action: 'admin.invite.consumed', severity: 'warning', target: admin.id, targetType: 'admin', meta: { email: admin.email, adminRole: admin.adminRole, invitedBy: invite.createdBy } });
+    emitAdmin('admin:created', { adminId: admin.id, email: admin.email, adminRole: admin.adminRole, via: 'invite' });
+
+    res.status(201).json({
+      accessToken,
+      refreshToken: refreshToken.token,
+      admin: { id: admin.id, name: admin.name, email: admin.email, adminRole: admin.adminRole, avatar: admin.avatar },
+      session: { id: session.id },
+    });
   } catch (e) {
     if (e instanceof z.ZodError) return next(badRequest('Invalid input', e.errors));
     next(e);

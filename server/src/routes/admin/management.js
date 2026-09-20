@@ -23,7 +23,9 @@ router.post('/', requireAdmin, requirePerm('admin.create'), (req, res, next) => 
       email: z.string().email(),
       password: z.string().min(8).max(128),
       name: z.string().min(1).max(100),
-      adminRole: z.enum(['super_admin', 'trader', 'risk_manager', 'finance_admin', 'compliance_officer', 'support_agent', 'marketing_manager', 'readonly_auditor']),
+      // Same 5-role vocabulary as ALL_ROLES in middleware/adminAuth.js — every
+      // requireRole(...) check across the admin API uses these exact names.
+      adminRole: z.enum(['super_admin', 'finance_admin', 'odds_manager', 'support', 'moderator']),
       permissionOverrides: z.array(z.string()).nullable().optional(),
     });
     const data = schema.parse(req.body);
@@ -72,7 +74,7 @@ router.put('/:id', requireAdmin, requirePerm('admin.edit'), (req, res, next) => 
   try {
     const schema = z.object({
       name: z.string().min(1).max(100).optional(),
-      adminRole: z.enum(['super_admin', 'trader', 'risk_manager', 'finance_admin', 'compliance_officer', 'support_agent', 'marketing_manager', 'readonly_auditor']).optional(),
+      adminRole: z.enum(['super_admin', 'finance_admin', 'odds_manager', 'support', 'moderator']).optional(),
       suspended: z.boolean().optional(),
       permissionOverrides: z.array(z.string()).nullable().optional(),
     });
@@ -126,7 +128,10 @@ router.post('/bulk-update', requireAdmin, requirePerm('admin.edit'), (req, res, 
   try {
     const schema = z.object({
       ids: z.array(z.string()).min(1),
-      updates: z.object({ suspended: z.boolean().optional(), adminRole: z.string().optional() }),
+      updates: z.object({
+        suspended: z.boolean().optional(),
+        adminRole: z.enum(['super_admin', 'finance_admin', 'odds_manager', 'support', 'moderator']).optional(),
+      }),
     });
     const { ids, updates } = schema.parse(req.body);
     const results = bulkUpdateAdmins(ids, updates, req.admin.id);

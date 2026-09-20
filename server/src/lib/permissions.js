@@ -179,10 +179,21 @@ export const PERMISSIONS = {
   'system.backup': 'Backup & restore',
 };
 
+// Role vocabulary is the same 5-role ladder used everywhere else in the admin
+// API (see ALL_ROLES in middleware/adminAuth.js and every requireRole(...)
+// call across routes/admin/*.js): super_admin, finance_admin, odds_manager,
+// support, moderator. This used to define a different 8-role vocabulary
+// (trader/risk_manager/compliance_officer/support_agent/marketing_manager/
+// readonly_auditor) that only overlapped on 'super_admin' and 'finance_admin'
+// — any admin created with one of those other roles would pass this file's
+// checks but immediately fail requireAdmin's ALL_ROLES check on every route
+// ("Admin role not configured"), and 'moderator'/'support'/'odds_manager'
+// couldn't be created at all. Keeping one vocabulary in sync everywhere.
 export const ROLE_PERMISSIONS = {
   super_admin: Object.keys(PERMISSIONS),
 
-  trader: [
+  // Sports, markets, odds, suspensions — was 'trader'.
+  odds_manager: [
     'sports.view', 'sports.create', 'sports.edit', 'sports.toggle',
     'leagues.view', 'leagues.create', 'leagues.edit', 'leagues.toggle', 'leagues.feature',
     'fixtures.view', 'fixtures.create', 'fixtures.edit', 'fixtures.import', 'fixtures.reschedule',
@@ -195,17 +206,7 @@ export const ROLE_PERMISSIONS = {
     'bets.view',
   ],
 
-  risk_manager: [
-    'sports.view', 'leagues.view', 'fixtures.view', 'teams.view', 'markets.view', 'odds.view',
-    'trading.liability', 'trading.limits', 'trading.suspend_all', 'trading.acceptance',
-    'odds.suspend', 'odds.lock',
-    'results.view',
-    'users.view',
-    'bets.view',
-    'fraud.view', 'fraud.configure', 'fraud.action',
-    'compliance.rg',
-  ],
-
+  // Payments, withdrawals, wallet adjustments — unchanged.
   finance_admin: [
     'sports.view', 'leagues.view', 'fixtures.view', 'teams.view',
     'users.view',
@@ -217,50 +218,27 @@ export const ROLE_PERMISSIONS = {
     'referrals.view', 'referrals.payouts',
   ],
 
-  compliance_officer: [
+  // Bans/suspensions, fraud flags — was 'compliance_officer', plus
+  // fraud.configure (was risk_manager-only) since flagging AND configuring
+  // fraud rules both belong to the same "moderation" job here.
+  moderator: [
     'sports.view', 'leagues.view', 'fixtures.view',
     'users.view', 'users.kyc', 'users.suspend', 'users.tags', 'users.notes',
     'bets.view',
     'compliance.kyc', 'compliance.sanctions', 'compliance.rg', 'compliance.reports',
-    'fraud.view', 'fraud.action',
+    'fraud.view', 'fraud.configure', 'fraud.action',
     'referrals.view',
     'support.tickets',
     'reports.view', 'reports.export',
     'admin.audit',
   ],
 
-  support_agent: [
+  // Read-only access to players + bets, ticket replies — was 'support_agent'.
+  support: [
     'sports.view', 'leagues.view', 'fixtures.view',
     'users.view', 'users.edit', 'users.impersonate', 'users.notes', 'users.tags',
     'bets.view', 'bets.note',
     'support.tickets', 'support.canned',
     'codes.view',
-  ],
-
-  marketing_manager: [
-    'sports.view', 'leagues.view', 'fixtures.view',
-    'bonuses.create', 'bonuses.edit', 'bonuses.delete',
-    'promotions.create', 'promotions.edit', 'promotions.delete',
-    'notifications.send', 'notifications.schedule', 'notifications.templates',
-    'cms.banners', 'cms.pages', 'cms.announcements',
-    'referrals.view', 'referrals.edit',
-    'reports.view', 'reports.export',
-    'admin.audit',
-    'affiliates.view',
-  ],
-
-  readonly_auditor: [
-    'sports.view', 'leagues.view', 'fixtures.view', 'teams.view',
-    'markets.view', 'odds.view',
-    'users.view',
-    'finance.view',
-    'bets.view',
-    'reports.view', 'reports.export',
-    'admin.audit', 'admin.health',
-    'referrals.view',
-    'codes.view',
-    'fraud.view',
-    'compliance.reports',
-    'affiliates.view',
   ],
 };

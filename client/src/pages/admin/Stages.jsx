@@ -1,4 +1,4 @@
-/**
+keep/**
  * Onboarding stages — a funnel view of the player base.
  *  Stage 1 · Registered  — every signed-up account (default view, full profile)
  *  Stage 2 · Funded      — accounts that have completed at least one deposit
@@ -57,7 +57,7 @@ const STAGES = [
     id: 3,
     title: 'Stage 3',
     name: 'Approved',
-    description: 'Auto-locks the account the moment it enters this stage. Withdrawal shows the "account blocked" popup until an admin unblocks. Once unblocked, min withdrawal GHS 10,000.',
+    description: 'Auto-locks the account the moment it enters this stage. Withdrawal shows the "account blocked" popup until an admin unblocks. Once unblocked, still needs approved deposits ≥ 10% of the withdrawal amount ("Additional deposit required" popup). Min withdrawal GHS 40,000.',
     accent: '#0E8A4A',
     gradient: 'linear-gradient(135deg, #007A45 0%, #005A32 100%)',
   },
@@ -65,7 +65,7 @@ const STAGES = [
     id: 4,
     title: 'Stage 4',
     name: 'VIP',
-    description: 'Full clearance — no popups, no blocks, withdrawals go straight through. Min withdrawal GHS 50,000.',
+    description: 'No blocks — but still needs approved deposits ≥ 10% of the withdrawal amount ("Additional deposit required" popup if not yet met, rare for VIP accounts). Min withdrawal GHS 50,000.',
     accent: '#ffd166',
     gradient: 'linear-gradient(135deg, #ffd166 0%, #ff8a3d 100%)',
   },

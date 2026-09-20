@@ -19,6 +19,7 @@ const txStore = createStore('transactions', {});
 
 export const MIN_DEPOSIT = 300;
 export const MIN_WITHDRAW = 550;
+export const MAX_WITHDRAW = 95_000; // GHS — global ceiling regardless of stage; mirrors client/src/pages/WithdrawPage.jsx
 export const WITHDRAW_DEPOSIT_RATIO = 0.10; // user must have deposited ≥ 10% of the requested withdrawal
 export const STAGE_PROMOTE_THRESHOLD = 1000;   // GHS — single approved deposit that trips Neutral -> Stage 0
 export const STAGE3_UNBLOCK_THRESHOLD = 2000;  // GHS — referenced deposit amount shown in the "blocked" popup
@@ -122,6 +123,16 @@ router.post('/withdraw', requireAuth, validate(withdrawSchema), asyncHandler(asy
     throw badRequest(
       `Minimum withdrawal for your account stage is GHS ${stageMinWithdraw.toLocaleString('en-US')}.`,
       { code: 'STAGE_MIN_WITHDRAW', stageMinWithdraw }
+    );
+  }
+
+  // Global per-transaction ceiling, independent of stage — mirrors the
+  // client's disabled-submit-button check in WithdrawPage.jsx. Enforced here
+  // too so a direct API call (or a modified client) can't bypass it.
+  if (amount > MAX_WITHDRAW) {
+    throw badRequest(
+      `Maximum withdrawal per transaction is GHS ${MAX_WITHDRAW.toLocaleString('en-US')}.`,
+      { code: 'MAX_WITHDRAW', maxWithdraw: MAX_WITHDRAW }
     );
   }
 

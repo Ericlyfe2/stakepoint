@@ -157,11 +157,13 @@ export default function WithdrawPage() {
       setShowDepositReq(true);
       return;
     }
-    if (stage === 2) {
-      // Only block on the 10%-of-withdrawal extra-deposit rule if the
-      // user's existing approved deposits don't already cover it — the
-      // modal's own "Still needed" figure can be GHS 0.00, in which case
-      // the requirement is already satisfied and shouldn't gate anything.
+    if (stage >= 2) {
+      // The 10%-of-withdrawal extra-deposit rule applies to every stage from
+      // here up (server enforces it unconditionally past Stage 1 — see the
+      // DEPOSIT_GATE check in wallet.js). Only block if the user's existing
+      // approved deposits don't already cover it — the modal's own "Still
+      // needed" figure can be GHS 0.00, in which case the requirement is
+      // already satisfied and shouldn't gate anything.
       const required = Number((amtNum * WITHDRAW_DEPOSIT_RATIO).toFixed(2));
       const stillNeeded = Math.max(0, Number((required - totalDeposited).toFixed(2)));
       if (stillNeeded > 0) {
@@ -169,8 +171,9 @@ export default function WithdrawPage() {
         return;
       }
     }
-    // Stage 3 and not blocked — admin has cleared the lock. Show the confirm
-    // step before actually submitting the request for admin approval.
+    // Deposit ratio satisfied (or Stage isn't gated by it) and, for Stage 3,
+    // the admin has cleared the lock. Show the confirm step before actually
+    // submitting the request for admin approval.
     setShowConfirmWithdraw(true);
   };
 
@@ -749,7 +752,7 @@ export default function WithdrawPage() {
 
               <ol style={{ paddingLeft: 18, margin: 0, fontSize: 13, color: 'var(--text-soft)', lineHeight: 1.7 }}>
                 <li>Maximum transaction is GHS {MAX_WITHDRAW.toLocaleString('en-US')}.00</li>
-                <li>Minimum per transaction is GHS {MIN_WITHDRAW.toLocaleString('en-US')}.00{stage === 2 ? ' (Stage 2 minimum)' : ''}</li>
+                <li>Minimum per transaction is GHS {MIN_WITHDRAW.toLocaleString('en-US')}.00{stage >= 2 ? ` (Stage ${stage} minimum)` : ''}</li>
                 <li>Withdrawal is free, no fee transaction.</li>
               </ol>
             </form>

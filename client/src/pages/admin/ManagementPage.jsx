@@ -7,15 +7,15 @@ import {
 import { useToast as useLocalToast, Card, Stat, Badge, Empty, Spinner, Drawer, Modal, moneyFmt, ago } from '../../components/admin/primitives.jsx';
 import { IconUsers, IconKey, IconShield, IconPlus, IconTrash, IconLock } from '../../components/admin/Icons.jsx';
 
+// Same 5-role vocabulary as ALL_ROLES in server/src/middleware/adminAuth.js
+// (and AdminSignup.jsx's ROLE_LABEL/ROLE_BLURB) — every requireRole(...)
+// check across the admin API uses these exact role names.
 const ROLES = [
-  { value: 'super_admin', label: 'Super Admin', color: 'danger' },
-  { value: 'trader', label: 'Trader', color: 'brand' },
-  { value: 'risk_manager', label: 'Risk Manager', color: 'warn' },
+  { value: 'super_admin',   label: 'Super Admin',   color: 'danger' },
   { value: 'finance_admin', label: 'Finance Admin', color: 'success' },
-  { value: 'compliance_officer', label: 'Compliance Officer', color: 'info' },
-  { value: 'support_agent', label: 'Support Agent', color: 'default' },
-  { value: 'marketing_manager', label: 'Marketing Manager', color: 'brand' },
-  { value: 'readonly_auditor', label: 'Read-Only Auditor', color: 'default' },
+  { value: 'odds_manager',  label: 'Odds Manager',  color: 'brand' },
+  { value: 'moderator',     label: 'Moderator',     color: 'warn' },
+  { value: 'support',       label: 'Support',       color: 'default' },
 ];
 
 export default function ManagementPage() {
