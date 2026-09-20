@@ -5,7 +5,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const DATA_DIR = path.join(__dirname, '../data-test');
+const DATA_DIR = path.join(__dirname, '../data-test-auth');
 
 process.env.DATABASE_URL = '';
 process.env.NODE_ENV = 'test';
@@ -118,6 +118,8 @@ describe('OTP Service', () => {
 
 describe('Password Reset Flow', () => {
   const email = `reset-flow-${Date.now()}@example.com`;
+  // updateUser keys on the user's id, not their email — captured here.
+  let userId;
 
   before(async () => {
     if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
@@ -127,13 +129,14 @@ describe('Password Reset Flow', () => {
     const { createUser } = await import('../src/db/users.js');
     const { hashPassword } = await import('../src/services/password.js');
     const hash = await hashPassword('OldP@ss123');
-    await createUser({
+    const u = await createUser({
       email,
       displayName: 'Reset Test',
       passwordHash: hash,
       country: 'GH',
       emailVerified: true,
     });
+    userId = u.id;
   });
 
   after(() => cleanData());
@@ -153,7 +156,7 @@ describe('Password Reset Flow', () => {
     assert.ok(record.codeHash);
 
     const newHash = await hashPassword('NewP@ss456');
-    await updateUser(email, { passwordHash: newHash });
+    await updateUser(userId, { passwordHash: newHash });
     consumeOtp(email, 'reset');
 
     const user = findByEmail(email);

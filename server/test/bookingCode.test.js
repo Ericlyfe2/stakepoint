@@ -5,7 +5,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const DATA_DIR = path.join(__dirname, '../data-test');
+const DATA_DIR = path.join(__dirname, '../data-test-booking-code');
 
 process.env.DATABASE_URL = '';
 process.env.NODE_ENV = 'test';
@@ -77,6 +77,10 @@ describe('Booking Code', () => {
   // ─── UNIQUENESS (27M namespace) ───────────────────────────────────────
 
   test('generates 500 unique booking codes with zero collisions', () => {
+    // Same raw generator, smaller sample: expected collisions here are
+    // ~500²/(2*40M) ≈ 0.003, so exact equality is safe at this scale (see
+    // the 5,000-draw version below for why that assumption breaks down at
+    // higher volumes).
     const codes = new Set();
     for (let i = 0; i < 500; i++) {
       codes.add(generateBookingCode());
@@ -84,21 +88,34 @@ describe('Booking Code', () => {
     assert.equal(codes.size, 500, `Got ${codes.size} unique codes out of 500 generated`);
   });
 
-  test('STRESS: generates 5,000 unique booking codes with zero collisions', () => {
+  test('STRESS: generateBookingCode stays well-formed and well-spread over 5,000 raw draws', () => {
+    // generateBookingCode() is raw randomness with no retry/collision-check —
+    // that guarantee belongs to uniqueBookingCode() (tested below, against
+    // the real index). Requiring zero collisions here was asserting the
+    // wrong thing: over a ~40M-code space (26*26*9^5), 5,000 independent
+    // draws have a real ~27% chance of at least one coincidental repeat
+    // (birthday paradox; expected collisions ≈ 5000²/(2*40M) ≈ 0.3), so
+    // that assertion failed intermittently through no fault of the code.
+    // What's actually worth guaranteeing here: every draw is well-formed,
+    // and the generator isn't degenerate (e.g. collapsed to a tiny
+    // effective range) — a healthy generator should be nowhere near the
+    // >100-collision mark this allows, which is ~300x the expected rate.
     const codes = new Set();
     for (let i = 0; i < 5_000; i++) {
       const code = generateBookingCode();
-      if (codes.has(code)) {
-        assert.fail(`Collision detected at iteration ${i}: "${code}"`);
-      }
+      assert.ok(CODE_REGEX.test(code), `Code "${code}" does not match the expected AA12345 format`);
       codes.add(code);
     }
-    assert.equal(codes.size, 5_000, `Got ${codes.size} unique codes out of 5,000 generated`);
+    assert.ok(codes.size >= 4_900, `Only ${codes.size}/5000 draws were unique — generator may be degenerate`);
   });
 
   // ─── uniqueBookingCode() ──────────────────────────────────────────────
 
   test('uniqueBookingCode returns unique codes', async () => {
+    // Register each code (as every real caller does via pushBet) so
+    // uniqueBookingCode()'s own collision check has something to check
+    // against — without this, "no duplicates" isn't guaranteed by the
+    // function under test, just increasingly unlikely by chance.
     const codes = new Set();
     for (let i = 0; i < 500; i++) {
       const code = await uniqueBookingCode();
@@ -106,6 +123,7 @@ describe('Booking Code', () => {
         `Code "${code}" does not match expected format`);
       assert.ok(!codes.has(code), `Duplicate code "${code}" at iteration ${i}`);
       codes.add(code);
+      await pushBet({ id: `unique-test-${i}`, bookingCode: code, userId: 'test', stake: 10, status: 'open' });
     }
   });
 
@@ -134,15 +152,23 @@ describe('Booking Code', () => {
   });
 
   test('uniqueBookingCode fallback triggers when namespace is full', async () => {
-    // Fill the store with enough codes to potentially trigger the 100-retry fallback
+    // Fill the store with enough codes to potentially trigger the 100-retry
+    // fallback. Each generated code must be registered (like real callers do
+    // via pushBet) before generating the next one — uniqueBookingCode() only
+    // avoids collisions against what's actually indexed, so without this the
+    // loop is 5000 independent random draws with no memory of each other,
+    // and a same-code collision within the loop itself (not caught by the
+    // function, since nothing was persisted) is a real ~1-in-5 event via the
+    // birthday paradox over a ~40M-code namespace, not a bug being tested.
     const used = new Set();
     for (let i = 0; i < 5000; i++) {
       const code = await uniqueBookingCode();
+      assert.ok(!used.has(code), `uniqueBookingCode returned a duplicate: "${code}"`);
       used.add(code);
+      await pushBet({ id: `fallback-test-${i}`, bookingCode: code, userId: 'test', stake: 10, status: 'open' });
     }
-    const codes = used;
-    assert.ok(codes.size >= 5000, `Expected at least 5000 codes, got ${codes.size}`);
-    for (const code of codes) {
+    assert.equal(used.size, 5000);
+    for (const code of used) {
       assert.ok(CODE_REGEX.test(code) || FALLBACK_REGEX.test(code),
         `Code "${code}" does not match any valid format`);
     }

@@ -1,7 +1,7 @@
 name: Tests
 
-# Runs the client's vitest suite (server currently has no test files) plus a
-# production build, on every push to any branch.
+# Runs the client's vitest suite plus a production build, and the server's
+# node:test suite, on every push to any branch.
 on:
   push:
   workflow_dispatch:
@@ -25,3 +25,19 @@ jobs:
 
       - name: Build client
         run: npm run build -w client
+
+  server-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run server tests
+        run: npm run test -w server

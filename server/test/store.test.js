@@ -5,7 +5,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const DATA_DIR = path.join(__dirname, '../data-test');
+const DATA_DIR = path.join(__dirname, '../data-test-store');
 
 process.env.DATABASE_URL = '';
 process.env.NODE_ENV = 'test';
@@ -70,6 +70,10 @@ describe('KV Store', () => {
 });
 
 describe('Users', () => {
+  // updateUser/deleteUser key on the user's id, not their email — only
+  // findByEmail resolves by email. Captured from the create step below.
+  let userId;
+
   before(async () => {
     if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
     cleanData();
@@ -93,6 +97,7 @@ describe('Users', () => {
     assert.ok(u);
     assert.equal(u.email, 'persist-test@example.com');
     assert.equal(u.balance, 500);
+    userId = u.id;
   });
 
   test('findByEmail finds the created user', async () => {
@@ -104,7 +109,7 @@ describe('Users', () => {
 
   test('updateUser updates and persists', async () => {
     const { updateUser, findByEmail } = await import('../src/db/users.js');
-    const u = await updateUser('persist-test@example.com', { balance: 1000 });
+    const u = await updateUser(userId, { balance: 1000 });
     assert.ok(u);
     assert.equal(u.balance, 1000);
     const fresh = findByEmail('persist-test@example.com');
@@ -113,15 +118,15 @@ describe('Users', () => {
 
   test('deleteUser removes user', async () => {
     const { deleteUser, findByEmail } = await import('../src/db/users.js');
-    await deleteUser('persist-test@example.com');
+    await deleteUser(userId);
     const u = findByEmail('persist-test@example.com');
-    assert.equal(u, undefined);
+    assert.equal(u, null); // findByEmail's not-found sentinel is null, not undefined
   });
 
   test('createUser rejects duplicate email', async () => {
     const { createUser, deleteUser } = await import('../src/db/users.js');
     const email = `dupe-${Date.now()}@example.com`;
-    await createUser({
+    const original = await createUser({
       email,
       displayName: 'Original',
       passwordHash: '$2b$10$fakehash',
@@ -136,12 +141,12 @@ describe('Users', () => {
       }),
       /already exists/
     );
-    await deleteUser(email);
+    await deleteUser(original.id);
   });
 
   test('findByGoogleId works', async () => {
     const { createUser, findByGoogleId, deleteUser } = await import('../src/db/users.js');
-    await createUser({
+    const created = await createUser({
       email: 'google@example.com',
       displayName: 'Google User',
       googleId: 'google-12345',
@@ -150,6 +155,6 @@ describe('Users', () => {
     const u = findByGoogleId('google-12345');
     assert.ok(u);
     assert.equal(u.email, 'google@example.com');
-    await deleteUser('google@example.com');
+    await deleteUser(created.id);
   });
 });
