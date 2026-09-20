@@ -1,4 +1,4 @@
-keep/**
+/**
  * Onboarding stages — a funnel view of the player base.
  *  Stage 1 · Registered  — every signed-up account (default view, full profile)
  *  Stage 2 · Funded      — accounts that have completed at least one deposit
