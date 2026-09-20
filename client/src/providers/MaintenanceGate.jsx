@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 
 // Same base convention as betApi.js / adminApi.js: unset in dev (Vite proxies
 // /api), set to the deployed backend in production.
@@ -15,16 +16,25 @@ const CHECK_TIMEOUT_MS = 8_000;
  * middleware is what actually stops traffic. This exists so visitors get a
  * clean blank page instead of a wall of failed requests.
  *
- * Three rules:
+ * Four rules:
  *  - Renders nothing until the check resolves, so the app never flashes into
  *    view and then vanishes.
  *  - Fails open: any error, timeout, or non-OK response shows the app. A
  *    network blip must never blackhole a healthy site.
  *  - Never mounted on /admin/* (see App.jsx), so admins can always get back in.
+ *  - Always lets /login?next=/admin/... through, maintenance or not. /admin/*
+ *    is exempt from this gate, but every path into it (AdminGuard, the
+ *    /admin/login redirect) funnels through the shared, otherwise-gated
+ *    /login page first — without this, an admin whose session expired (or
+ *    who's on a fresh browser) during maintenance would have no way back in
+ *    to turn it back off. See App.jsx's /maintance escape-hatch route.
  */
 export default function MaintenanceGate({ children }) {
   // null = still checking, true/false = resolved.
   const [blocked, setBlocked] = useState(null);
+  const loc = useLocation();
+  const isAdminLoginEscape = loc.pathname === '/login'
+    && (new URLSearchParams(loc.search).get('next') || '').startsWith('/admin');
 
   useEffect(() => {
     let cancelled = false;
@@ -47,6 +57,7 @@ export default function MaintenanceGate({ children }) {
     return () => { cancelled = true; if (timer) clearTimeout(timer); ctl?.abort(); };
   }, []);
 
+  if (isAdminLoginEscape) return children;
   if (blocked === null) return null;
   if (blocked) return <div aria-hidden="true" style={BLANK} />;
   return children;

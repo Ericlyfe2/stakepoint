@@ -111,6 +111,11 @@ export default function App() {
       <ScrollRestoration />
       <Routes>
         <Route path="/admin/*" element={<AdminApp />} />
+        {/* Quick admin escape hatch during maintenance: /maintance always
+            redirects to /admin/settings so it can be turned back off, without
+            needing to remember the full admin path. Deliberately outside
+            MaintenanceGate below, same as /admin/* itself. */}
+        <Route path="/maintance" element={<Navigate to="/admin/settings" replace />} />
         {/* The gate wraps only the player-facing branch — /admin/* above is
             deliberately outside it so maintenance can always be turned off. */}
         <Route path="/*" element={
