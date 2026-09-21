@@ -267,10 +267,16 @@ export default function AppProviders({ children }) {
 
     refreshAuth(); // re-handshake the socket with the now-current access token
 
+    const knownWinIds = new Set();
     const tick = async () => {
       try {
         const { bets } = await fetchUnacknowledgedWins();
         if (!alive || !Array.isArray(bets) || !bets.length) return;
+        // A win we haven't seen yet means the payout just landed — pull the
+        // fresh balance now instead of waiting for the next wallet poll.
+        const fresh = bets.filter((b) => !knownWinIds.has(b.id));
+        fresh.forEach((b) => knownWinIds.add(b.id));
+        if (fresh.length) refresh().catch(() => {});
         // Merge instead of replace so a concurrent cash-out modal entry
         // isn't clobbered by a polled win batch.
         let newWins = null;
@@ -290,7 +296,9 @@ export default function AppProviders({ children }) {
       } catch { /* ignore */ }
     };
     tick();
-    const id = setInterval(tick, 60_000);
+    // The socket pushes bet:won instantly; this poll is the safety net for a
+    // missed push, so keep it short enough that a win never sits unseen.
+    const id = setInterval(tick, 10_000);
 
     // Live updates pushed by the server.
     const offWallet = onLive('wallet:update', ({ balance }) => {

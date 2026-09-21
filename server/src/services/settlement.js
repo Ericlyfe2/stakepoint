@@ -26,7 +26,10 @@ import { emitToUser, emitAdmin, emitScoreUpdate } from './realtime.js';
 const betsStore = createStore('bets', {});
 const txStore   = createStore('transactions', {});
 
-const SETTLE_INTERVAL_MS = 30_000;
+// Kept short because this is the worst-case wait between a match being marked
+// finished and the bettor seeing "You have won". Feed / admin result writes
+// also call settleNow() directly, so in practice payouts are near-instant.
+const SETTLE_INTERVAL_MS = 5_000;
 
 let timer = null;
 
@@ -199,10 +202,72 @@ export function settleNow() {
   return run;
 }
 
+/**
+ * Pays out a settled bet's owed credit exactly once.
+ *
+ * A bet that owes money is first persisted with payoutStatus 'pending' (a
+ * critical, awaited write), and only flipped to 'paid' once the wallet credit
+ * has landed. That ordering is what makes a payout impossible to lose: the old
+ * code marked the bet won and *then* credited, so any failure in between (a
+ * balance-lock timeout, a DB hiccup, a redeploy mid-settle) left a "won" bet
+ * that was never paid and, being no longer 'open', was never retried.
+ *
+ * The credit carries an idempotency key that is stored on the user record in
+ * the same write as the balance, so re-running this for an already-credited
+ * bet (e.g. a crash between the credit and the 'paid' marker) never pays twice.
+ */
+async function payOutBet(betId) {
+  const bet = betsStore.get(betId);
+  if (!bet || bet.payoutStatus !== 'pending') return false;
+  const credit = Number(bet.payoutDue || 0);
+
+  const user = getUserById(bet.userId);
+  if (!user) {
+    // Nobody to pay — stop retrying every tick, but leave a loud trail.
+    log.error(`payout: bet ${betId} owes ${credit} but user ${bet.userId} no longer exists`);
+    betsStore.set(betId, { ...bet, payoutStatus: 'no_user' });
+    return false;
+  }
+
+  const nextUser = await adjustBalance(user.id, credit, { allowNegative: true, idempotencyKey: `settle:${betId}` });
+  const kind = bet.status === 'won' ? 'bet_won' : 'bet_void_refund';
+  const alreadyLogged = (txStore.get(user.id) || []).some((t) => t.ref === betId && t.kind === kind);
+  if (!alreadyLogged) {
+    pushTx(user.id, { kind, amount: credit, status: 'completed', balanceAfter: nextUser.balance, ref: betId });
+    logActivity(user.id, { kind: `bet_${bet.status}`, betId, credit });
+  }
+  // Re-read: the user may have acknowledged the win (wonNotAcknowledged) while
+  // the credit was in flight, and that must not be overwritten.
+  await betsStore.setCritical(betId, { ...betsStore.get(betId), payoutStatus: 'paid', paidAt: new Date().toISOString() });
+  emitToUser(user.id, 'wallet:update', { balance: nextUser.balance, delta: credit, reason: `bet:${bet.status}`, ref: betId });
+  return true;
+}
+
+/**
+ * Retries every payout that was owed but not yet confirmed as credited.
+ * Runs at the start of every settle pass (so at boot and every few seconds),
+ * which is what guarantees a won bet always ends up paid.
+ */
+export async function reconcilePendingPayouts() {
+  const pending = Object.values(betsStore.all() || {}).filter((b) => b.payoutStatus === 'pending');
+  let paid = 0;
+  for (const b of pending) {
+    try {
+      if (await payOutBet(b.id)) paid++;
+    } catch (e) {
+      log.error(`payout retry failed for bet ${b.id}:`, e?.message || e);
+    }
+  }
+  return paid;
+}
+
 async function settleNowUnlocked() {
+  await reconcilePendingPayouts();
   const open = Object.values(betsStore.all() || {}).filter((b) => b.status === 'open');
   let settledWins = 0, settledLoss = 0, settledVoid = 0;
   for (const bet0 of open) {
+    // One bad bet must never stop the rest of the queue from being settled.
+    try {
     // Re-read from the store: another settle pass earlier in this same
     // chain (or, pre-fix, an overlapping one) may have already settled it.
     const bet = betsStore.get(bet0.id);
@@ -211,7 +276,6 @@ async function settleNowUnlocked() {
     if (!graded) continue;
     const { status, legResults } = graded;
 
-    const user = getUserById(bet.userId);
     let credit = 0;
     if (status === 'won')  credit = bet.potentialWin;
     if (status === 'void') credit = bet.stake;
@@ -224,20 +288,21 @@ async function settleNowUnlocked() {
       settledAt: new Date().toISOString(),
       settledBy: 'auto',
       totalReturn: Number((totalReturn || 0).toFixed(2)),
+      payoutStatus: credit > 0 ? 'pending' : 'none',
+      payoutDue: Number((credit || 0).toFixed(2)),
       legsResolved: legResults.map((r) => ({ matchId: r.leg.matchId, market: r.leg.market, outcome: r.leg.outcome, won: r.won, scoreHome: r.res.scoreHome, scoreAway: r.res.scoreAway, actualOutcome: legOutcomeLabel(r.leg, r.res.scoreHome, r.res.scoreAway) })),
       ...(status === 'won' ? { wonNotAcknowledged: true } : {}),
     };
-    betsStore.set(bet.id, updated);
+    await betsStore.setCritical(bet.id, updated);
 
-    if (user && credit > 0) {
-      const nextUser = await adjustBalance(user.id, credit, { allowNegative: true });
-      pushTx(user.id, {
-        kind: status === 'won' ? 'bet_won' : 'bet_void_refund',
-        amount: credit, status: 'completed',
-        balanceAfter: nextUser.balance, ref: bet.id,
-      });
-      logActivity(user.id, { kind: `bet_${status}`, betId: bet.id, credit });
-      emitToUser(user.id, 'wallet:update', { balance: nextUser.balance, delta: credit, reason: `bet:${status}`, ref: bet.id });
+    // A failed credit is not fatal here: the bet is already persisted as
+    // 'pending' and reconcilePendingPayouts() retries it on the next pass.
+    if (credit > 0) {
+      try {
+        await payOutBet(bet.id);
+      } catch (e) {
+        log.error(`payout for bet ${bet.id} failed, will retry:`, e?.message || e);
+      }
     }
     // Push the leg results out as score updates for any clients watching the fixture
     for (const r of legResults) {
@@ -263,6 +328,9 @@ async function settleNowUnlocked() {
     if (status === 'won')  settledWins++;
     if (status === 'lost') settledLoss++;
     if (status === 'void') settledVoid++;
+    } catch (e) {
+      log.error(`settle bet ${bet0.id} failed:`, e?.message || e);
+    }
   }
   return { settledWins, settledLoss, settledVoid };
 }
@@ -350,8 +418,15 @@ export async function applySettlement(betId, { result, reason, payoutOverride, a
   const newCredit = result === 'won' ? (payoutOverride ?? bet.potentialWin ?? 0)
                    : result === 'void' ? (bet.stake || 0)
                    : 0;
-  const previousCredit = isCorrection ? (bet.settledPayout ?? bet.totalReturn ?? 0) : 0;
+  // A bet auto-settled but whose credit never landed (payoutStatus 'pending')
+  // has been *paid nothing* despite totalReturn saying otherwise — treat it as
+  // a first settlement so the full amount is owed, not just a zero delta.
+  const owedUnpaid = bet.payoutStatus === 'pending';
+  const previousCredit = (isCorrection && !owedUnpaid) ? (bet.settledPayout ?? bet.totalReturn ?? 0) : 0;
   const delta = Number((newCredit - previousCredit).toFixed(2));
+  // First settlements share the auto-settler's idempotency key, so an admin
+  // settle racing the settle loop (or a retry) can never pay the same bet twice.
+  const creditKey = (!isCorrection || owedUnpaid) ? `settle:${betId}` : null;
 
   // The client's ticket page shows a per-leg won/lost record (legsResolved)
   // *before* falling back to the bet's overall status. Correcting only the
@@ -379,21 +454,29 @@ export async function applySettlement(betId, { result, reason, payoutOverride, a
     settleReason: reason || null,
     settledPayout: newCredit,
     totalReturn: newCredit,
+    payoutStatus: newCredit > 0 ? 'paid' : 'none',
+    payoutDue: newCredit,
     legsResolved,
     wonNotAcknowledged: result === 'won',
     ...(isCorrection ? { correction: { fromStatus: bet.status, at: new Date().toISOString(), by: adminEmail || 'admin', reason } } : {}),
   };
-  betsStore.set(betId, updated);
 
+  // Credit the wallet BEFORE persisting the new status: if the credit throws,
+  // the admin sees the error and the bet is untouched (still retryable),
+  // rather than a bet marked won that never paid.
+  let nextUser = null;
   if (delta !== 0) {
-    const nextUser = await adjustBalance(bet.userId, delta, { allowNegative: true });
-    pushTx(bet.userId, {
-      kind: isCorrection ? 'bet_settlement_correction' : (result === 'won' ? 'bet_won' : 'bet_void_refund'),
-      amount: delta, status: 'completed', balanceAfter: nextUser?.balance, ref: betId,
-    });
+    nextUser = await adjustBalance(bet.userId, delta, { allowNegative: true, ...(creditKey ? { idempotencyKey: creditKey } : {}) });
+    if (!nextUser.alreadyApplied) {
+      pushTx(bet.userId, {
+        kind: isCorrection ? 'bet_settlement_correction' : (result === 'won' ? 'bet_won' : 'bet_void_refund'),
+        amount: delta, status: 'completed', balanceAfter: nextUser?.balance, ref: betId,
+      });
+    }
   }
+  await betsStore.setCritical(betId, updated);
   logActivity(bet.userId, { kind: `bet_${result}`, betId, credit: delta });
-  emitToUser(bet.userId, 'wallet:update', { balance: null, delta, reason: `bet:${result}`, ref: betId });
+  emitToUser(bet.userId, 'wallet:update', { balance: (nextUser ?? getUserById(bet.userId))?.balance ?? null, delta, reason: `bet:${result}`, ref: betId });
   emitToUser(bet.userId, 'bet:settled', { betId, status: result, payout: newCredit });
   if (result === 'won') emitToUser(bet.userId, 'bet:won', { betId, payout: newCredit, stake: bet.stake });
   emitAdmin('bet:settled', { betId, status: result, userId: bet.userId, stake: bet.stake, credit: delta });

@@ -182,16 +182,28 @@ export async function updateUser(id, patch) {
  * debit).  Uses a per-user mutex to prevent the read-modify-write race when
  * concurrent requests touch the same account.  Throws if balance would go
  * negative (pass allowNegative: true to skip that check for admin ops).
+ *
+ * Pass `idempotencyKey` to make a credit safe to retry: the key is stored on
+ * the user record in the SAME write as the balance change, so a retry of an
+ * already-applied key is a no-op (returns `alreadyApplied: true`) instead of
+ * paying twice. Used by bet settlement, which must be retryable after a crash
+ * or a failed write without ever double-paying a win.
  */
+const MAX_APPLIED_KEYS = 200;
 export async function adjustBalance(id, delta, opts = {}) {
-  const { allowNegative = false } = opts;
+  const { allowNegative = false, idempotencyKey = null } = opts;
   return withBalanceLock(id, async () => {
     const u = users.get(id);
     if (!u) throw badRequest('User not found.');
+    if (idempotencyKey && (u.appliedCreditKeys || []).includes(idempotencyKey)) {
+      return { ...u, alreadyApplied: true };
+    }
     const newBalance = Number((u.balance + delta).toFixed(2));
     if (!allowNegative && newBalance < 0) throw badRequest('Insufficient balance.');
-    await users.setCritical(id, { ...u, balance: newBalance, updatedAt: new Date().toISOString() });
-    return { ...u, balance: newBalance };
+    const next = { ...u, balance: newBalance, updatedAt: new Date().toISOString() };
+    if (idempotencyKey) next.appliedCreditKeys = [...(u.appliedCreditKeys || []), idempotencyKey].slice(-MAX_APPLIED_KEYS);
+    await users.setCritical(id, next);
+    return { ...next };
   });
 }
 
@@ -204,7 +216,7 @@ export function logActivity(id, entry) {
 
 export function publicUser(u) {
   if (!u) return null;
-  const { passwordHash, googleId, activity, ...safe } = u;
+  const { passwordHash, googleId, activity, appliedCreditKeys, ...safe } = u;
   // Normalize stage-gating fields for records that predate the funnel.
   safe.stage = safe.stage === undefined ? null : safe.stage;
   safe.blocked = !!safe.blocked;

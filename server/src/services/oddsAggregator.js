@@ -38,6 +38,15 @@ const liveFailureStreak = new Map(); // 'live' -> consecutive global live-loop f
 let liveTimer = null;
 let liveRunning = false;
 
+// A confirmed full-time result pays winners out right away instead of waiting
+// for the next periodic settle tick. Fire-and-forget: settleNow() serializes
+// itself and the periodic loop remains the safety net if this ever fails.
+function settleAfterResult() {
+  import('./settlement.js')
+    .then((m) => m.settleNow())
+    .catch((e) => log.warn(`post-result settle failed: ${e?.message || e}`));
+}
+
 // A fixture must be missing this many consecutive polls before we infer it
 // finished. A single miss is routinely just a rate-limited/failed provider
 // call for that cycle (fetchLiveOddsAll/fetchLiveScoresAll swallow per-
@@ -345,6 +354,7 @@ async function liveLoop() {
         setMatchStatus(fx.key, 'finished');
         setResult(fx.key, fx.scoreHome, fx.scoreAway, 'feed');
         emitFixtureStatusChanged({ fixtureId: fx.key, status: 'finished', scoreHome: fx.scoreHome, scoreAway: fx.scoreAway, minute: fx.minute, sport: fx.sport });
+        settleAfterResult();
       }
     }
 
@@ -372,6 +382,7 @@ async function liveLoop() {
         emitScoreUpdate({ fixtureId: key, sport: last.sport, scoreHome: last.scoreHome, scoreAway: last.scoreAway, minute: last.minute, eventKind: 'full_time' });
         emitFixtureStatusChanged({ fixtureId: key, status: 'finished', scoreHome: last.scoreHome, scoreAway: last.scoreAway, minute: last.minute, sport: last.sport });
         liveLastByKey.set(key, { ...last, status: 'finished' });
+        settleAfterResult();
       }
     }
 

@@ -29,6 +29,7 @@ import {
   archiveFixture, restoreFixture, isFixtureArchived, duplicateFixture,
 } from '../../db/sportsAdmin.js';
 import { settleNow } from '../../services/settlement.js';
+import { log } from '../../utils/logger.js';
 import { emitFixtureStatusChanged } from '../../services/realtime.js';
 import { buildCorrectScoreMarket, MATCH_STATUSES, computeMatchStatus, isKickoffPassed } from '../../matchesData.js';
 
@@ -496,14 +497,12 @@ router.post('/fixtures/:id/status',
       patchOverride(req.params.id, { cashoutLocked: true });
     }
 
-    // When marking as FT, also auto-set the result if scores provided
-    if (status === 'ft' && scoreHome != null && scoreAway != null) {
+    // When marking as FT / finished, also set the result if scores provided,
+    // and settle straight away so winners are paid now rather than on the
+    // next periodic settle tick.
+    if ((status === 'ft' || status === 'finished') && scoreHome != null && scoreAway != null) {
       setResult(req.params.id, scoreHome, scoreAway, 'manual');
-    }
-
-    // If marking as finished, set result if scores provided
-    if (status === 'finished' && scoreHome != null && scoreAway != null) {
-      setResult(req.params.id, scoreHome, scoreAway, 'manual');
+      settleNow().catch((e) => log.warn(`settle after manual FT failed: ${e?.message || e}`));
     }
 
     // For cancelled/postponed/abandoned/void — no result, just status
