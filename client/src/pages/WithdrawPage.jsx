@@ -752,7 +752,7 @@ export default function WithdrawPage() {
 
               <ol style={{ paddingLeft: 18, margin: 0, fontSize: 13, color: 'var(--text-soft)', lineHeight: 1.7 }}>
                 <li>Maximum transaction is GHS {MAX_WITHDRAW.toLocaleString('en-US')}.00</li>
-                <li>Minimum per transaction is GHS {MIN_WITHDRAW.toLocaleString('en-US')}.00{(stage >= 2 && !isFlatMinWithdrawAccount) ? ` (Stage ${stage} minimum)` : ''}</li>
+                <li>Minimum per transaction is GHS {MIN_WITHDRAW.toLocaleString('en-US')}.00</li>
                 <li>Withdrawal is free, no fee transaction.</li>
               </ol>
             </form>
