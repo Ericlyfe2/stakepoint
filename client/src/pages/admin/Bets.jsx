@@ -12,7 +12,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAdmin } from '../../providers/AdminProvider.jsx';
 import {
   adminListBets, adminGetBet, adminSettleBet, adminCancelBet, adminNoteBet, adminBulkBets,
-  adminDeleteBet, adminRestoreBet, adminSettlementAudit,
+  adminDeleteBet, adminRestoreBet, adminSettlementAudit, adminSettlementUnpaid, adminSettlementRepay,
 } from '../../api/adminApi.js';
 
 function toBookingCode(id = '') {
@@ -42,6 +42,7 @@ export default function BetsPage({ initialStatus = 'all' }) {
   const [bulkBusy, setBulkBusy] = useState(false);
   const [bulkSettleOpen, setBulkSettleOpen] = useState(false);
   const [auditOpen, setAuditOpen] = useState(false);
+  const [unpaidOpen, setUnpaidOpen] = useState(false);
   const debounceRef = useRef(0);
 
   function toggleSelect(id) {
@@ -133,6 +134,9 @@ export default function BetsPage({ initialStatus = 'all' }) {
           {hasRole('odds_manager', 'finance_admin') && (
             <button className="adm-btn warn" onClick={() => setAuditOpen(true)}><IconAlert size={14} /> Settlement audit</button>
           )}
+          {hasRole('finance_admin') && (
+            <button className="adm-btn warn" onClick={() => setUnpaidOpen(true)}><IconAlert size={14} /> Unpaid wins</button>
+          )}
         </div>
       </header>
 
@@ -141,6 +145,14 @@ export default function BetsPage({ initialStatus = 'all' }) {
           onClose={() => setAuditOpen(false)}
           showToast={showToast}
           onFixed={load}
+        />
+      )}
+
+      {unpaidOpen && (
+        <UnpaidPayoutsModal
+          onClose={() => setUnpaidOpen(false)}
+          showToast={showToast}
+          onPaid={load}
         />
       )}
 
@@ -572,6 +584,99 @@ function SettlementAuditModal({ onClose, showToast, onFixed }) {
               </button>
             </div>
           ))}
+        </div>
+      )}
+    </Modal>
+  );
+}
+
+/**
+ * Won / refunded bets that were settled but never reached the player's wallet
+ * (the old settle-then-credit ordering could strand them). Search by phone,
+ * email, booking code or bet id, then pay one out: it credits the exact
+ * winnings once and re-triggers the player's "You won" trophy. Paying is a
+ * two-step click so a stray tap can't move money.
+ */
+function UnpaidPayoutsModal({ onClose, showToast, onPaid }) {
+  const [q, setQ] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [rows, setRows] = useState([]);
+  const [armedId, setArmedId] = useState(null);
+  const [payingId, setPayingId] = useState(null);
+
+  async function load(query = q) {
+    setLoading(true);
+    try {
+      const r = await adminSettlementUnpaid({ q: query.trim() || undefined });
+      setRows(r.payouts || []);
+    } catch (e) {
+      showToast(e.message, 'error');
+    } finally {
+      setLoading(false);
+    }
+  }
+  useEffect(() => { load(''); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // A first click "arms" a row for 5s; only a second click pays.
+  useEffect(() => {
+    if (!armedId) return undefined;
+    const t = setTimeout(() => setArmedId(null), 5000);
+    return () => clearTimeout(t);
+  }, [armedId]);
+
+  async function pay(row) {
+    if (armedId !== row.betId) { setArmedId(row.betId); return; }
+    setPayingId(row.betId);
+    setArmedId(null);
+    try {
+      const r = await adminSettlementRepay(row.betId);
+      setRows((prev) => prev.filter((x) => x.betId !== row.betId));
+      showToast(r.credited > 0
+        ? `Paid ${moneyFmt(r.credited)} to ${row.userEmail || row.userId}.${row.status === 'won' ? ' Their win trophy will show now.' : ''}`
+        : 'Already credited — marked as paid and the win trophy re-armed.');
+      onPaid?.();
+    } catch (e) {
+      showToast(`${row.bookingCode || row.betId}: ${e.message}`, 'error');
+    } finally {
+      setPayingId(null);
+    }
+  }
+
+  return (
+    <Modal open title="Unpaid wins" onClose={onClose}
+           description="Won or refunded bets with no matching wallet entry. Check the player's wallet history before paying — a cleared history can look the same.">
+      <form onSubmit={(e) => { e.preventDefault(); load(); }} style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+        <input className="adm-input" style={{ flex: 1 }} value={q} onChange={(e) => setQ(e.target.value)}
+               placeholder="Phone, email, booking code or bet id" />
+        <button className="adm-btn" type="submit" disabled={loading}><IconSearch size={14} /> Search</button>
+      </form>
+      {loading ? (
+        <div className="adm-skel" style={{ height: 120, borderRadius: 12 }} />
+      ) : rows.length === 0 ? (
+        <Empty title="No unpaid wins found" subtitle="Every settled win in this search has a matching wallet entry." />
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: '55vh', overflowY: 'auto' }}>
+          {rows.map((r) => {
+            const armed = armedId === r.betId;
+            return (
+              <div key={r.betId} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '10px 12px', background: 'var(--surface-soft)', border: `1px solid ${armed ? 'var(--warn, #f5a623)' : 'var(--border)'}`, borderRadius: 10 }}>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontWeight: 700, fontSize: 13 }}>
+                    {r.bookingCode || r.betId.slice(0, 14)}
+                    {r.legs?.[0] && <span style={{ color: 'var(--text-soft)', fontWeight: 500 }}> · {r.legs[0].home} — {r.legs[0].away} · {r.legs[0].market} {r.legs[0].outcome}</span>}
+                  </div>
+                  <div style={{ fontSize: 12.5, color: 'var(--text-soft)', marginTop: 2 }}>
+                    {r.userEmail || r.userId}{r.displayName ? ` (${r.displayName})` : ''} · <strong className={`bet-status ${r.status}`}>{r.status}</strong> · owed <strong>{moneyFmt(r.owed)}</strong>
+                    {!r.userExists && <span style={{ color: 'var(--danger, #d63a2c)' }}> · player no longer exists</span>}
+                  </div>
+                </div>
+                <button className={`adm-btn sm ${armed ? 'danger' : 'primary'}`} onClick={() => pay(r)}
+                        disabled={!!payingId || !r.userExists}>
+                  {payingId === r.betId ? 'Paying…' : armed ? `Confirm: pay ${moneyFmt(r.owed)}` : (r.status === 'won' ? 'Pay & show trophy' : 'Refund')}
+                </button>
+              </div>
+            );
+          })}
         </div>
       )}
     </Modal>

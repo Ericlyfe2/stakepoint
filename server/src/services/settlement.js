@@ -261,6 +261,124 @@ export async function reconcilePendingPayouts() {
   return paid;
 }
 
+/* ------------ repairing wins that were settled but never paid ------------ */
+
+// Ledger entries that prove a bet's money reached the wallet.
+const PAYOUT_LEDGER_KINDS = new Set(['bet_won', 'bet_void_refund', 'bet_settlement_correction']);
+
+function hasPayoutLedgerEntry(bet) {
+  return (txStore.get(bet.userId) || []).some((t) => t.ref === bet.id && PAYOUT_LEDGER_KINDS.has(t.kind));
+}
+
+function owedAmount(bet) {
+  if (bet.status === 'won')  return Number((Number(bet.settledPayout) || Number(bet.totalReturn) || Number(bet.potentialWin) || 0).toFixed(2));
+  if (bet.status === 'void') return Number((Number(bet.stake) || 0).toFixed(2));
+  return 0;
+}
+
+function matchesQuery(bet, user, q) {
+  const raw = String(q || '').trim().toLowerCase();
+  if (!raw) return true;
+  const digits = raw.replace(/\D/g, '');
+  const userDigits = `${user?.phone || ''}${user?.email || ''}`.replace(/\D/g, '');
+  return bet.id.toLowerCase() === raw
+    || String(bet.bookingCode || '').toLowerCase() === raw
+    || String(bet.userId || '').toLowerCase() === raw
+    || String(user?.email || '').toLowerCase().includes(raw)
+    || String(user?.displayName || '').toLowerCase().includes(raw)
+    || (digits.length >= 6 && userDigits.includes(digits));
+}
+
+/**
+ * Lists won / void bets that appear to have been settled without the wallet
+ * ever being credited — the fallout of the old settle-then-credit ordering,
+ * which settleNow() can never retry because the bet is no longer 'open'.
+ *
+ * "Appears" is deliberate: legacy bets carry no payout marker, so the evidence
+ * is the absence of a matching wallet-ledger entry. A cleared or capped
+ * (500-row) transaction history can therefore make a paid bet look unpaid, so
+ * this is read-only and every row needs an admin to confirm before repayBet().
+ * Bets the settler is already retrying itself ('pending') are excluded.
+ */
+export function findUnpaidPayouts({ q } = {}) {
+  const rows = [];
+  for (const bet of Object.values(betsStore.all() || {})) {
+    if (!['won', 'void'].includes(bet.status)) continue;
+    if (bet.payoutStatus === 'paid' || bet.payoutStatus === 'none' || bet.payoutStatus === 'pending') continue;
+    const owed = owedAmount(bet);
+    if (!(owed > 0) || hasPayoutLedgerEntry(bet)) continue;
+    const user = getUserById(bet.userId);
+    if (!matchesQuery(bet, user, q)) continue;
+    rows.push({
+      betId: bet.id,
+      bookingCode: bet.bookingCode || null,
+      userId: bet.userId,
+      userExists: !!user,
+      userEmail: user?.email || null,
+      displayName: user?.displayName || null,
+      status: bet.status,
+      stake: bet.stake,
+      owed,
+      placedAt: bet.placedAt,
+      settledAt: bet.settledAt,
+      settledBy: bet.settledBy,
+      trophyPending: !!bet.wonNotAcknowledged,
+      legs: (bet.legs || []).map((l) => ({ home: l.home, away: l.away, market: l.market, outcome: l.outcome })),
+    });
+  }
+  return rows.sort((a, b) => new Date(b.settledAt || b.placedAt || 0) - new Date(a.settledAt || a.placedAt || 0));
+}
+
+/**
+ * Pays one stranded win/refund exactly once and, for a win, re-arms the
+ * trophy so the player gets the "You won" celebration on their next poll.
+ * The credit carries the same idempotency key the settler uses, so it can
+ * never double-pay against the settler, another admin, or a repeated click.
+ *
+ * Returns { ok: true, bet, credited, balance } or { error: 'not_found' |
+ * 'not_payable' | 'already_paid' | 'nothing_owed' | 'no_user' }.
+ */
+export async function repayBet(betId, { adminEmail } = {}) {
+  const bet = betsStore.get(betId);
+  if (!bet) return { error: 'not_found' };
+  if (!['won', 'void'].includes(bet.status)) return { error: 'not_payable' };
+  if (bet.payoutStatus === 'paid' || bet.payoutStatus === 'pending' || hasPayoutLedgerEntry(bet)) return { error: 'already_paid' };
+  const amount = owedAmount(bet);
+  if (!(amount > 0)) return { error: 'nothing_owed' };
+  const user = getUserById(bet.userId);
+  if (!user) return { error: 'no_user' };
+
+  const nextUser = await adjustBalance(user.id, amount, { allowNegative: true, idempotencyKey: `settle:${bet.id}` });
+  const now = new Date().toISOString();
+  const paidBefore = !!nextUser.alreadyApplied; // key already on the user: money was credited earlier
+  const kind = bet.status === 'won' ? 'bet_won' : 'bet_void_refund';
+  if (!paidBefore) {
+    pushTx(user.id, { kind, amount, status: 'completed', balanceAfter: nextUser.balance, ref: bet.id, note: 'Payout repair' });
+    logActivity(user.id, { kind: `bet_${bet.status}`, betId: bet.id, credit: amount, repairedBy: adminEmail });
+  }
+  const updated = {
+    ...betsStore.get(bet.id),
+    payoutStatus: 'paid',
+    payoutDue: amount,
+    paidAt: now,
+    payoutRepairedBy: adminEmail || 'admin',
+    ...(bet.status === 'won' ? { wonNotAcknowledged: true, acknowledgedAt: null } : {}),
+  };
+  await betsStore.setCritical(bet.id, updated);
+
+  emitToUser(user.id, 'wallet:update', { balance: nextUser.balance, delta: paidBefore ? 0 : amount, reason: `bet:${bet.status}`, ref: bet.id });
+  emitToUser(user.id, 'bet:settled', { betId: bet.id, status: bet.status, payout: amount });
+  if (bet.status === 'won') emitToUser(user.id, 'bet:won', { betId: bet.id, payout: amount, stake: bet.stake });
+  emitAdmin('bet:settled', { betId: bet.id, status: bet.status, userId: user.id, stake: bet.stake, credit: paidBefore ? 0 : amount });
+  recordAudit({
+    action: 'bet.payout.repair', target: bet.id, targetType: 'bet', severity: 'warning',
+    meta: { userId: user.id, amount, alreadyCredited: paidBefore, by: adminEmail },
+  });
+  // paidBefore: the wallet already had this credit (the marker was just missing),
+  // so nothing was added — the bet is now correctly marked paid and the trophy re-armed.
+  return { ok: true, bet: updated, credited: paidBefore ? 0 : amount, alreadyCredited: paidBefore, balance: nextUser.balance };
+}
+
 async function settleNowUnlocked() {
   await reconcilePendingPayouts();
   const open = Object.values(betsStore.all() || {}).filter((b) => b.status === 'open');

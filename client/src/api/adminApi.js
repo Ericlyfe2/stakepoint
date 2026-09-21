@@ -291,6 +291,8 @@ export const adminSettlementTrigger = (id) => post(`/settlement/fixtures/${encod
 export const adminSettlementSettleBet = (id, body) => post(`/settlement/bets/${encodeURIComponent(id)}/settle`, body);
 export const adminSettlementBulk = (body) => post('/settlement/bulk', body);
 export const adminSettlementAudit = () => get('/settlement/audit');
+export const adminSettlementUnpaid = (params) => get(`/settlement/unpaid${qs(params)}`);
+export const adminSettlementRepay = (id) => post(`/settlement/bets/${encodeURIComponent(id)}/repay`);
 
 /* KYC */
 export const adminListKyc        = (params) => get(`/kyc${qs(params)}`);

@@ -42,6 +42,7 @@ export async function buildTestApp(name) {
   const { default: adminDepositsRouter } = await import('../../src/routes/admin/deposits.js');
   const { default: adminWithdrawalsRouter } = await import('../../src/routes/admin/withdrawals.js');
   const { default: adminManagementRouter } = await import('../../src/routes/admin/management.js');
+  const { default: adminSettlementRouter } = await import('../../src/routes/admin/settlement.js');
 
   const app = express();
   app.use(express.json());
@@ -52,6 +53,7 @@ export async function buildTestApp(name) {
   app.use('/api/admin/deposits', adminDepositsRouter);
   app.use('/api/admin/withdrawals', adminWithdrawalsRouter);
   app.use('/api/admin/management', adminManagementRouter);
+  app.use('/api/admin/settlement', adminSettlementRouter);
   app.use('/api', notFoundHandler);
   app.use(errorHandler);
 

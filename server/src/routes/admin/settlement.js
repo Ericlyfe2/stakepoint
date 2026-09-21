@@ -4,7 +4,7 @@ import { asyncHandler } from '../../utils/asyncHandler.js';
 import { notFound } from '../../utils/httpError.js';
 import { createStore } from '../../db/store.js';
 import { setResult, adminLookupFixture, compiledLeagues } from '../../db/sportsAdmin.js';
-import { settleNow, auditSettledBets, applySettlement } from '../../services/settlement.js';
+import { settleNow, auditSettledBets, applySettlement, findUnpaidPayouts, repayBet } from '../../services/settlement.js';
 
 const betStore = createStore('bets', {});
 const router = Router();
@@ -68,6 +68,25 @@ router.get('/audit', requireAdmin, requireRole('odds_manager', 'finance_admin'),
   const { scanned, mismatches } = auditSettledBets();
   res.json({ scanned, mismatches });
 });
+
+// Won / refunded bets that look settled but never reached the player's wallet.
+// Read-only; `q` narrows by phone, email, name, booking code, bet id or user id.
+router.get('/unpaid', requireAdmin, requireRole('finance_admin', 'odds_manager'), (req, res) => {
+  const rows = findUnpaidPayouts({ q: req.query.q });
+  res.json({ count: rows.length, payouts: rows.slice(0, 200) });
+});
+
+// Pays one stranded bet exactly once and re-triggers the player's win trophy.
+router.post('/bets/:id/repay', requireAdmin, requireRole('finance_admin'), asyncHandler(async (req, res) => {
+  const out = await repayBet(req.params.id, { adminEmail: req.admin?.email });
+  if (out.error === 'not_found')    throw notFound('Bet not found');
+  if (out.error === 'not_payable')  return res.status(409).json({ error: 'Only won or void bets can be paid out.' });
+  if (out.error === 'already_paid') return res.status(409).json({ error: 'This bet has already been paid out.' });
+  if (out.error === 'nothing_owed') return res.status(409).json({ error: 'Nothing is owed on this bet.' });
+  if (out.error === 'no_user')      return res.status(409).json({ error: 'The bet belongs to a user that no longer exists.' });
+  audit(req, { action: 'bet.payout.repair', target: req.params.id, targetType: 'bet', severity: 'warning', meta: { credited: out.credited } });
+  res.json({ ok: true, credited: out.credited, alreadyCredited: out.alreadyCredited, balance: out.balance, bet: out.bet });
+}));
 
 router.get('/fixtures', requireAdmin, asyncHandler(async (req, res) => {
   const { status } = req.query;
