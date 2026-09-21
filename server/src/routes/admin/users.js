@@ -266,8 +266,10 @@ router.patch('/:id/stage',
       patch.stagePromotionRequestedTo = null;
     }
     const next_ = await updateUser(u.id, patch);
-    // Blocking (entering Stage 3) also kills every active session.
-    if (patch.blocked === true) revokeAllForAccount(u.id);
+    // Entering Stage 3 blocks WITHDRAWALS only. The user must stay signed in to
+    // see the withdraw popups, so sessions are deliberately NOT revoked here —
+    // the live `account:stage-changed` event below updates their open tabs.
+    // (Suspending an account is a separate action and still ends sessions.)
     const promoted = nextIdx > prevIdx;
     audit(req, {
       action: promoted ? 'user.stage.promote' : 'user.stage.demote',
@@ -299,7 +301,8 @@ router.patch('/:id/blocked',
       blockedAt: blocked ? new Date().toISOString() : null,
       blockedBy: blocked ? (req.admin?.email || req.admin?.id || 'admin') : null,
     });
-    if (blocked) revokeAllForAccount(u.id);
+    // A block only locks withdrawals — the user stays signed in so they can
+    // see the "account blocked" popup (sessions are only ended by suspending).
     audit(req, {
       action: blocked ? 'user.blocked' : 'user.unblocked',
       target: u.id, targetType: 'user',

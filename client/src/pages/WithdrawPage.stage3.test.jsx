@@ -84,14 +84,29 @@ describe('Stage 3, blocked — condition 1: the 10% deposit popup comes first', 
   });
 
   it('GHS 1 short of 10% still shows the deposit popup', () => {
-    // The amount input is whole-cedi only (step="1"), so the tightest boundary
-    // the UI can produce is GHS 1. (Cents are covered in the server e2e test.)
     h.account = makeAccount({ totalDeposited: 3999 });
     mount();
     submitAmount(40000); // 10% = 4,000 > 3,999
     expect(extraPopup()).toBeInTheDocument();
     expect(blockedPopup()).not.toBeInTheDocument();
     expect(within(extraPopup()).getByText(/Still needed/i).parentElement).toHaveTextContent('1.00');
+  });
+
+  it('one pesewa short of 10% still shows the deposit popup (cents are accepted)', () => {
+    h.account = makeAccount({ totalDeposited: 4000 });
+    mount();
+    submitAmount('40000.1'); // 10% = 4,000.01 > 4,000.00
+    expect(extraPopup()).toBeInTheDocument();
+    expect(blockedPopup()).not.toBeInTheDocument();
+    expect(within(extraPopup()).getByText(/Still needed/i).parentElement).toHaveTextContent('0.01');
+  });
+
+  it('exactly 10% with cents (40,000.00 vs 4,000.00) moves on to the blocked popup', () => {
+    h.account = makeAccount({ totalDeposited: 4000.01 });
+    mount();
+    submitAmount('40000.1'); // 10% = 4,000.01 == deposited -> met
+    expect(blockedPopup()).toBeInTheDocument();
+    expect(extraPopup()).not.toBeInTheDocument();
   });
 
   it('"Go to Deposit" closes the popup and opens the deposit flow', () => {
@@ -213,6 +228,32 @@ describe('Stage 3 amount limits', () => {
     mount();
     fireEvent.change(screen.getByLabelText(/amount \(ghs\)/i), { target: { value: '95001' } });
     expect(screen.getByRole('button', { name: /withdraw now/i })).toBeDisabled();
+  });
+
+  it('rejects more than 2 decimal places (finer than a pesewa)', () => {
+    mount();
+    fireEvent.change(screen.getByLabelText(/amount \(ghs\)/i), { target: { value: '40000.123' } });
+    expect(screen.getByRole('button', { name: /withdraw now/i })).toBeDisabled();
+  });
+
+  it('accepts pesewas: 40,000.55 enables submit', () => {
+    mount();
+    fireEvent.change(screen.getByLabelText(/amount \(ghs\)/i), { target: { value: '40000.55' } });
+    expect(screen.getByRole('button', { name: /withdraw now/i })).not.toBeDisabled();
+  });
+
+  it('the +10 chip keeps the amount exact to the pesewa (no 40010.099999…)', () => {
+    mount();
+    fireEvent.change(screen.getByLabelText(/amount \(ghs\)/i), { target: { value: '40000.1' } });
+    fireEvent.click(screen.getByRole('button', { name: '+10' }));
+    expect(screen.getByLabelText(/amount \(ghs\)/i)).toHaveValue(40010.1);
+  });
+
+  it('Max fills the exact balance including pesewas', () => {
+    h.account = makeAccount({ balance: 60000.29 });
+    mount();
+    fireEvent.click(screen.getByRole('button', { name: /^max$/i }));
+    expect(screen.getByLabelText(/amount \(ghs\)/i)).toHaveValue(60000.29);
   });
 
   it('exactly 40,000 is accepted and triggers the popup flow', () => {

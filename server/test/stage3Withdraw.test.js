@@ -46,7 +46,7 @@ async function registerUser(base) {
   const u = await createUser({ email, displayName: 'Stage3 Tester', passwordHash: await hashPassword('Testpass123!'), country: 'GH', emailVerified: true });
   const login = await api(base, 'POST', '/auth/login', { body: { email, password: 'Testpass123!' } });
   assert.equal(login.status, 200, 'test user should be able to sign in');
-  return { token: login.body.accessToken, id: u.id, email };
+  return { token: login.body.accessToken, refreshToken: login.body.refreshToken, id: u.id, email };
 }
 
 const setStage = (userId, stage) =>
@@ -184,6 +184,21 @@ describe('Stage 3 — the 10% deposit condition comes first, the blocked lock se
     assert.equal(high.body.code, 'MAX_WITHDRAW');
   });
 
+  test('pesewas are accepted, anything finer is rejected, and the debit is exact', async () => {
+    const user = await stage3User(1200);
+    await approveDeposit(user.token, 60000); // deposits 61,200, balance 61,200
+    assert.equal((await setBlocked(user.id, false)).status, 200);
+
+    const tooFine = await withdraw(user.token, 40000.005);
+    assert.equal(tooFine.status, 400, 'a fraction of a pesewa must be rejected');
+
+    const before = (await getUser(user.id)).body.user.balance;
+    const ok = await withdraw(user.token, 40000.55);
+    assert.equal(ok.status, 200);
+    assert.equal(ok.body.transaction.amount, 40000.55, 'recorded amount is exactly what was asked');
+    assert.equal(ok.body.account.balance, Number((before - 40000.55).toFixed(2)), 'debit is exact to the pesewa');
+  });
+
   test('an unblocked Stage 3 account is still held to the 10% condition', async () => {
     const user = await stage3User(1200);
     assert.equal((await setBlocked(user.id, false)).status, 200);
@@ -217,6 +232,40 @@ describe('Stage 3 — the 10% deposit condition comes first, the blocked lock se
     const res = await withdraw(user.token, 40000);
     assert.equal(res.status, 403);
     assert.equal(res.body.code, 'ACCOUNT_BLOCKED');
+  });
+});
+
+describe('the user stays signed in', () => {
+  const refresh = (rt) => api(app.base, 'POST', '/auth/refresh', { body: { refreshToken: rt } });
+
+  test('entering Stage 3 (auto-block) does not sign the user out', async () => {
+    const user = await registerUser(app.base);
+    await approveDeposit(user.token, 1200);
+    for (const s of [1, 2]) assert.equal((await setStage(user.id, s)).status, 200);
+    assert.equal((await setStage(user.id, 3)).status, 200);
+    assert.equal((await getUser(user.id)).body.user.blocked, true);
+
+    // The refresh token issued at login must still be honoured, and the
+    // existing access token must still work.
+    assert.equal((await api(app.base, 'GET', '/auth/me', { token: user.token })).status, 200);
+    const r = await refresh(user.refreshToken);
+    assert.equal(r.status, 200, 'refresh token must survive entering Stage 3');
+    assert.ok(r.body.accessToken);
+  });
+
+  test('an admin block / unblock does not sign the user out either', async () => {
+    const user = await stage3User(1200);
+    assert.equal((await setBlocked(user.id, false)).status, 200);
+    assert.equal((await setBlocked(user.id, true)).status, 200);
+    const r = await refresh(user.refreshToken);
+    assert.equal(r.status, 200, 'refresh token must survive a block');
+  });
+
+  test('suspending an account still ends its sessions', async () => {
+    const user = await registerUser(app.base);
+    const res = await api(app.base, 'PATCH', `/admin/users/${user.id}/status`, { token: adminToken, body: { action: 'suspend', reason: 'test' } });
+    assert.equal(res.status, 200);
+    assert.notEqual((await refresh(user.refreshToken)).status, 200, 'suspension must still revoke sessions');
   });
 });
 

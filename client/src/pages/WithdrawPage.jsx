@@ -129,11 +129,16 @@ export default function WithdrawPage() {
   // The deposit-ratio gate is enforced via the stage popups instead of
   // blocking the button, so the user always reaches the modal that explains
   // *why* the withdrawal can't proceed yet.
-  const isAmountValid = amtNum >= MIN_WITHDRAW && amtNum <= MAX_WITHDRAW && !overBalance;
+  // Amounts are in cedis and pesewas — at most 2 decimal places (matches the
+  // server, which rejects anything finer than a pesewa).
+  const hasValidCents = Math.abs(amtNum * 100 - Math.round(amtNum * 100)) < 1e-6;
+  const isAmountValid = amtNum >= MIN_WITHDRAW && amtNum <= MAX_WITHDRAW && !overBalance && hasValidCents;
   const net = NETWORKS[method] || NETWORKS.momo;
   const accountPhone = account.phone || account.email || '+233 59****943';
 
-  const bump = (n) => setAmount(String(Math.min(MAX_WITHDRAW, Math.round(amtNum + n))));
+  // Round to the pesewa so 40000.10 + 10 is 40010.1, never 40010.099999…
+  const toCents = (n) => Number(n.toFixed(2));
+  const bump = (n) => setAmount(String(Math.min(MAX_WITHDRAW, toCents(amtNum + n))));
 
   const cycleNetwork = () => {
     const order = ['momo', 'vodafone', 'airteltigo'];
@@ -687,7 +692,7 @@ export default function WithdrawPage() {
                   type="number"
                   min={MIN_WITHDRAW}
                   max={MAX_WITHDRAW}
-                  step="1"
+                  step="0.01"
                   inputMode="decimal"
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
@@ -711,7 +716,7 @@ export default function WithdrawPage() {
                 ))}
                 <button
                   type="button"
-                  onClick={() => setAmount(String(Math.min(MAX_WITHDRAW, Math.floor(balance))))}
+                  onClick={() => setAmount(String(Math.min(MAX_WITHDRAW, Math.floor(Number((balance * 100).toFixed(4))) / 100)))}
                   disabled={balance < MIN_WITHDRAW}
                   title={balance < MIN_WITHDRAW ? `Balance below minimum (GHS ${MIN_WITHDRAW.toLocaleString('en-US')})` : 'Withdraw your full balance'}
                   style={{

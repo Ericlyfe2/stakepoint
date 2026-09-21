@@ -47,7 +47,10 @@ const withdrawSchema = z.object({
   amount: z
     .number()
     .min(MIN_WITHDRAW, `Minimum withdrawal is GHS ${MIN_WITHDRAW.toLocaleString('en-US')}.`)
-    .max(1_000_000),
+    .max(1_000_000)
+    // Cedis and pesewas only. The wallet debit is rounded to 2 decimals, so a
+    // finer amount would make the recorded withdrawal differ from what's taken.
+    .refine((n) => Math.abs(n * 100 - Math.round(n * 100)) < 1e-6, 'Amount can have at most 2 decimal places.'),
   method: z.string().trim().max(40).optional(),
 });
 
