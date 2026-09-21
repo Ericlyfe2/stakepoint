@@ -1085,8 +1085,8 @@ function VerificationStageCard({ user, hasRole, onStage, onBlocked }) {
         }}>
           <div style={{ fontSize: 13, lineHeight: 1.5, marginBottom: 10 }}>
             {user.blocked
-              ? 'Account auto-locked on entering Stage 3. The user sees the "account blocked" popup on every withdrawal attempt until you unblock it.'
-              : 'Unblocked — Stage 3 withdrawals go through normally at the Stage 3 minimum.'}
+              ? 'Account auto-locked on entering Stage 3. The user first sees the "Additional deposit required" popup until their approved deposits cover 10% of the withdrawal, and then the "account blocked" popup on every withdrawal attempt until you unblock it.'
+              : 'Unblocked — Stage 3 withdrawals go through at the Stage 3 minimum once approved deposits cover 10% of the withdrawal amount.'}
           </div>
           <button
             type="button"

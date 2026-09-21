@@ -57,7 +57,7 @@ const STAGES = [
     id: 3,
     title: 'Stage 3',
     name: 'Approved',
-    description: 'Auto-locks the account the moment it enters this stage. Withdrawal shows the "account blocked" popup until an admin unblocks. Once unblocked, still needs approved deposits ≥ 10% of the withdrawal amount ("Additional deposit required" popup). Min withdrawal GHS 40,000.',
+    description: 'Auto-locks the account the moment it enters this stage. Two conditions, in order: (1) approved deposits ≥ 10% of the withdrawal amount ("Additional deposit required" popup); (2) once that is met, the "account blocked" popup shows until an admin unblocks. Min withdrawal GHS 40,000.',
     accent: '#0E8A4A',
     gradient: 'linear-gradient(135deg, #007A45 0%, #005A32 100%)',
   },

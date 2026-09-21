@@ -145,9 +145,11 @@ export default function WithdrawPage() {
     e.preventDefault();
     setErr('');
     if (!isAmountValid || busy) return;
-    // Stage 3 promotes lock the account — the blocked popup gates everything
-    // until an admin clears the block.
-    if (isBlocked) {
+    // A blocked account is stopped by the "account blocked" popup before
+    // anything else — EXCEPT at Stage 3, which auto-blocks on entry but has
+    // two ordered conditions: the 10% deposit requirement comes first, and the
+    // blocked popup only appears once that is met (handled further down).
+    if (isBlocked && stage !== 3) {
       setShowBlocked(true);
       return;
     }
@@ -171,8 +173,13 @@ export default function WithdrawPage() {
         return;
       }
     }
-    // Deposit ratio satisfied (or Stage isn't gated by it) and, for Stage 3,
-    // the admin has cleared the lock. Show the confirm step before actually
+    // Stage 3, condition 2 of 2: the 10% requirement is met, so now the
+    // account-blocked popup shows until an admin unblocks the account.
+    if (isBlocked) {
+      setShowBlocked(true);
+      return;
+    }
+    // Every gate is satisfied. Show the confirm step before actually
     // submitting the request for admin approval.
     setShowConfirmWithdraw(true);
   };

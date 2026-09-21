@@ -27,7 +27,7 @@ Source of truth in code:
 | **0** | In review | **Automatic** — first *approved* deposit ≥ GHS 1,000 while stage is Neutral | Same as Neutral: **"Deposit requirement"** popup. Min withdrawal GHS 550 |
 | **1** | Verified | **Manual** — admin promotes from 0 | Still gated behind the **"Deposit requirement"** popup (GHS 1,000). Min withdrawal GHS 550 |
 | **2** | Trusted | **Manual** — admin promotes from 1 | **"Additional deposit required"** popup — must have approved deposits ≥ 10% of the withdrawal amount. Min withdrawal **GHS 10,000** |
-| **3** | Approved | **Manual** — admin promotes from 2 | **Auto-locks the account** (`blocked: true`) the moment it enters Stage 3. Withdrawal shows the **"account blocked"** popup until an admin unblocks. Once unblocked, min withdrawal **GHS 40,000** |
+| **3** | Approved | **Manual** — admin promotes from 2 | **Auto-locks the account** (`blocked: true`) the moment it enters Stage 3. Two ordered withdrawal conditions: **(1)** approved deposits ≥ 10% of the withdrawal amount (**"Additional deposit required"** popup) — **(2)** only once that is met, the **"account blocked"** popup shows until an admin unblocks. Min withdrawal **GHS 40,000** |
 | **4** | VIP | **Manual** — admin promotes from 3 | Full clearance — no popups, no blocks, withdrawals go straight through. Min withdrawal **GHS 50,000** |
 
 Global withdrawal ceiling regardless of stage: **GHS 95,000** per transaction
@@ -79,10 +79,17 @@ then decides which popup — if any — blocks submission:
 
 | Condition | Popup shown |
 |---|---|
-| `account.blocked === true` | **"account blocked"** — must deposit GHS 2,000 and contact support |
+| `account.blocked === true` (any stage except 3) | **"account blocked"** — must deposit GHS 2,000 and contact support |
 | Stage 0 or 1 | **"Deposit requirement"** — must deposit GHS 1,000 to verify the account |
 | Stage 2 | **"Additional deposit required"** — shows required extra deposit (10% of withdrawal amount), how much approved-deposit credit is already available, and how much more is still needed |
-| Stage 3 (not blocked) or Stage 4 | No popup — normal withdrawal submitted via `POST /api/wallet/withdraw` |
+| Stage 3, blocked, 10% **not** yet met | **"Additional deposit required"** first (condition 1 of 2) |
+| Stage 3, blocked, 10% met | **"account blocked"** (condition 2 of 2) until an admin unblocks |
+| Stage 3 (not blocked), 10% not met | **"Additional deposit required"** |
+| Stage 3 (not blocked, 10% met) or Stage 4 | No popup — normal withdrawal submitted via `POST /api/wallet/withdraw` |
+
+The server enforces the same order for Stage 3: `DEPOSIT_GATE` is checked
+before `ACCOUNT_BLOCKED`. For every other stage a blocked account is rejected
+with `ACCOUNT_BLOCKED` first.
 
 Server-side, every withdrawal (independent of stage) additionally enforces:
 - Minimum **GHS 550** (`MIN_WITHDRAW`)

@@ -95,20 +95,23 @@ router.post('/withdraw', requireAuth, validate(withdrawSchema), asyncHandler(asy
   const { amount, method = 'momo' } = req.body;
   const user = req.user;
 
-  // Stage 3 auto-blocks the account — no money leaves until an admin
-  // unblocks. The client shows the "account blocked" popup for this.
-  if (user.blocked) {
-    throw forbidden(
-      `Your account is blocked. Deposit GHS ${STAGE3_UNBLOCK_THRESHOLD.toLocaleString('en-US')} and contact support for review.`,
-      { code: 'ACCOUNT_BLOCKED' }
-    );
-  }
+  const stage = normalizedStage(user);
+
+  // A blocked account can't withdraw until an admin unblocks it; the client
+  // shows the "account blocked" popup for this. Stage 3 is the one exception
+  // to "blocked comes first": it auto-blocks on entry, and its two conditions
+  // are ordered — the 10% deposit requirement must be met FIRST, and only then
+  // does the blocked popup appear (see the second blocked check below).
+  const blockedError = () => forbidden(
+    `Your account is blocked. Deposit GHS ${STAGE3_UNBLOCK_THRESHOLD.toLocaleString('en-US')} and contact support for review.`,
+    { code: 'ACCOUNT_BLOCKED' }
+  );
+  if (user.blocked && stage !== 3) throw blockedError();
 
   // Neutral / Stage 0 / Stage 1 are gated behind manual admin verification —
   // the client never lets these stages submit a real withdrawal (it always
   // shows the "Deposit requirement" popup instead), so the server must
   // refuse them too or the gate is a client-side-only illusion.
-  const stage = normalizedStage(user);
   if (stage === null || stage === 0 || stage === 1) {
     throw forbidden(
       `You need to deposit GHS ${STAGE_PROMOTE_THRESHOLD.toLocaleString('en-US')} and be verified by an admin before withdrawing.`,
@@ -144,6 +147,8 @@ router.post('/withdraw', requireAuth, validate(withdrawSchema), asyncHandler(asy
       { code: 'DEPOSIT_GATE', required, totalDeposited }
     );
   }
+  // Stage 3, condition 2 of 2: 10% requirement is satisfied, now the lock.
+  if (user.blocked) throw blockedError();
   if (amount > user.balance) throw badRequest('Insufficient balance.');
 
   // Withdrawals now require admin approval: reserve the funds immediately
