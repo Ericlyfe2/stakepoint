@@ -109,10 +109,35 @@ function loadFromFile(file, fallback) {
   }
 }
 
+// On Windows, renaming over an existing file can fail transiently (EPERM /
+// EBUSY / EACCES) when antivirus, the search indexer, or a just-closed handle
+// still has the destination open. That is not a real failure — retry briefly.
+const TRANSIENT_RENAME_ERRORS = new Set(['EPERM', 'EBUSY', 'EACCES']);
+const RENAME_RETRIES = 6;
+function sleepSync(ms) {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+}
+
 function persistFile(file, data) {
   const tmp = `${file}.tmp`;
-  fs.writeFileSync(tmp, JSON.stringify(data, null, 2), 'utf8');
-  fs.renameSync(tmp, file);
+  const json = JSON.stringify(data, null, 2);
+  fs.writeFileSync(tmp, json, 'utf8');
+  for (let attempt = 0; ; attempt++) {
+    try {
+      fs.renameSync(tmp, file);
+      return;
+    } catch (e) {
+      if (!TRANSIENT_RENAME_ERRORS.has(e?.code)) throw e;
+      if (attempt >= RENAME_RETRIES) {
+        // Still locked: fall back to writing the destination directly rather
+        // than losing the write (this can't be atomic, but it isn't lost).
+        fs.writeFileSync(file, json, 'utf8');
+        try { fs.unlinkSync(tmp); } catch { /* best effort */ }
+        return;
+      }
+      sleepSync(5 * (attempt + 1));
+    }
+  }
 }
 
 // ---- Public createStore() --------------------------------------------------
