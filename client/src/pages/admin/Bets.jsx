@@ -13,6 +13,7 @@ import { useAdmin } from '../../providers/AdminProvider.jsx';
 import {
   adminListBets, adminGetBet, adminSettleBet, adminCancelBet, adminNoteBet, adminBulkBets,
   adminDeleteBet, adminRestoreBet, adminSettlementAudit, adminSettlementUnpaid, adminSettlementRepay,
+  adminSlipEditBet,
 } from '../../api/adminApi.js';
 
 function toBookingCode(id = '') {
@@ -27,6 +28,7 @@ import {
 } from '../../components/admin/primitives.jsx';
 import {
   IconSearch, IconRefresh, IconCheck, IconAlert, IconBan, IconDownload, IconReceipt, IconLive, IconSettle,
+  IconEdit, IconPlus, IconTrash,
 } from '../../components/admin/Icons.jsx';
 
 const STATUS_TONES = { open: 'info', won: 'success', lost: 'danger', void: 'warn', cashed_out: 'brand', cancelled: 'default' };
@@ -329,6 +331,7 @@ function BetDrawer({ open, betId, onClose, onUpdate, hasRole, showToast }) {
   const [busy, setBusy] = useState(false);
   const [settleOpen, setSettleOpen] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
   const [noteText, setNoteText] = useState('');
 
   useEffect(() => {
@@ -363,6 +366,15 @@ function BetDrawer({ open, betId, onClose, onUpdate, hasRole, showToast }) {
       setNoteText('');
     } catch (e) { showToast(e.message, 'error'); }
   }
+  async function doSlipEdit(body) {
+    setBusy(true);
+    try {
+      const { bet: updated } = await adminSlipEditBet(betId, body);
+      setBet(updated); onUpdate(updated);
+      showToast('Bet slip updated.');
+      setEditOpen(false);
+    } catch (e) { showToast(e.message, 'error'); } finally { setBusy(false); }
+  }
 
   if (!open) return null;
 
@@ -375,6 +387,11 @@ function BetDrawer({ open, betId, onClose, onUpdate, hasRole, showToast }) {
       footer={bet && bet.status === 'open' && hasRole('odds_manager', 'finance_admin', 'moderator') ? (
         <>
           {hasRole('odds_manager', 'finance_admin') && (
+            <button className="adm-btn" onClick={() => setEditOpen(true)} disabled={busy}>
+              <IconEdit size={14} /> Edit slip
+            </button>
+          )}
+          {hasRole('odds_manager', 'finance_admin') && (
             <button className="adm-btn primary" onClick={() => setSettleOpen(true)} disabled={busy}>
               <IconSettle size={14} /> Settle
             </button>
@@ -384,10 +401,19 @@ function BetDrawer({ open, betId, onClose, onUpdate, hasRole, showToast }) {
           </button>
         </>
       ) : bet && ['won', 'lost', 'void'].includes(bet.status) && hasRole('odds_manager', 'finance_admin') ? (
-        <button className="adm-btn warn" onClick={() => setSettleOpen(true)} disabled={busy}>
-          <IconSettle size={14} /> Correct settlement
+        <>
+          <button className="adm-btn" onClick={() => setEditOpen(true)} disabled={busy}>
+            <IconEdit size={14} /> Edit slip
+          </button>
+          <button className="adm-btn warn" onClick={() => setSettleOpen(true)} disabled={busy}>
+            <IconSettle size={14} /> Correct settlement
+          </button>
+        </>
+      ) : bet && hasRole('odds_manager', 'finance_admin') && (
+        <button className="adm-btn" onClick={() => setEditOpen(true)} disabled={busy}>
+          <IconEdit size={14} /> Edit slip
         </button>
-      ) : null}
+      )}
     >
       {!bet ? <div className="adm-skel" style={{ height: 200 }} /> : (
         <>
@@ -449,6 +475,7 @@ function BetDrawer({ open, betId, onClose, onUpdate, hasRole, showToast }) {
 
       <SettleModal open={settleOpen} onClose={() => setSettleOpen(false)} onSubmit={doSettle} busy={busy} bet={bet} />
       <CancelModal open={cancelOpen} onClose={() => setCancelOpen(false)} onSubmit={doCancel} busy={busy} bet={bet} />
+      <EditSlipModal open={editOpen} onClose={() => setEditOpen(false)} onSubmit={doSlipEdit} busy={busy} bet={bet} />
     </Drawer>
   );
 }
@@ -699,6 +726,135 @@ function CancelModal({ open, onClose, onSubmit, busy, bet }) {
         <button className="adm-btn ghost" type="button" onClick={onClose}>Back</button>
         <button className="adm-btn danger" type="button" onClick={() => reason.length >= 2 && onSubmit(reason)} disabled={busy || reason.length < 2}>
           {busy ? 'Refunding…' : 'Cancel and refund'}
+        </button>
+      </div>
+    </Modal>
+  );
+}
+
+/* ---------------- Edit slip ---------------- */
+
+const EMPTY_LEG = { matchId: '', market: '', outcome: '', odds: '', home: '', away: '', marketName: '' };
+
+function EditSlipModal({ open, onClose, onSubmit, busy, bet }) {
+  const [stake, setStake] = useState('');
+  const [legs, setLegs] = useState([]);
+  const [reason, setReason] = useState('');
+  const [result, setResult] = useState('none');
+  const [payoutOverride, setPayoutOverride] = useState('');
+
+  useEffect(() => {
+    if (!open || !bet) return;
+    setStake(String(bet.stake ?? ''));
+    setLegs((bet.legs || []).map((l) => ({
+      matchId: l.matchId || '', market: l.market || '', outcome: l.outcome || '',
+      odds: String(l.odds ?? ''), home: l.home || '', away: l.away || '', marketName: l.marketName || l.market || '',
+    })));
+    setReason('');
+    setResult('none');
+    setPayoutOverride('');
+  }, [open, bet]);
+
+  if (!bet) return null;
+
+  const isCorrection = bet.status !== 'open';
+  const validLegs = legs.filter((l) => l.matchId.trim() && l.market.trim() && l.outcome.trim() && Number(l.odds) > 0);
+  const totalOdds = validLegs.length === legs.length && legs.length > 0
+    ? Number(legs.reduce((p, l) => p * (Number(l.odds) || 0), 1).toFixed(4))
+    : 0;
+  const stakeNum = Number(stake);
+  const potentialWin = stakeNum > 0 && totalOdds > 0 ? Number((stakeNum * totalOdds).toFixed(2)) : 0;
+  const reasonMissing = isCorrection && !reason.trim();
+  const canSave = stakeNum > 0 && legs.length > 0 && validLegs.length === legs.length && !reasonMissing;
+
+  function setLeg(i, patch) {
+    setLegs((prev) => prev.map((l, x) => (x === i ? { ...l, ...patch } : l)));
+  }
+  function addLeg() { setLegs((prev) => [...prev, { ...EMPTY_LEG }]); }
+  function removeLeg(i) { setLegs((prev) => prev.filter((_, x) => x !== i)); }
+
+  function submit() {
+    if (!canSave) return;
+    const body = {
+      stake: stakeNum,
+      legs: legs.map((l) => ({
+        matchId: l.matchId.trim(), market: l.market.trim(), outcome: l.outcome.trim(),
+        odds: Number(l.odds), home: l.home.trim(), away: l.away.trim(),
+        marketName: l.marketName.trim() || undefined,
+      })),
+      reason: reason.trim() || undefined,
+    };
+    if (result !== 'none') {
+      body.result = result;
+      if (payoutOverride !== '' && Number(payoutOverride) >= 0) body.payoutOverride = Number(payoutOverride);
+    }
+    onSubmit(body);
+  }
+
+  return (
+    <Modal open={open} onClose={onClose}
+           title="Edit bet slip"
+           description={`Edit the stake and legs of ${bet.id.slice(0, 16)}…  ·  currently ${moneyFmt(bet.stake)} at ${Number(bet.totalOdds).toFixed(4)}x${isCorrection ? `  ·  already ${bet.status}` : ''}`}>
+      <div className="adm-field">
+        <label>Stake ({bet.currency || 'GHS'})</label>
+        <input className="adm-input" type="number" min="0" step="0.01" value={stake} onChange={(e) => setStake(e.target.value)} />
+      </div>
+
+      <div className="adm-field" style={{ marginTop: 12 }}>
+        <label>Legs ({legs.length})</label>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {legs.map((l, i) => (
+            <div key={i} style={{ background: 'var(--surface-soft)', border: '1px solid var(--border)', borderRadius: 10, padding: 10 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
+                <input className="adm-input" placeholder="Home" value={l.home} onChange={(e) => setLeg(i, { home: e.target.value })} />
+                <input className="adm-input" placeholder="Away" value={l.away} onChange={(e) => setLeg(i, { away: e.target.value })} />
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 90px 36px', gap: 8 }}>
+                <input className="adm-input" placeholder="Market" value={l.market} onChange={(e) => setLeg(i, { market: e.target.value })} />
+                <input className="adm-input" placeholder="Pick" value={l.outcome} onChange={(e) => setLeg(i, { outcome: e.target.value })} />
+                <input className="adm-input" type="number" min="1" step="0.01" placeholder="Odds" value={l.odds} onChange={(e) => setLeg(i, { odds: e.target.value })} />
+                <button className="adm-icon-btn" type="button" onClick={() => removeLeg(i)} aria-label="Remove leg" disabled={legs.length <= 1}>
+                  <IconTrash size={14} />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+        <button className="adm-btn sm" type="button" onClick={addLeg} style={{ marginTop: 8 }}>
+          <IconPlus size={14} /> Add leg
+        </button>
+      </div>
+
+      <div style={{ display: 'flex', gap: 18, background: 'var(--surface-soft)', border: '1px solid var(--border)', borderRadius: 12, padding: '10px 12px', fontSize: 13, marginTop: 12 }}>
+        <div>Total odds <strong style={{ display: 'block', fontSize: 14 }}>{totalOdds ? totalOdds.toFixed(4) : '—'}</strong></div>
+        <div>Potential <strong style={{ display: 'block', fontSize: 14 }}>{potentialWin ? moneyFmt(potentialWin, bet.currency) : '—'}</strong></div>
+      </div>
+
+      <div className="adm-field" style={{ marginTop: 12 }}>
+        <label>Reason {isCorrection ? '(required, audited)' : '(optional, audited)'}</label>
+        <input className="adm-input" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. wrong odds entered at placement" />
+      </div>
+
+      <div className="adm-field" style={{ marginTop: 12 }}>
+        <label>Result (optional — re-settle at the same time)</label>
+        <div style={{ display: 'flex', gap: 8 }}>
+          {[['none', 'No change'], ['won', 'Won'], ['lost', 'Lost'], ['void', 'Void']].map(([k, l]) => (
+            <button key={k} type="button" className={`adm-btn sm ${result === k ? 'primary' : 'ghost'}`} onClick={() => setResult(k)}>{l}</button>
+          ))}
+        </div>
+      </div>
+
+      {result !== 'none' && (
+        <div className="adm-field" style={{ marginTop: 12 }}>
+          <label>Payout override (optional)</label>
+          <input className="adm-input" type="number" min="0" step="0.01" value={payoutOverride} onChange={(e) => setPayoutOverride(e.target.value)} placeholder="default: computed payout" />
+        </div>
+      )}
+
+      <div className="adm-modal-actions">
+        <button className="adm-btn ghost" type="button" onClick={onClose}>Cancel</button>
+        <button className="adm-btn primary" type="button" onClick={submit} disabled={busy || !canSave}>
+          {busy ? 'Saving…' : 'Save slip'}
         </button>
       </div>
     </Modal>

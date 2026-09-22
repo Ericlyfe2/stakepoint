@@ -151,6 +151,7 @@ export const adminListBets   = (params) => get(`/bets${qs(params)}`);
 export const adminLiveBets   = ()     => get('/bets/live');
 export const adminGetBet     = (id)   => get(`/bets/${encodeURIComponent(id)}`);
 export const adminSettleBet  = (id, body) => post(`/bets/${encodeURIComponent(id)}/settle`, body);
+export const adminSlipEditBet = (id, body) => post(`/bets/${encodeURIComponent(id)}/slip-edit`, body);
 export const adminCancelBet  = (id, reason) => post(`/bets/${encodeURIComponent(id)}/cancel`, { reason });
 export const adminNoteBet    = (id, note)   => post(`/bets/${encodeURIComponent(id)}/note`, { note });
 export const adminDeleteBet  = (id, reason) => post(`/bets/${encodeURIComponent(id)}/delete`,  { reason });
