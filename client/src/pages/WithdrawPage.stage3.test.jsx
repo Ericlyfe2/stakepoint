@@ -62,6 +62,7 @@ function submitAmount(value) {
 }
 
 const extraPopup = () => screen.queryByRole('dialog', { name: /additional deposit required/i });
+const rulePopup = () => screen.queryByRole('dialog', { name: /withdrawal conditions/i });
 const blockedPopup = () => screen.queryByRole('dialog', { name: /account blocked/i });
 const confirmPopup = () => screen.queryByRole('dialog', { name: /confirm to withdraw/i });
 
@@ -185,14 +186,15 @@ describe('Stage 3, blocked — condition 2: the blocked popup once the 10% is me
     fireEvent.click(within(blockedPopup()).getByRole('button', { name: /^close$/i }));
 
     // 3) An admin unblocks the account (account:stage-changed pushes blocked:false).
-    //    All conditions are now met, but below Stage 4 the "Additional deposit
-    //    required" popup still BLOCKS — the confirm step never appears.
+    //    All conditions are met, but below Stage 4 the "Withdrawal conditions"
+    //    popup still BLOCKS — the confirm step never appears.
     h.account = makeAccount({ totalDeposited: 4000, blocked: false });
     view.rerender(<MemoryRouter initialEntries={['/withdraw']}><WithdrawPage /></MemoryRouter>);
     fireEvent.click(screen.getByRole('button', { name: /withdraw now/i }));
     expect(blockedPopup()).not.toBeInTheDocument();
-    expect(extraPopup()).toBeInTheDocument();
+    expect(extraPopup()).not.toBeInTheDocument();
     expect(confirmPopup()).not.toBeInTheDocument();
+    expect(rulePopup()).toBeInTheDocument();
     expect(h.withdraw).not.toHaveBeenCalled();
   });
 });
@@ -207,14 +209,30 @@ describe('Stage 3, unblocked', () => {
     expect(confirmPopup()).not.toBeInTheDocument();
   });
 
-  it('shows the "Additional deposit required" popup even when the 10% is met (no confirm below Stage 4)', () => {
+  it('shows the "Withdrawal conditions" popup once the 10% is met (no confirm below Stage 4)', () => {
     h.account = makeAccount({ blocked: false, totalDeposited: 4000 });
     mount();
     submitAmount(40000);
-    expect(extraPopup()).toBeInTheDocument();
+    expect(rulePopup()).toBeInTheDocument();
+    expect(extraPopup()).not.toBeInTheDocument();
     expect(blockedPopup()).not.toBeInTheDocument();
     expect(confirmPopup()).not.toBeInTheDocument();
     expect(h.withdraw).not.toHaveBeenCalled();
+    expect(within(rulePopup()).getByText(/awaiting Stage 4 promotion/i)).toBeInTheDocument();
+    expect(within(rulePopup()).queryByText(/Still needed/i)).not.toBeInTheDocument();
+  });
+
+  it('never shows "Still needed: GHS 0.00" when deposits already cover the 10%', () => {
+    // The reported bug: a Stage 2 account with GHS 13,500 lifetime deposits
+    // withdrawing GHS 10,000 saw "Additional deposit required" with "Still
+    // needed: GHS 0.00" (10% = 1,000 < 13,500). The conditions are met, so it
+    // must get the "Withdrawal conditions / awaiting Stage 4" popup instead.
+    h.account = makeAccount({ stage: 2, blocked: false, totalDeposited: 13500 });
+    mount();
+    submitAmount(10000);
+    expect(extraPopup()).not.toBeInTheDocument();
+    expect(rulePopup()).toBeInTheDocument();
+    expect(within(rulePopup()).getByText(/conditions met/i)).toBeInTheDocument();
   });
 });
 
