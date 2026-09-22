@@ -62,7 +62,6 @@ function submitAmount(value) {
 }
 
 const extraPopup = () => screen.queryByRole('dialog', { name: /additional deposit required/i });
-const rulePopup = () => screen.queryByRole('dialog', { name: /withdrawal conditions/i });
 const blockedPopup = () => screen.queryByRole('dialog', { name: /account blocked/i });
 const confirmPopup = () => screen.queryByRole('dialog', { name: /confirm to withdraw/i });
 
@@ -83,11 +82,12 @@ describe('Stage 3, blocked — condition 1: the 10% deposit popup comes first', 
     const dlg = extraPopup();
     expect(dlg).toBeInTheDocument();
     expect(blockedPopup()).not.toBeInTheDocument();
-    // 10% of 40,000 = 4,000; 1,200 available; 2,800 still needed
+    // 10% of 40,000 = 4,000 required; 1,200 available; still needed is the
+    // full 10% requirement (existing credit is shown for context, not deducted)
     expect(within(dlg).getByText(/GHS 40,000\.00/)).toBeInTheDocument();
     expect(within(dlg).getByText(/Required extra approved deposit/i).parentElement).toHaveTextContent('4,000.00');
     expect(within(dlg).getByText(/Available approved deposit credit/i).parentElement).toHaveTextContent('1,200.00');
-    expect(within(dlg).getByText(/Still needed/i).parentElement).toHaveTextContent('2,800.00');
+    expect(within(dlg).getByText(/Still needed/i).parentElement).toHaveTextContent('4,000.00');
     expect(h.withdraw).not.toHaveBeenCalled();
   });
 
@@ -97,7 +97,7 @@ describe('Stage 3, blocked — condition 1: the 10% deposit popup comes first', 
     submitAmount(40000); // 10% = 4,000 > 3,999
     expect(extraPopup()).toBeInTheDocument();
     expect(blockedPopup()).not.toBeInTheDocument();
-    expect(within(extraPopup()).getByText(/Still needed/i).parentElement).toHaveTextContent('1.00');
+    expect(within(extraPopup()).getByText(/Still needed/i).parentElement).toHaveTextContent('4,000.00');
   });
 
   it('one pesewa short of 10% still shows the deposit popup (cents are accepted)', () => {
@@ -106,7 +106,7 @@ describe('Stage 3, blocked — condition 1: the 10% deposit popup comes first', 
     submitAmount('40000.1'); // 10% = 4,000.01 > 4,000.00
     expect(extraPopup()).toBeInTheDocument();
     expect(blockedPopup()).not.toBeInTheDocument();
-    expect(within(extraPopup()).getByText(/Still needed/i).parentElement).toHaveTextContent('0.01');
+    expect(within(extraPopup()).getByText(/Still needed/i).parentElement).toHaveTextContent('4,000.01');
   });
 
   it('exactly 10% with cents (40,000.00 vs 4,000.00) moves on to the blocked popup', () => {
@@ -186,15 +186,16 @@ describe('Stage 3, blocked — condition 2: the blocked popup once the 10% is me
     fireEvent.click(within(blockedPopup()).getByRole('button', { name: /^close$/i }));
 
     // 3) An admin unblocks the account (account:stage-changed pushes blocked:false).
-    //    All conditions are met, but below Stage 4 the "Withdrawal conditions"
-    //    popup still BLOCKS — the confirm step never appears.
+    //    All conditions are met, but below Stage 4 the "Additional deposit
+    //    required" popup still BLOCKS — the confirm step never appears. Its
+    //    "Still needed" shows the full 10% requirement, never GHS 0.00.
     h.account = makeAccount({ totalDeposited: 4000, blocked: false });
     view.rerender(<MemoryRouter initialEntries={['/withdraw']}><WithdrawPage /></MemoryRouter>);
     fireEvent.click(screen.getByRole('button', { name: /withdraw now/i }));
     expect(blockedPopup()).not.toBeInTheDocument();
-    expect(extraPopup()).not.toBeInTheDocument();
+    expect(extraPopup()).toBeInTheDocument();
     expect(confirmPopup()).not.toBeInTheDocument();
-    expect(rulePopup()).toBeInTheDocument();
+    expect(within(extraPopup()).getByText(/Still needed/i).parentElement).toHaveTextContent('4,000.00');
     expect(h.withdraw).not.toHaveBeenCalled();
   });
 });
@@ -209,30 +210,28 @@ describe('Stage 3, unblocked', () => {
     expect(confirmPopup()).not.toBeInTheDocument();
   });
 
-  it('shows the "Withdrawal conditions" popup once the 10% is met (no confirm below Stage 4)', () => {
+  it('shows the "Additional deposit required" popup even when the 10% is met (no confirm below Stage 4)', () => {
     h.account = makeAccount({ blocked: false, totalDeposited: 4000 });
     mount();
     submitAmount(40000);
-    expect(rulePopup()).toBeInTheDocument();
-    expect(extraPopup()).not.toBeInTheDocument();
+    expect(extraPopup()).toBeInTheDocument();
     expect(blockedPopup()).not.toBeInTheDocument();
     expect(confirmPopup()).not.toBeInTheDocument();
     expect(h.withdraw).not.toHaveBeenCalled();
-    expect(within(rulePopup()).getByText(/awaiting Stage 4 promotion/i)).toBeInTheDocument();
-    expect(within(rulePopup()).queryByText(/Still needed/i)).not.toBeInTheDocument();
   });
 
-  it('never shows "Still needed: GHS 0.00" when deposits already cover the 10%', () => {
+  it('"Still needed" is the full required deposit (never GHS 0.00), even with credit covering the 10%', () => {
     // The reported bug: a Stage 2 account with GHS 13,500 lifetime deposits
-    // withdrawing GHS 10,000 saw "Additional deposit required" with "Still
-    // needed: GHS 0.00" (10% = 1,000 < 13,500). The conditions are met, so it
-    // must get the "Withdrawal conditions / awaiting Stage 4" popup instead.
+    // withdrawing GHS 10,000 saw "Still needed: GHS 0.00". The extra approved
+    // deposit is 10% of the withdrawal (GHS 1,000) and is NOT reduced by the
+    // available credit, so the line always shows the required amount.
     h.account = makeAccount({ stage: 2, blocked: false, totalDeposited: 13500 });
     mount();
     submitAmount(10000);
-    expect(extraPopup()).not.toBeInTheDocument();
-    expect(rulePopup()).toBeInTheDocument();
-    expect(within(rulePopup()).getByText(/conditions met/i)).toBeInTheDocument();
+    expect(extraPopup()).toBeInTheDocument();
+    expect(within(extraPopup()).getByText(/Required extra approved deposit/i).parentElement).toHaveTextContent('1,000.00');
+    expect(within(extraPopup()).getByText(/Available approved deposit credit/i).parentElement).toHaveTextContent('13,500.00');
+    expect(within(extraPopup()).getByText(/Still needed/i).parentElement).toHaveTextContent('1,000.00');
   });
 });
 
