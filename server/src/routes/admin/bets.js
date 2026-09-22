@@ -15,6 +15,7 @@ import { requireAdmin, requireRole, audit } from '../../middleware/adminAuth.js'
 import { validate } from '../../middleware/validate.js';
 import { asyncHandler } from '../../utils/asyncHandler.js';
 import { badRequest, conflict, notFound } from '../../utils/httpError.js';
+import { SYSTEM_TYPES, maxSystemReturn } from '../../lib/systemBets.js';
 import * as cashOutEngine from '../../services/cashOutEngine.js';
 import { applySettlement } from '../../services/settlement.js';
 
@@ -128,148 +129,227 @@ router.post('/:id/settle',
   })
 );
 
-router.post('/:id/slip-edit',
-  requireAdmin, requireRole('odds_manager', 'finance_admin'),
-  validate(z.object({
-    stake: z.number().positive().optional(),
-    legs: z.array(z.object({
-      matchId: z.string().min(1),
-      market: z.string().min(1),
-      outcome: z.string().min(1),
-      odds: z.number().positive(),
-      home: z.string().min(1),
-      away: z.string().min(1),
-      marketName: z.string().optional(),
-      scoreHome: z.number().int().min(0).optional(),
-      scoreAway: z.number().int().min(0).optional(),
-    })).min(1).max(20),
-    reason: z.string().max(500).optional(),
-    result: z.enum(['won', 'lost', 'void']).optional(),
-    payoutOverride: z.number().nonnegative().optional(),
-  })),
-  asyncHandler(async (req, res, next) => {
-    const bet = betsStore.get(req.params.id);
-    if (!bet) return next(notFound('Bet not found'));
-    if (bet.status === 'cashed_out') return next(conflict('Cashed-out bets cannot have their slip edited. Settle the cash-out amount manually instead.'));
-    if (bet.status === 'cancelled')  return next(conflict('Cancelled bets cannot be edited — restore first.'));
+/* ─── Full administrative bet slip edit ───
+ * PATCH /:id  (and POST /:id/slip-edit alias) lets an admin rewrite the
+ * placed/settled timestamps, stake, bonus, mode, status and legs of a real
+ * bet in the database — NOT just the displayed text.
+ *
+ * Financial safety: the new slip's totals are recomputed with the same
+ * formulas used at placement (single/multiple/system + bonus), and whenever
+ * the payout that the slip owes changes (status change, or a settled bet
+ * whose stake/odds/bonus/legs moved) the wallet is reconciled through the
+ * shared applySettlement() engine, which credits/debits only the delta and
+ * can never double-pay (idempotency key on the user record).
+ *
+ * Timestamps are stored as ISO-8601 UTC strings (same as placedAt at
+ * placement). The client converts its local date+time inputs to UTC before
+ * sending, so no timezone drift is introduced — the db timestamp is the
+ * authoritative wall-clock instant, and every surface (admin drawer, list,
+ * user ticket history, API responses) reads it back from the store.
+ *
+ * Concurrency: sends expectedVersion (the bet.updatedAt it loaded); if
+ * another admin saved in between, we 409 instead of clobbering their write.
+ */
+const EDITABLE_STATUSES = ['open', 'booked', 'won', 'lost', 'void'];
 
-    const isCorrection = bet.status !== 'open';
-    if (isCorrection && !req.body.reason?.trim()) return next(badRequest('A reason is required to edit an already-settled slip.'));
+const isIsoDate = (v) => (v === null || v === undefined) || !Number.isNaN(Date.parse(v));
 
-    const stake = Number(req.body.stake ?? bet.stake);
-    const legs = req.body.legs.map((l) => ({
-      matchId: l.matchId, market: l.market, outcome: l.outcome, odds: Number(l.odds),
-      home: l.home, away: l.away, marketName: l.marketName || l.market,
-      scoreHome: l.scoreHome, scoreAway: l.scoreAway,
-    }));
-    const totalOdds = Number(legs.reduce((p, l) => p * l.odds, 1).toFixed(4));
-    const potentialWin = Number((stake * totalOdds).toFixed(2));
+const legEditSchema = z.object({
+  matchId: z.string().min(1).max(200),
+  market: z.string().min(1).max(100),
+  outcome: z.string().min(1).max(100),
+  odds: z.number().positive().max(1_000_000),
+  home: z.string().min(1).max(200),
+  away: z.string().min(1).max(200),
+  marketName: z.string().max(200).optional(),
+  kickoff: z.string().max(40).optional(),
+  day: z.string().max(20).optional(),
+  league: z.string().max(200).optional(),
+  scoreHome: z.number().int().min(0).optional(),
+  scoreAway: z.number().int().min(0).optional(),
+});
 
-    // Persist the corrected slip first (behind the same enrich() the rest of
-    // the admin UI reads), so even a re-settle that fails later leaves the
-    // slip itself corrected and auditable.
-    const slipEdited = {
-      ...bet,
-      stake, legs, totalOdds, potentialWin,
-      slipEditedAt: new Date().toISOString(), slipEditedBy: req.admin.email,
-    };
-    betsStore.set(bet.id, slipEdited);
+const slipEditSchema = z.object({
+  expectedVersion: z.string().max(64).optional(),
+  status: z.enum(EDITABLE_STATUSES).optional(),
+  mode: z.enum(['single', 'multiple', 'system']).optional(),
+  stake: z.number().positive().max(1_000_000_000).optional(),
+  bonusRate: z.number().min(0).max(1).optional(),
+  placedAt: z.string().refine(isIsoDate, 'Invalid placedAt timestamp').optional(),
+  settledAt: z.string().nullable().refine(isIsoDate, 'Invalid settledAt timestamp').optional(),
+  legs: z.array(legEditSchema).min(1).max(20).optional(),
+  reason: z.string().trim().min(2).max(500),
+});
 
-    // If the admin is also fixing the result in the same action, route it
-    // through the shared settlement engine so the wallet delta (credits the
-    // corrected payout exactly once, guarded by the settle idempotency key),
-    // legsResolved regrade and the won-trophy re-arm all stay consistent.
-    let updated = slipEdited;
-    if (req.body.result) {
-      const outcome = await applySettlement(req.params.id, {
-        result: req.body.result,
-        reason: req.body.reason,
-        payoutOverride: req.body.payoutOverride,
-        adminEmail: req.admin.email,
-      });
-      if (outcome.error === 'not_found')        return next(notFound('Bet not found'));
-      if (outcome.error === 'cashed_out')       return next(conflict('Bet was cashed out — correct the cash-out amount manually.'));
-      if (outcome.error === 'reason_required')  return next(badRequest('A reason is required to re-settle an already-settled bet.'));
-      if (outcome.error === 'pending_payout')   return next(conflict('Payout is pending — repay or correct via the unpaid-wins tool first.'));
-      updated = outcome.bet;
-    }
+/** Mirrors server/src/routes/bet.js placement math so edited slips pay like
+ *  they were placed today. Mode single → leg odds; multiple → product;
+ *  system → maxSystemReturn(); potential always × (1 + bonusRate). */
+function recomputeSlip(bet, patch) {
+  const mode = patch.mode ?? bet.mode;
+  const stake = Number(patch.stake ?? bet.stake ?? 0);
+  const bonusRate = Number(patch.bonusRate ?? bet.bonusRate ?? 0.08);
+  const legs = (patch.legs ?? bet.legs).map((l) => ({ ...l, odds: Number(l.odds) }));
 
-    audit(req, {
-      action: 'bet.slip.correct', target: bet.id, targetType: 'bet', severity: 'warning',
-      meta: { legs: legs.length, stake, totalOdds, reason: req.body.reason, userId: bet.userId },
+  let totalOdds;
+  let potentialWin;
+  let stakePerLine = null;
+  let linesCount = null;
+
+  if (mode === 'system') {
+    const key = String(bet.systemType || '').toLowerCase();
+    const def = SYSTEM_TYPES[key];
+    if (!def) throw conflict('System betting metadata is missing on this bet — change the mode to single or multiple instead.');
+    if (legs.length !== def.selections) throw conflict(`${def.label} requires exactly ${def.selections} selections (this slip has ${legs.length}).`);
+    linesCount = def.totalLines;
+    stakePerLine = Number((stake / linesCount).toFixed(2));
+    potentialWin = Number(maxSystemReturn(legs.map((l) => l.odds), key, stakePerLine).toFixed(2));
+    totalOdds = Number((potentialWin / stake).toFixed(4));
+  } else {
+    totalOdds = mode === 'single'
+      ? legs[0].odds
+      : Number(legs.reduce((p, l) => p * l.odds, 1).toFixed(4));
+    potentialWin = Number((stake * totalOdds * (1 + bonusRate)).toFixed(2));
+  }
+
+  return {
+    mode, stake: Number(stake.toFixed(2)), bonusRate,
+    totalOdds: Number(totalOdds.toFixed(4)), potentialWin,
+    legs, stakePerLine, linesCount,
+  };
+}
+
+/** Compact comparable snapshot of the money/timestamp/leg fields for the
+ *  audit diff. Keeps the audit row small while preserving "what changed". */
+function slipSnapshot(b) {
+  return {
+    status: b.status,
+    mode: b.mode,
+    stake: Number(b.stake ?? 0),
+    bonusRate: Number(b.bonusRate ?? 0),
+    totalOdds: Number(b.totalOdds ?? 0),
+    potentialWin: Number(b.potentialWin ?? 0),
+    placedAt: b.placedAt ?? null,
+    settledAt: b.settledAt ?? null,
+    legs: (b.legs || []).map((l) => ({
+      matchId: l.matchId, home: l.home, away: l.away,
+      market: l.market, outcome: l.outcome, odds: Number(l.odds),
+      marketName: l.marketName || null,
+    })),
+  };
+}
+
+async function applySlipEdit(req, res, next) {
+  const betId = req.params.id;
+  const bet = betsStore.get(betId);
+  if (!bet) return next(notFound('Bet not found'));
+  if (bet.status === 'cashed_out') return next(conflict('Cashed-out bets cannot have their slip edited — settle/correct the cash-out amount manually.'));
+  if (bet.status === 'cancelled')  return next(conflict('Cancelled bets cannot be edited — restore first.'));
+
+  // Optimistic concurrency — the client sends the updatedAt it loaded.
+  const currentVersion = bet.updatedAt;
+  if (req.body.expectedVersion && currentVersion && req.body.expectedVersion !== currentVersion) {
+    return next(conflict('This bet has been modified by another administrator. Refresh the bet and review the latest changes before editing again.'));
+  }
+
+  const status = req.body.status ?? bet.status;
+  if (status === 'open' && bet.status !== 'open') {
+    return next(badRequest('Already-settled bets cannot be reopened here. Use Correct settlement, or restore/cancel via the dedicated actions.'));
+  }
+
+  const slip = recomputeSlip(bet, req.body);
+  const placedAt = req.body.placedAt ?? bet.placedAt;
+  const settledAt = 'settledAt' in req.body ? req.body.settledAt : (bet.settledAt ?? null);
+
+  if (status !== 'open' && settledAt && Date.parse(settledAt) < Date.parse(placedAt)) {
+    return next(badRequest('Settled date/time cannot be earlier than the placed date/time.'));
+  }
+
+  // Only won/lost/void are "settled" — booked is a pending booking, not a
+  // financial state, and must never be pushed through the settlement engine.
+  const SETTLED = ['won', 'lost', 'void'];
+  const wasSettled = SETTLED.includes(bet.status);
+  const isSettled = SETTLED.includes(status);
+
+  // What the ledger already paid for this bet vs what the edited slip owes.
+  const oldPayout = bet.status === 'won' ? (bet.settledPayout ?? bet.totalReturn ?? bet.potentialWin ?? 0)
+                  : bet.status === 'void' ? (bet.settledPayout ?? bet.totalReturn ?? bet.stake ?? 0)
+                  : (bet.settledPayout ?? bet.totalReturn ?? 0);
+  const newPayout = status === 'won' ? slip.potentialWin
+                  : status === 'void' ? slip.stake
+                  : 0;
+  const payoutDelta = Number((newPayout - oldPayout).toFixed(2));
+  // Reconcile the wallet whenever the status changes OR the payout moved.
+  const needsSettlement = isSettled && (status !== bet.status || Math.abs(payoutDelta) >= 0.01);
+
+  // Persist the corrected slip first — even if a reconciliation below fails,
+  // the slip itself is fixed and auditable, and the wallet is never touched
+  // half-way (applySettlement guards the credit with its idempotency key).
+  const slipEdited = {
+    ...bet,
+    mode: slip.mode,
+    stake: slip.stake,
+    bonusRate: slip.bonusRate,
+    totalOdds: slip.totalOdds,
+    potentialWin: slip.potentialWin,
+    legs: slip.legs,
+    placedAt,
+    status,
+    settledAt: needsSettlement ? (settledAt ?? bet.settledAt ?? null) : settledAt,
+    ...(slip.mode === 'system' && slip.stakePerLine !== null ? { stakePerLine: slip.stakePerLine, linesCount: slip.linesCount } : {}),
+    ...(slip.mode !== 'system' ? { stakePerLine: undefined, linesCount: undefined } : {}),
+    slipEditedAt: new Date().toISOString(),
+    slipEditedBy: req.admin.email,
+    updatedAt: new Date().toISOString(),
+  };
+  await betsStore.setCritical(betId, slipEdited);
+
+  let updated = slipEdited;
+  if (needsSettlement) {
+    const outcome = await applySettlement(betId, {
+      result: status, // 'won' | 'lost' | 'void' — 'open' never reaches here (isSettled guard)
+      reason: req.body.reason,
+      adminEmail: req.admin.email,
+      settledAt: settledAt || undefined,
     });
-    res.json({ bet: enrich(updated) });
-  })
+    if (outcome.error === 'not_found')        return next(notFound('Bet not found'));
+    if (outcome.error === 'cashed_out')       return next(conflict('Bet was cashed out — correct the cash-out amount manually.'));
+    if (outcome.error === 'reason_required')  return next(badRequest('A reason is required to re-settle an already-settled bet.'));
+    updated = outcome.bet;
+  }
+
+  const before = slipSnapshot(bet);
+  const after = slipSnapshot(updated);
+  const changed = Object.keys(before).filter((k) => JSON.stringify(before[k]) !== JSON.stringify(after[k]));
+
+  audit(req, {
+    action: needsSettlement ? 'bet.slip.edit.settle' : 'bet.slip.edit',
+    target: betId, targetType: 'bet',
+    severity: needsSettlement || status !== bet.status ? 'warning' : 'info',
+    meta: {
+      reason: req.body.reason,
+      settled: isSettled,
+      settlementReconciled: needsSettlement,
+      payoutDelta,
+      changed,
+      from: changed.reduce((o, k) => { o[k] = before[k]; return o; }, {}),
+      to: changed.reduce((o, k) => { o[k] = after[k]; return o; }, {}),
+      userId: bet.userId,
+    },
+  });
+
+  res.json({ bet: enrich(updated) });
+}
+
+router.patch('/:id',
+  requireAdmin, requireRole('odds_manager', 'finance_admin'),
+  validate(slipEditSchema),
+  asyncHandler(applySlipEdit)
 );
 
-router.post('/:id/slip',
+router.post('/:id/slip-edit',
   requireAdmin, requireRole('odds_manager', 'finance_admin'),
-  validate(z.object({
-    stake: z.number().positive().optional(),
-    legs: z.array(z.object({
-      matchId: z.string().min(1),
-      market: z.string().min(1),
-      outcome: z.string().min(1),
-      odds: z.number().positive(),
-      home: z.string().min(1).optional(),
-      away: z.string().min(1).optional(),
-      scoreHome: z.number().int().min(0).optional(),
-      scoreAway: z.number().int().min(0).optional(),
-    })).min(1).max(20),
-    result: z.enum(['won', 'lost', 'void']).optional(),
-    payoutOverride: z.number().nonnegative().optional(),
-    reason: z.string().max(500).optional(),
-  })),
-  asyncHandler(async (req, res, next) => {
-    const bet = betsStore.get(req.params.id);
-    if (!bet) return next(notFound('Bet not found'));
-    if (bet.status === 'cashed_out') return next(conflict('Cashed-out bets cannot have their slip edited — correct the cash-out amount instead.'));
-    if (bet.status === 'cancelled')  return next(conflict('Cancelled bets cannot have their slip edited — restore first.'));
-
-    const stake = Number(req.body.stake ?? bet.stake);
-    const legs = req.body.legs.map((l) => ({
-      matchId: l.matchId,
-      market:  l.market,
-      outcome: l.outcome,
-      odds:    Number(l.odds),
-      home:    l.home ?? bet.legs?.find((x) => x.matchId === l.matchId)?.home,
-      away:    l.away ?? bet.legs?.find((x) => x.matchId === l.matchId)?.away,
-      scoreHome: l.scoreHome,
-      scoreAway: l.scoreAway,
-    }));
-    const totalOdds    = Number(legs.reduce((p, l) => p * l.odds, 1).toFixed(4));
-    const potentialWin = Number((stake * totalOdds).toFixed(2));
-
-    // Persist the corrected slip first — even if an optional re-settle below
-    // fails, the slip itself is fixed and auditable.
-    const slipEdited = {
-      ...bet,
-      stake, legs, totalOdds, potentialWin,
-      slipEditedAt: new Date().toISOString(), slipEditedBy: req.admin.email,
-    };
-    betsStore.set(bet.id, slipEdited2(slipEdited));
-
-    let updated = slipEdited;
-    if (req.body.result) {
-      const outcome = await applySettlement(req.params.id, {
-        result: req.body.result,
-        reason: req.body.reason,
-        payoutOverride: req.body.payoutOverride ?? (req.body.result === 'won' ? potentialWin : undefined),
-        adminEmail: req.admin.email,
-      });
-      if (outcome.error === 'not_found') return next(notFound('Bet not found'));
-      if (outcome.error === 'cashed_out') return next(conflict('Bet was cashed out — correct the cash-out amount manually.'));
-      if (outcome.error === 'reason_required') return next(badRequest('A reason is required to re-settle an already-settled bet.'));
-      updated = outcome.bet;
-    }
-
-    audit(req, {
-      action: updated.correction ? 'bet.slip.correct' : 'bet.slip.edit',
-      target: req.params.id, targetType: 'bet', severity: updated.correction ? 'warning' : 'info',
-      meta: { stake, totalOdds, potentialWin, legs: legs.length, reason: req.body.reason, userId: bet.userId },
-    });
-    res.json({ bet: enrich(updated) });
-  })
+  validate(slipEditSchema),
+  asyncHandler(applySlipEdit)
 );
 
 router.post('/:id/cancel',

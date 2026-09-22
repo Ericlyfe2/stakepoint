@@ -409,6 +409,7 @@ async function settleNowUnlocked() {
       payoutStatus: credit > 0 ? 'pending' : 'none',
       payoutDue: Number((credit || 0).toFixed(2)),
       legsResolved: legResults.map((r) => ({ matchId: r.leg.matchId, market: r.leg.market, outcome: r.leg.outcome, won: r.won, scoreHome: r.res.scoreHome, scoreAway: r.res.scoreAway, actualOutcome: legOutcomeLabel(r.leg, r.res.scoreHome, r.res.scoreAway) })),
+      updatedAt: new Date().toISOString(),
       ...(status === 'won' ? { wonNotAcknowledged: true } : {}),
     };
     await betsStore.setCritical(bet.id, updated);
@@ -523,7 +524,7 @@ export function auditSettledBets() {
  * Returns { ok: true, bet } on success, or { error: 'not_found' | 'cashed_out'
  * | 'reason_required' | 'bad_result' }.
  */
-export async function applySettlement(betId, { result, reason, payoutOverride, adminEmail } = {}) {
+export async function applySettlement(betId, { result, reason, payoutOverride, adminEmail, settledAt } = {}) {
   if (!['won', 'lost', 'void'].includes(result)) return { error: 'bad_result' };
 
   const bet = betsStore.get(betId);
@@ -567,7 +568,10 @@ export async function applySettlement(betId, { result, reason, payoutOverride, a
   const updated = {
     ...bet,
     status: result,
-    settledAt: new Date().toISOString(),
+    // An admin slip-edit may carry an explicit settlement timestamp; first /
+    // ordinary settlements still stamp "now". Always presented/stored as an
+    // ISO-8601 UTC string, matching placedAt and the rest of the schema.
+    settledAt: settledAt ?? new Date().toISOString(),
     settledBy: adminEmail || 'admin',
     settleReason: reason || null,
     settledPayout: newCredit,
@@ -576,6 +580,7 @@ export async function applySettlement(betId, { result, reason, payoutOverride, a
     payoutDue: newCredit,
     legsResolved,
     wonNotAcknowledged: result === 'won',
+    updatedAt: new Date().toISOString(),
     ...(isCorrection ? { correction: { fromStatus: bet.status, at: new Date().toISOString(), by: adminEmail || 'admin', reason } } : {}),
   };
 

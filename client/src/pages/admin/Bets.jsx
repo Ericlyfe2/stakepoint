@@ -13,7 +13,7 @@ import { useAdmin } from '../../providers/AdminProvider.jsx';
 import {
   adminListBets, adminGetBet, adminSettleBet, adminCancelBet, adminNoteBet, adminBulkBets,
   adminDeleteBet, adminRestoreBet, adminSettlementAudit, adminSettlementUnpaid, adminSettlementRepay,
-  adminSlipEditBet,
+  adminEditBet,
 } from '../../api/adminApi.js';
 
 function toBookingCode(id = '') {
@@ -30,6 +30,7 @@ import {
   IconSearch, IconRefresh, IconCheck, IconAlert, IconBan, IconDownload, IconReceipt, IconLive, IconSettle,
   IconEdit, IconPlus, IconTrash,
 } from '../../components/admin/Icons.jsx';
+import { SYSTEM_TYPES, maxSystemReturn } from '../../lib/systemBets.js';
 
 const STATUS_TONES = { open: 'info', won: 'success', lost: 'danger', void: 'warn', cashed_out: 'brand', cancelled: 'default' };
 
@@ -369,7 +370,7 @@ function BetDrawer({ open, betId, onClose, onUpdate, hasRole, showToast }) {
   async function doSlipEdit(body) {
     setBusy(true);
     try {
-      const { bet: updated } = await adminSlipEditBet(betId, body);
+      const { bet: updated } = await adminEditBet(betId, body);
       setBet(updated); onUpdate(updated);
       showToast('Bet slip updated.');
       setEditOpen(false);
@@ -736,125 +737,332 @@ function CancelModal({ open, onClose, onSubmit, busy, bet }) {
 
 const EMPTY_LEG = { matchId: '', market: '', outcome: '', odds: '', home: '', away: '', marketName: '' };
 
+const STATUS_OPTIONS = [
+  ['open', 'Open'],
+  ['booked', 'Booked'],
+  ['won', 'Won'],
+  ['lost', 'Lost'],
+  ['void', 'Void'],
+];
+
+// ISO-8601 UTC string → local <input type="date">/<input type="time"> values.
+// The whole schema stores timestamps as ISO UTC strings; converting to the
+// browser's local wall-clock for editing and back to ISO on save guarantees
+// a round-trip with no timezone offset (the same 21 Sept 2026, 11:38 PM the
+// admin types is the instant that persists, and whatever zone renders the
+// bet later sees its own correct conversion — exactly like dateShort()).
+function toLocalInput(iso) {
+  if (!iso) return { date: '', time: '' };
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return { date: '', time: '' };
+  const p = (n) => String(n).padStart(2, '0');
+  return {
+    date: `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`,
+    time: `${p(d.getHours())}:${p(d.getMinutes())}`,
+  };
+}
+
+function buildIso(date, time) {
+  if (!date || !time) return undefined;
+  const [y, m, d] = date.split('-').map(Number);
+  const [hh, mm] = time.split(':').map(Number);
+  if (!y || !m || !d || Number.isNaN(hh) || Number.isNaN(mm)) return undefined;
+  const dt = new Date(y, m - 1, d, hh, mm, 0, 0);
+  return Number.isNaN(dt.getTime()) ? undefined : dt.toISOString();
+}
+
+function legFingerprint(l) {
+  return [l.home, l.away, l.market, l.outcome, l.marketName, Number(l.odds)].join('~');
+}
+
 function EditSlipModal({ open, onClose, onSubmit, busy, bet }) {
+  const [status, setStatus] = useState('');
+  const [mode, setMode] = useState('');
   const [stake, setStake] = useState('');
+  const [bonusPct, setBonusPct] = useState('');
+  const [placedStr, setPlacedStr] = useState({ date: '', time: '' });
+  const [settledStr, setSettledStr] = useState({ date: '', time: '' });
   const [legs, setLegs] = useState([]);
   const [reason, setReason] = useState('');
-  const [result, setResult] = useState('none');
-  const [payoutOverride, setPayoutOverride] = useState('');
+  const [armed, setArmed] = useState(false);
+  const [removeTarget, setRemoveTarget] = useState(null);
 
   useEffect(() => {
     if (!open || !bet) return;
+    setStatus(bet.status || 'open');
+    setMode(bet.mode || 'single');
     setStake(String(bet.stake ?? ''));
+    setBonusPct(String(Math.round((bet.bonusRate || 0) * 100)));
+    setPlacedStr(toLocalInput(bet.placedAt));
+    setSettledStr(toLocalInput(bet.settledAt));
     setLegs((bet.legs || []).map((l) => ({
       matchId: l.matchId || '', market: l.market || '', outcome: l.outcome || '',
-      odds: String(l.odds ?? ''), home: l.home || '', away: l.away || '', marketName: l.marketName || l.market || '',
+      odds: String(l.odds ?? ''), home: l.home || '', away: l.away || '',
+      marketName: l.marketName || l.market || '',
+      kickoff: l.kickoff || '', day: l.day || '', league: l.league || '',
     })));
     setReason('');
-    setResult('none');
-    setPayoutOverride('');
+    setArmed(false);
+    setRemoveTarget(null);
   }, [open, bet]);
+
+  // Any edit after the confirm step has been armed returns to the safe
+  // "review" state — a confirmation is only good for the exact current draft.
+  useEffect(() => { setArmed(false); }, [status, mode, stake, bonusPct, legs, reason, placedStr, settledStr]);
 
   if (!bet) return null;
 
-  const isCorrection = bet.status !== 'open';
-  const validLegs = legs.filter((l) => l.matchId.trim() && l.market.trim() && l.outcome.trim() && Number(l.odds) > 0);
-  const totalOdds = validLegs.length === legs.length && legs.length > 0
-    ? Number(legs.reduce((p, l) => p * (Number(l.odds) || 0), 1).toFixed(4))
-    : 0;
+  const alreadySettled = bet.status !== 'open';
+  const draftSettles = status !== 'open' && status !== 'booked';
+
   const stakeNum = Number(stake);
-  const potentialWin = stakeNum > 0 && totalOdds > 0 ? Number((stakeNum * totalOdds).toFixed(2)) : 0;
-  const reasonMissing = isCorrection && !reason.trim();
-  const canSave = stakeNum > 0 && legs.length > 0 && validLegs.length === legs.length && !reasonMissing;
+  const bonusNum = Number(bonusPct);
+  const bonusRate = Number.isFinite(bonusNum) && bonusNum >= 0 ? Math.min(bonusNum, 100) / 100 : (bet.bonusRate || 0);
+
+  const validLegs = legs.filter((l) => l.home.trim() && l.away.trim() && l.market.trim() && l.outcome.trim() && Number(l.odds) > 0);
+  const allLegsValid = legs.length > 0 && validLegs.length === legs.length;
+
+  // Live totals — mirrors the server placement math (single/multiple/system).
+  let draftTotalOdds = 0;
+  let draftPotential = 0;
+  let draftNote = null;
+  if (allLegsValid) {
+    const odds = validLegs.map((l) => Number(l.odds));
+    if (mode === 'system') {
+      const key = String(bet.systemType || '').toLowerCase();
+      const def = SYSTEM_TYPES[key];
+      if (def && odds.length === def.selections && stakeNum > 0) {
+        const stakePerLine = stakeNum / def.totalLines;
+        draftPotential = Number(maxSystemReturn(odds, key, stakePerLine).toFixed(2));
+        draftTotalOdds = Number((draftPotential / stakeNum).toFixed(4));
+      } else if (!def || odds.length !== def.selections) {
+        draftNote = `System bet needs exactly ${def ? def.selections : 'its'} selections.`;
+      }
+    } else {
+      draftTotalOdds = mode === 'single'
+        ? odds[0]
+        : Number(odds.reduce((p, o) => p * o, 1).toFixed(4));
+      draftPotential = Number((stakeNum * draftTotalOdds * (1 + bonusRate)).toFixed(2));
+    }
+  }
+
+  const draftPlacedIso = buildIso(placedStr.date, placedStr.time);
+  const draftSettledIso = buildIso(settledStr.date, settledStr.time);
+  // Settled timestamp semantics:
+  //  - already-settled bet left blank → keep the stored settlement instant
+  //  - new settlement left blank → "auto", set at reconciliation time
+  //  - filled in → that exact instant (persisted in the DB)
+  let settledPayload = draftSettledIso;
+  if (bet.settledAt && !draftSettledIso) settledPayload = bet.settledAt;
+  if (!bet.settledAt && !draftSettledIso) settledPayload = undefined;
+
+  const origFp = (bet.legs || []).map(legFingerprint).join('|');
+  const draftFp = legs.map(legFingerprint).join('|');
+
+  // ---- change summary (every editable field, before → after) ----
+  const changed = [];
+  const addChange = (label, from, to) => { if (from !== to) changed.push({ label, from: from ?? '—', to: to ?? '—' }); };
+  addChange('Status', bet.status, status);
+  addChange('Mode', bet.mode, mode);
+  addChange('Stake', moneyFmt(bet.stake, bet.currency), Number.isFinite(stakeNum) && stakeNum > 0 ? moneyFmt(stakeNum, bet.currency) : '—');
+  addChange('Bonus', `${Math.round((bet.bonusRate || 0) * 100)}%`, `${Number.isFinite(bonusNum) ? bonusNum : 0}%`);
+  addChange('Placed', dateShort(bet.placedAt), draftPlacedIso ? dateShort(draftPlacedIso) : '—');
+  addChange('Settled',
+    bet.settledAt ? dateShort(bet.settledAt) : '—',
+    settledPayload ? dateShort(settledPayload) : (draftSettles ? 'auto (settlement time)' : '—'));
+  if (origFp !== draftFp || legs.length !== (bet.legs || []).length) {
+    addChange('Legs', `${(bet.legs || []).length} selection(s)`, `${legs.length} selection(s)`);
+  }
+  addChange('Total odds', Number(bet.totalOdds || 0).toFixed(4), draftTotalOdds ? draftTotalOdds.toFixed(4) : '—');
+  addChange('Potential', moneyFmt(bet.potentialWin, bet.currency), draftPotential ? moneyFmt(draftPotential, bet.currency) : '—');
+
+  const dateOrderOk = !draftPlacedIso || !settledPayload || Date.parse(settledPayload) >= Date.parse(draftPlacedIso);
+  const reasonMissing = !reason.trim() || reason.trim().length < 2;
+  const canSave = changed.length > 0 && allLegsValid && stakeNum > 0 && !reasonMissing && dateOrderOk && !draftNote;
 
   function setLeg(i, patch) {
     setLegs((prev) => prev.map((l, x) => (x === i ? { ...l, ...patch } : l)));
   }
-  function addLeg() { setLegs((prev) => [...prev, { ...EMPTY_LEG }]); }
-  function removeLeg(i) { setLegs((prev) => prev.filter((_, x) => x !== i)); }
+  function addLeg() {
+    setLegs((prev) => [...prev, { ...EMPTY_LEG, matchId: `m-${Date.now()}-${prev.length}-${Math.random().toString(36).slice(2, 6)}` }]);
+  }
+  function confirmRemove(i) { setRemoveTarget(i); }
+  function doRemove(i) {
+    setLegs((prev) => prev.filter((_, x) => x !== i));
+    setRemoveTarget(null);
+  }
 
   function submit() {
     if (!canSave) return;
+    if (!armed) { setArmed(true); return; }
     const body = {
-      stake: stakeNum,
-      legs: legs.map((l) => ({
-        matchId: l.matchId.trim(), market: l.market.trim(), outcome: l.outcome.trim(),
-        odds: Number(l.odds), home: l.home.trim(), away: l.away.trim(),
-        marketName: l.marketName.trim() || undefined,
+      expectedVersion: bet.updatedAt || '',
+      status,
+      mode,
+      stake: Number(stakeNum.toFixed(2)),
+      bonusRate: Number(bonusRate.toFixed(4)),
+      placedAt: draftPlacedIso || undefined,
+      ...(settledPayload !== undefined ? { settledAt: settledPayload } : {}),
+      legs: validLegs.map((l) => ({
+        matchId: l.matchId.trim() || `m-${Date.now()}-0-${Math.random().toString(36).slice(2, 6)}`,
+        home: l.home.trim(), away: l.away.trim(),
+        market: l.market.trim(), outcome: l.outcome.trim(),
+        odds: Number(l.odds),
+        ...(l.marketName && l.marketName.trim() ? { marketName: l.marketName.trim() } : {}),
+        ...(l.kickoff ? { kickoff: l.kickoff } : {}),
+        ...(l.day ? { day: l.day } : {}),
+        ...(l.league ? { league: l.league } : {}),
       })),
-      reason: reason.trim() || undefined,
+      reason: reason.trim(),
     };
-    if (result !== 'none') {
-      body.result = result;
-      if (payoutOverride !== '' && Number(payoutOverride) >= 0) body.payoutOverride = Number(payoutOverride);
-    }
     onSubmit(body);
   }
 
   return (
     <Modal open={open} onClose={onClose}
            title="Edit bet slip"
-           description={`Edit the stake and legs of ${bet.id.slice(0, 16)}…  ·  currently ${moneyFmt(bet.stake)} at ${Number(bet.totalOdds).toFixed(4)}x${isCorrection ? `  ·  already ${bet.status}` : ''}`}>
-      <div className="adm-field">
-        <label>Stake ({bet.currency || 'GHS'})</label>
-        <input className="adm-input" type="number" min="0" step="0.01" value={stake} onChange={(e) => setStake(e.target.value)} />
-      </div>
+           description={`Ticket ${bet.id} · ${moneyFmt(bet.stake, bet.currency)} at ${Number(bet.totalOdds || 0).toFixed(4)}x · currently ${bet.status}`}>
+      <div style={{ maxHeight: '62vh', overflowY: 'auto', paddingRight: 4 }}>
+        {alreadySettled && (
+          <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start', background: 'rgba(245,166,35,.12)', border: '1px solid rgba(245,166,35,.4)', borderRadius: 10, padding: '10px 12px', fontSize: 13, marginBottom: 12 }}>
+            <IconAlert size={16} style={{ flexShrink: 0, marginTop: 1, color: '#f5a623' }} />
+            <span>
+              <strong>This bet has already been settled ({bet.status}).</strong> Changing status, stake, odds, legs or bonus
+              reconciles the wallet through the settlement engine — only the payout delta is credited or debited, exactly once.
+              An audit reason is required and the original values are preserved in the audit log.
+            </span>
+          </div>
+        )}
 
-      <div className="adm-field" style={{ marginTop: 12 }}>
-        <label>Legs ({legs.length})</label>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {legs.map((l, i) => (
-            <div key={i} style={{ background: 'var(--surface-soft)', border: '1px solid var(--border)', borderRadius: 10, padding: 10 }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
-                <input className="adm-input" placeholder="Home" value={l.home} onChange={(e) => setLeg(i, { home: e.target.value })} />
-                <input className="adm-input" placeholder="Away" value={l.away} onChange={(e) => setLeg(i, { away: e.target.value })} />
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 90px 36px', gap: 8 }}>
-                <input className="adm-input" placeholder="Market" value={l.market} onChange={(e) => setLeg(i, { market: e.target.value })} />
-                <input className="adm-input" placeholder="Pick" value={l.outcome} onChange={(e) => setLeg(i, { outcome: e.target.value })} />
-                <input className="adm-input" type="number" min="1" step="0.01" placeholder="Odds" value={l.odds} onChange={(e) => setLeg(i, { odds: e.target.value })} />
-                <button className="adm-icon-btn" type="button" onClick={() => removeLeg(i)} aria-label="Remove leg" disabled={legs.length <= 1}>
-                  <IconTrash size={14} />
-                </button>
-              </div>
-            </div>
-          ))}
+        <div className="adm-field">
+          <label>Status</label>
+          <select className="adm-input" value={status} onChange={(e) => setStatus(e.target.value)}>
+            {STATUS_OPTIONS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+          </select>
         </div>
-        <button className="adm-btn sm" type="button" onClick={addLeg} style={{ marginTop: 8 }}>
-          <IconPlus size={14} /> Add leg
-        </button>
-      </div>
 
-      <div style={{ display: 'flex', gap: 18, background: 'var(--surface-soft)', border: '1px solid var(--border)', borderRadius: 12, padding: '10px 12px', fontSize: 13, marginTop: 12 }}>
-        <div>Total odds <strong style={{ display: 'block', fontSize: 14 }}>{totalOdds ? totalOdds.toFixed(4) : '—'}</strong></div>
-        <div>Potential <strong style={{ display: 'block', fontSize: 14 }}>{potentialWin ? moneyFmt(potentialWin, bet.currency) : '—'}</strong></div>
-      </div>
-
-      <div className="adm-field" style={{ marginTop: 12 }}>
-        <label>Reason {isCorrection ? '(required, audited)' : '(optional, audited)'}</label>
-        <input className="adm-input" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. wrong odds entered at placement" />
-      </div>
-
-      <div className="adm-field" style={{ marginTop: 12 }}>
-        <label>Result (optional — re-settle at the same time)</label>
-        <div style={{ display: 'flex', gap: 8 }}>
-          {[['none', 'No change'], ['won', 'Won'], ['lost', 'Lost'], ['void', 'Void']].map(([k, l]) => (
-            <button key={k} type="button" className={`adm-btn sm ${result === k ? 'primary' : 'ghost'}`} onClick={() => setResult(k)}>{l}</button>
-          ))}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginTop: 10 }}>
+          <div className="adm-field">
+            <label>Mode</label>
+            <select className="adm-input" value={mode} onChange={(e) => setMode(e.target.value)}>
+              <option value="single">Single</option>
+              <option value="multiple">Multiple</option>
+              <option value="system">System</option>
+            </select>
+          </div>
+          <div className="adm-field">
+            <label>Stake ({bet.currency || 'GHS'})</label>
+            <input className="adm-input" type="number" min="0" step="0.01" value={stake} onChange={(e) => setStake(e.target.value)} />
+          </div>
+          <div className="adm-field">
+            <label>Bonus (%)</label>
+            <input className="adm-input" type="number" min="0" max="100" step="1" value={bonusPct} onChange={(e) => setBonusPct(e.target.value)} />
+          </div>
         </div>
-      </div>
 
-      {result !== 'none' && (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 10 }}>
+          <div className="adm-field">
+            <label>Placed date</label>
+            <input className="adm-input" type="date" value={placedStr.date} onChange={(e) => setPlacedStr((s) => ({ ...s, date: e.target.value }))} />
+          </div>
+          <div className="adm-field">
+            <label>Placed time</label>
+            <input className="adm-input" type="time" value={placedStr.time} onChange={(e) => setPlacedStr((s) => ({ ...s, time: e.target.value }))} />
+          </div>
+          <div className="adm-field">
+            <label>Settled date</label>
+            <input className="adm-input" type="date" value={settledStr.date}
+                   onChange={(e) => setSettledStr((s) => ({ ...s, date: e.target.value }))}
+                   disabled={!draftSettles && !bet.settledAt} />
+          </div>
+          <div className="adm-field">
+            <label>Settled time</label>
+            <input className="adm-input" type="time" value={settledStr.time}
+                   onChange={(e) => setSettledStr((s) => ({ ...s, time: e.target.value }))}
+                   disabled={!draftSettles && !bet.settledAt} />
+          </div>
+        </div>
+        {!dateOrderOk && (
+          <div style={{ color: 'var(--danger, #d63a2c)', fontSize: 12.5, marginTop: 6 }}>
+            Settled date/time cannot be earlier than the placed date/time.
+          </div>
+        )}
+
         <div className="adm-field" style={{ marginTop: 12 }}>
-          <label>Payout override (optional)</label>
-          <input className="adm-input" type="number" min="0" step="0.01" value={payoutOverride} onChange={(e) => setPayoutOverride(e.target.value)} placeholder="default: computed payout" />
+          <label>Bet legs ({legs.length})</label>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {legs.map((l, i) => (
+              <div key={i} style={{ background: 'var(--surface-soft)', border: '1px solid var(--border)', borderRadius: 10, padding: 10 }}>
+                {removeTarget === i ? (
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, fontSize: 13 }}>
+                    <span>Remove this leg from the slip?</span>
+                    <span style={{ display: 'flex', gap: 6 }}>
+                      <button className="adm-btn sm danger" type="button" onClick={() => doRemove(i)}>Remove</button>
+                      <button className="adm-btn sm ghost" type="button" onClick={() => setRemoveTarget(null)}>Keep</button>
+                    </span>
+                  </div>
+                ) : (
+                  <>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
+                      <input className="adm-input" placeholder="Home" value={l.home} onChange={(e) => setLeg(i, { home: e.target.value })} />
+                      <input className="adm-input" placeholder="Away" value={l.away} onChange={(e) => setLeg(i, { away: e.target.value })} />
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 90px 36px', gap: 8 }}>
+                      <input className="adm-input" placeholder="Market" value={l.market} onChange={(e) => setLeg(i, { market: e.target.value })} />
+                      <input className="adm-input" placeholder="Pick" value={l.outcome} onChange={(e) => setLeg(i, { outcome: e.target.value })} />
+                      <input className="adm-input" type="number" min="0.01" step="0.01" placeholder="Odds" value={l.odds} onChange={(e) => setLeg(i, { odds: e.target.value })} />
+                      <button className="adm-icon-btn" type="button" onClick={() => confirmRemove(i)} aria-label="Remove leg" title="Remove leg">
+                        <IconTrash size={14} />
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            ))}
+          </div>
+          <button className="adm-btn sm" type="button" onClick={addLeg} style={{ marginTop: 8 }}>
+            <IconPlus size={14} /> Add leg
+          </button>
+          {draftNote && <div style={{ color: 'var(--warn, #f5a623)', fontSize: 12.5, marginTop: 6 }}>{draftNote}</div>}
         </div>
-      )}
+
+        <div style={{ display: 'flex', gap: 18, background: 'var(--surface-soft)', border: '1px solid var(--border)', borderRadius: 12, padding: '10px 12px', fontSize: 13, marginTop: 12 }}>
+          <div>Total odds <strong style={{ display: 'block', fontSize: 14 }}>{draftTotalOdds ? draftTotalOdds.toFixed(4) : '—'}</strong></div>
+          <div>Bonus <strong style={{ display: 'block', fontSize: 14 }}>{bonusNum}%</strong></div>
+          <div>Potential <strong style={{ display: 'block', fontSize: 14 }}>{draftPotential ? moneyFmt(draftPotential, bet.currency) : '—'}</strong></div>
+        </div>
+
+        {changed.length > 0 && (
+          <div style={{ background: 'rgba(79,139,255,.08)', border: '1px solid rgba(79,139,255,.35)', borderRadius: 12, padding: '10px 12px', marginTop: 12 }}>
+            <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 6 }}>Review changes {armed ? <span style={{ color: '#f5a623' }}>· press Confirm to apply</span> : null}</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12.5 }}>
+              {changed.map((c, i) => (
+                <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'baseline' }}>
+                  <span style={{ width: 84, flexShrink: 0, color: 'var(--text-soft)' }}>{c.label}</span>
+                  <span style={{ color: 'var(--text-dim)', textDecoration: 'line-through' }}>{c.from}</span>
+                  <span>→</span>
+                  <strong>{c.to}</strong>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        {changed.length === 0 && (
+          <div style={{ color: 'var(--text-dim)', fontSize: 12.5, marginTop: 12 }}>No changes made yet.</div>
+        )}
+
+        <div className="adm-field" style={{ marginTop: 12 }}>
+          <label>Reason for edit (required, audited)</label>
+          <input className="adm-input" value={reason} onChange={(e) => setReason(e.target.value)}
+                 placeholder="e.g. wrong odds entered at placement; customer mis-typed stake" />
+          {reasonMissing && <div style={{ color: 'var(--danger, #d63a2c)', fontSize: 12, marginTop: 4 }}>A reason of at least 2 characters is required to save.</div>}
+        </div>
+      </div>
 
       <div className="adm-modal-actions">
-        <button className="adm-btn ghost" type="button" onClick={onClose}>Cancel</button>
+        <button className="adm-btn ghost" type="button" onClick={() => { setArmed(false); onClose(); }}>Cancel</button>
         <button className="adm-btn primary" type="button" onClick={submit} disabled={busy || !canSave}>
-          {busy ? 'Saving…' : 'Save slip'}
+          {busy ? 'Saving…' : armed ? 'Confirm changes' : 'Save changes'}
         </button>
       </div>
     </Modal>
