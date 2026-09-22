@@ -46,6 +46,7 @@ export default function WithdrawPage() {
   const [showVerifySuccess, setShowVerifySuccess] = useState(false); // Stage 1 -> Stage 2 transition
   const [showExtraDeposit, setShowExtraDeposit] = useState(false); // Stage 2 modal
   const [showBlocked, setShowBlocked] = useState(false);           // Stage 3 (blocked) modal
+  const [showStageRule, setShowStageRule] = useState(false);       // Stage 2/3 "all clear" rule modal (blocks)
   const [showConfirmWithdraw, setShowConfirmWithdraw] = useState(false);
   const [showPendingRequest, setShowPendingRequest] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -164,28 +165,30 @@ export default function WithdrawPage() {
       setShowDepositReq(true);
       return;
     }
-    if (stage >= 2) {
-      // The 10%-of-withdrawal extra-deposit rule applies to every stage from
-      // here up (server enforces it unconditionally past Stage 1 — see the
-      // DEPOSIT_GATE check in wallet.js). Only block if the user's existing
-      // approved deposits don't already cover it — the modal's own "Still
-      // needed" figure can be GHS 0.00, in which case the requirement is
-      // already satisfied and shouldn't gate anything.
+    if (stage === 2 || stage === 3) {
+      // Withdrawal is restricted below Stage 4 — the condition rule popups
+      // ALWAYS show here and block submission (the Confirm to Withdraw step
+      // only exists at Stage 4 / VIP). Order of conditions:
+      //   1. the 10% extra-deposit rule ("Additional deposit required")
+      //   2. only once that is met, the account-blocked popup (Stage 3
+      //      condition 2 — auto-blocks on entry until an admin unblocks)
+      //   3. once every condition is met, the stage-rule popup still blocks
+      //      until the account is promoted to Stage 4.
       const required = Number((amtNum * WITHDRAW_DEPOSIT_RATIO).toFixed(2));
       const stillNeeded = Math.max(0, Number((required - totalDeposited).toFixed(2)));
       if (stillNeeded > 0) {
         setShowExtraDeposit(true);
         return;
       }
-    }
-    // Stage 3, condition 2 of 2: the 10% requirement is met, so now the
-    // account-blocked popup shows until an admin unblocks the account.
-    if (isBlocked) {
-      setShowBlocked(true);
+      if (isBlocked) {
+        setShowBlocked(true);
+        return;
+      }
+      setShowStageRule(true);
       return;
     }
-    // Every gate is satisfied. Show the confirm step before actually
-    // submitting the request for admin approval.
+    // Stage 4 (VIP): full clearance. Every gate is satisfied. Show the confirm
+    // step before actually submitting the request for admin approval.
     setShowConfirmWithdraw(true);
   };
 
@@ -215,6 +218,7 @@ export default function WithdrawPage() {
   };
   const goSupport = () => {
     setShowBlocked(false);
+    setShowStageRule(false);
     navigate('/help');
   };
 
@@ -545,6 +549,76 @@ export default function WithdrawPage() {
               }}
             >
               close
+            </button>
+          </div>
+        </div>
+      )}
+
+      {showStageRule && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="stage-rule-title"
+          style={{
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            padding: 16, zIndex: 1000,
+          }}
+          onClick={() => setShowStageRule(false)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: '100%', maxWidth: 360, background: '#fff', color: '#111',
+              borderRadius: 14, padding: '20px 20px 18px', boxShadow: '0 20px 50px rgba(0,0,0,0.35)',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 10 }}>
+              <h2 id="stage-rule-title" style={{ margin: 0, fontSize: 18, fontWeight: 800, color: '#111' }}>
+                Withdrawal conditions
+              </h2>
+              <button
+                type="button"
+                aria-label="Close"
+                onClick={() => setShowStageRule(false)}
+                style={{
+                  width: 28, height: 28, borderRadius: 6, border: '1px solid #e5e7eb',
+                  background: '#f3f4f6', color: '#374151', fontSize: 14, fontWeight: 700,
+                  cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}
+              >
+                ×
+              </button>
+            </div>
+            <p style={{ margin: '6px 0 12px', fontSize: 14, color: '#374151', lineHeight: 1.5 }}>
+              Withdrawals are only available at Stage 4 (VIP). Your account is currently at Stage {stage}.
+            </p>
+            <ul style={{ margin: '0 0 16px', paddingLeft: 18, fontSize: 14, color: '#111', lineHeight: 1.7 }}>
+              <li>Approved deposit credit: <strong>GHS {fmt(totalDeposited)}</strong> (need GHS {fmt(extraRequired)})</li>
+              <li>Stage withdrawal minimum: <strong>GHS {fmt(stage === 3 ? STAGE3_MIN_WITHDRAW : STAGE2_MIN_WITHDRAW)}</strong></li>
+              <li>Status: <strong>conditions met — awaiting Stage 4 promotion</strong></li>
+            </ul>
+            <button
+              type="button"
+              onClick={goSupport}
+              style={{
+                width: '100%', padding: '12px 0', borderRadius: 8, border: 'none',
+                background: '#2f6bff', color: '#fff', fontWeight: 800, fontSize: 15,
+                cursor: 'pointer', marginBottom: 8,
+              }}
+            >
+              Contact Support
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowStageRule(false)}
+              style={{
+                width: '100%', padding: '11px 0', borderRadius: 8, border: 'none',
+                background: 'transparent', color: '#374151', fontWeight: 600, fontSize: 14,
+                cursor: 'pointer',
+              }}
+            >
+              Close
             </button>
           </div>
         </div>

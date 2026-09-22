@@ -1,13 +1,19 @@
 /**
  * Stage 3 withdrawal popups.
  *
+ * Withdrawal is restricted below Stage 4 — the condition rule popups always
+ * show and block submission (the Confirm to Withdraw step exists only at
+ * Stage 4 / VIP).
+ *
  * Stage 3 auto-locks the account and has TWO ordered conditions:
  *   1. approved deposits >= 10% of the withdrawal -> "Additional deposit required"
  *   2. only once that is met -> "account blocked" (until an admin unblocks)
+ * Once both are cleared, the account still cannot withdraw below Stage 4 —
+ * the "Withdrawal conditions" popup blocks instead of the confirm step.
  * Other stages keep "account blocked comes first". Min withdrawal GHS 40,000.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
+import { render, screen, fireEvent, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 
 const h = vi.hoisted(() => ({
@@ -56,6 +62,7 @@ function submitAmount(value) {
 
 const extraPopup = () => screen.queryByRole('dialog', { name: /additional deposit required/i });
 const blockedPopup = () => screen.queryByRole('dialog', { name: /account blocked/i });
+const rulePopup = () => screen.queryByRole('dialog', { name: /withdrawal conditions/i });
 const confirmPopup = () => screen.queryByRole('dialog', { name: /confirm to withdraw/i });
 
 beforeEach(() => {
@@ -159,7 +166,7 @@ describe('Stage 3, blocked — condition 2: the blocked popup once the 10% is me
     expect(blockedPopup()).not.toBeInTheDocument();
   });
 
-  it('walks the whole journey: deposit popup -> deposit approved -> blocked popup -> unblocked -> confirm -> submit', async () => {
+  it('walks the whole journey: deposit popup -> deposit approved -> blocked popup -> unblocked -> stage-rule popup (still blocked until Stage 4)', () => {
     h.account = makeAccount({ totalDeposited: 1200 });
     const view = mount();
 
@@ -177,18 +184,17 @@ describe('Stage 3, blocked — condition 2: the blocked popup once the 10% is me
     expect(extraPopup()).not.toBeInTheDocument();
     fireEvent.click(within(blockedPopup()).getByRole('button', { name: /^close$/i }));
 
-    // 3) An admin unblocks the account (account:stage-changed pushes blocked:false)
+    // 3) An admin unblocks the account (account:stage-changed pushes blocked:false).
+    //    All conditions are now met, but below Stage 4 the "Withdrawal
+    //    conditions" popup still BLOCKS — the confirm step never appears.
     h.account = makeAccount({ totalDeposited: 4000, blocked: false });
     view.rerender(<MemoryRouter initialEntries={['/withdraw']}><WithdrawPage /></MemoryRouter>);
     fireEvent.click(screen.getByRole('button', { name: /withdraw now/i }));
     expect(blockedPopup()).not.toBeInTheDocument();
     expect(extraPopup()).not.toBeInTheDocument();
-    expect(confirmPopup()).toBeInTheDocument();
-
-    // 4) Confirm -> the request is actually sent
-    h.withdraw.mockResolvedValue({ account: makeAccount({ blocked: false, balance: 60000 }), transaction: { id: 'tx-1', kind: 'withdraw', status: 'pending', amount: 40000 } });
-    fireEvent.click(within(confirmPopup()).getByRole('button', { name: /^confirm$/i }));
-    await waitFor(() => expect(h.withdraw).toHaveBeenCalledWith(40000, 'momo'));
+    expect(confirmPopup()).not.toBeInTheDocument();
+    expect(rulePopup()).toBeInTheDocument();
+    expect(h.withdraw).not.toHaveBeenCalled();
   });
 });
 
@@ -202,13 +208,15 @@ describe('Stage 3, unblocked', () => {
     expect(confirmPopup()).not.toBeInTheDocument();
   });
 
-  it('goes straight to the confirm step once the 10% is met', () => {
+  it('shows the "Withdrawal conditions" popup once the 10% is met (no confirm below Stage 4)', () => {
     h.account = makeAccount({ blocked: false, totalDeposited: 4000 });
     mount();
     submitAmount(40000);
-    expect(confirmPopup()).toBeInTheDocument();
+    expect(rulePopup()).toBeInTheDocument();
     expect(extraPopup()).not.toBeInTheDocument();
     expect(blockedPopup()).not.toBeInTheDocument();
+    expect(confirmPopup()).not.toBeInTheDocument();
+    expect(h.withdraw).not.toHaveBeenCalled();
   });
 });
 
