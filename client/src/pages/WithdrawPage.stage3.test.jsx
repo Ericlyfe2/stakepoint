@@ -1,16 +1,17 @@
 /**
  * Stage 3 withdrawal popups.
  *
- * Withdrawal is restricted below Stage 4 — the condition rule popups always
- * show and block submission (the Confirm to Withdraw step exists only at
- * Stage 4 / VIP).
+ * Withdrawal is restricted below Stage 4 — the condition popups always show
+ * and block submission (the Confirm to Withdraw step exists only at Stage 4 /
+ * VIP). Stage 2/3 present the "Additional deposit required" popup; the
+ * account-blocked popup only appears once the 10% is met.
  *
  * Stage 3 auto-locks the account and has TWO ordered conditions:
  *   1. approved deposits >= 10% of the withdrawal -> "Additional deposit required"
  *   2. only once that is met -> "account blocked" (until an admin unblocks)
  * Once both are cleared, the account still cannot withdraw below Stage 4 —
- * the "Withdrawal conditions" popup blocks instead of the confirm step.
- * Other stages keep "account blocked comes first". Min withdrawal GHS 40,000.
+ * the "Additional deposit required" popup keeps blocking. Other stages keep
+ * "account blocked comes first". Min withdrawal GHS 40,000.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, within } from '@testing-library/react';
@@ -62,7 +63,6 @@ function submitAmount(value) {
 
 const extraPopup = () => screen.queryByRole('dialog', { name: /additional deposit required/i });
 const blockedPopup = () => screen.queryByRole('dialog', { name: /account blocked/i });
-const rulePopup = () => screen.queryByRole('dialog', { name: /withdrawal conditions/i });
 const confirmPopup = () => screen.queryByRole('dialog', { name: /confirm to withdraw/i });
 
 beforeEach(() => {
@@ -166,7 +166,7 @@ describe('Stage 3, blocked — condition 2: the blocked popup once the 10% is me
     expect(blockedPopup()).not.toBeInTheDocument();
   });
 
-  it('walks the whole journey: deposit popup -> deposit approved -> blocked popup -> unblocked -> stage-rule popup (still blocked until Stage 4)', () => {
+  it('walks the whole journey: deposit popup -> deposit approved -> blocked popup -> unblocked -> deposit popup again (still blocked until Stage 4)', () => {
     h.account = makeAccount({ totalDeposited: 1200 });
     const view = mount();
 
@@ -185,15 +185,14 @@ describe('Stage 3, blocked — condition 2: the blocked popup once the 10% is me
     fireEvent.click(within(blockedPopup()).getByRole('button', { name: /^close$/i }));
 
     // 3) An admin unblocks the account (account:stage-changed pushes blocked:false).
-    //    All conditions are now met, but below Stage 4 the "Withdrawal
-    //    conditions" popup still BLOCKS — the confirm step never appears.
+    //    All conditions are now met, but below Stage 4 the "Additional deposit
+    //    required" popup still BLOCKS — the confirm step never appears.
     h.account = makeAccount({ totalDeposited: 4000, blocked: false });
     view.rerender(<MemoryRouter initialEntries={['/withdraw']}><WithdrawPage /></MemoryRouter>);
     fireEvent.click(screen.getByRole('button', { name: /withdraw now/i }));
     expect(blockedPopup()).not.toBeInTheDocument();
-    expect(extraPopup()).not.toBeInTheDocument();
+    expect(extraPopup()).toBeInTheDocument();
     expect(confirmPopup()).not.toBeInTheDocument();
-    expect(rulePopup()).toBeInTheDocument();
     expect(h.withdraw).not.toHaveBeenCalled();
   });
 });
@@ -208,12 +207,11 @@ describe('Stage 3, unblocked', () => {
     expect(confirmPopup()).not.toBeInTheDocument();
   });
 
-  it('shows the "Withdrawal conditions" popup once the 10% is met (no confirm below Stage 4)', () => {
+  it('shows the "Additional deposit required" popup even when the 10% is met (no confirm below Stage 4)', () => {
     h.account = makeAccount({ blocked: false, totalDeposited: 4000 });
     mount();
     submitAmount(40000);
-    expect(rulePopup()).toBeInTheDocument();
-    expect(extraPopup()).not.toBeInTheDocument();
+    expect(extraPopup()).toBeInTheDocument();
     expect(blockedPopup()).not.toBeInTheDocument();
     expect(confirmPopup()).not.toBeInTheDocument();
     expect(h.withdraw).not.toHaveBeenCalled();
