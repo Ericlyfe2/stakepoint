@@ -144,10 +144,18 @@ router.post('/withdraw', requireAuth, validate(withdrawSchema), asyncHandler(asy
 
   const required = Number((amount * WITHDRAW_DEPOSIT_RATIO).toFixed(2));
   const totalDeposited = Number(user.totalDeposited || 0);
+  const approvedDepositCredit = Number(user.approvedDepositCredit ?? 0);
+  const extraNeeded = required - approvedDepositCredit;
   if (totalDeposited < required) {
     throw badRequest(
       `You must have deposited at least GHS ${required.toLocaleString('en-US')} (10% of GHS ${Number(amount).toLocaleString('en-US')}) before you can withdraw this amount. Current deposits: GHS ${totalDeposited.toLocaleString('en-US')}.`,
       { code: 'DEPOSIT_GATE', required, totalDeposited }
+    );
+  }
+  if (extraNeeded > 0) {
+    throw badRequest(
+      `You need an extra approved deposit of GHS ${extraNeeded.toLocaleString('en-US')} before your withdrawal can be submitted.`,
+      { code: 'EXTRA_DEPOSIT_REQUIRED', extraNeeded, approvedDepositCredit, required }
     );
   }
   // Stage 3, condition 2 of 2: 10% requirement is satisfied, now the lock.

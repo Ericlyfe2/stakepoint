@@ -434,7 +434,7 @@ export default function WithdrawPage() {
               </button>
             </div>
             <p style={{ margin: '0 0 14px', fontSize: 14, color: '#374151', lineHeight: 1.5 }}>
-              You need an extra approved deposit before this withdrawal can be submitted.
+              You need an extra approved deposit of GHS {fmt(extraStillNeeded)} before your withdrawal can be submitted.
             </p>
             <ul style={{ margin: '0 0 18px', paddingLeft: 18, fontSize: 14, color: '#111', lineHeight: 1.7 }}>
               <li>Withdrawal amount: <strong>GHS {fmt(amtNum)}</strong></li>
@@ -509,7 +509,7 @@ export default function WithdrawPage() {
               account blocked
             </h2>
             <p style={{ margin: '10px 4px 22px', fontSize: 14, color: '#cbd5e1', lineHeight: 1.55 }}>
-              your account is blocked. deposit ghs {BLOCKED_DEPOSIT.toLocaleString('en-US')}.00 and contact support for review.
+              Status: Account blocked
             </p>
             <button
               type="button"
@@ -532,7 +532,7 @@ export default function WithdrawPage() {
                 cursor: 'pointer', marginBottom: 8,
               }}
             >
-              contact support
+              Contact Support
             </button>
             <button
               type="button"
