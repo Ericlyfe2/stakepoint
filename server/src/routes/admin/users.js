@@ -341,7 +341,7 @@ router.patch('/:id/wallet',
     if (!u) throw notFound('User not found');
     const next_ = await adjustBalance(u.id, req.body.delta, { allowNegative: req.body.delta < 0 });
     // mirror into transactions
-    const tx = { id: `adj-${Date.now()}`, userId: u.id, at: new Date().toISOString(), kind: 'admin_adjust', amount: req.body.delta, status: 'completed', balanceAfter: next_.balance, reason: req.body.reason, adminId: req.admin.id };
+    const tx = { id: `adj-${Date.now()}`, userId: u.id, at: new Date().toISOString(), kind: req.body.delta > 0 ? 'deposit_approve' : 'admin_adjust', amount: req.body.delta, status: 'completed', balanceAfter: next_.balance, reason: req.body.reason, adminId: req.admin.id };
     const list = txStore.get(u.id) || [];
     txStore.set(u.id, [tx, ...list].slice(0, 500));
     audit(req, { action: 'user.wallet.adjust', target: u.id, targetType: 'user', severity: 'warning', meta: { delta: req.body.delta, balanceAfter: next_.balance, reason: req.body.reason } });

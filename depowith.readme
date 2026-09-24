@@ -43,7 +43,7 @@ anything that touches a wallet gets one row here.
   id: 'tx-<timestamp>-<random4>',   // e.g. tx-1784201165513-jo50
   userId: 'u-...',
   at: '2026-07-16T11:26:05.513Z',   // ISO timestamp
-  kind: 'deposit' | 'withdraw' | 'bet_placed' | 'cash_out' | 'admin_adjust' | 'referral_bonus',
+  kind: 'deposit' | 'deposit_approve' | 'withdraw' | 'bet_placed' | 'cash_out' | 'admin_adjust' | 'referral_bonus',
   amount: 600,                       // always positive for deposit/withdraw; the UI decides the sign/icon
   method: 'momo' | 'vodafone' | 'airteltigo' | 'card' | 'paybill',
   status: 'pending' | 'completed' | 'rejected',

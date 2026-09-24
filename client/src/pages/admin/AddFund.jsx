@@ -278,7 +278,8 @@ export default function AddFundPage() {
             wallet. This uses the same audited adjustment endpoint as the
             wallet action on the Users page — amounts are applied to the
             balance immediately and appear on the player's transaction
-            history as <code>admin_adjust</code>. Removals can't exceed the
+            history as <code>deposit approve</code> for credits (or
+            <code>admin_adjust</code> for removals). Removals can't exceed the
             player's current balance.
           </p>
         </Card>

@@ -22,14 +22,15 @@ function relTime(iso) {
 }
 
 const txLabel = {
-  deposit:       'Deposit',
-  withdraw:      'Withdrawal',
-  withdrawal:    'Withdrawal',
-  bet_placed:    'Bet placed',
-  bet_won:       'Bet won',
-  bet_lost:      'Bet lost',
-  cash_out:      'Cash-out',
-  jackpot_entry: 'Jackpot entry',
+  deposit:         'Deposit',
+  deposit_approve: 'Deposit approve',
+  withdraw:        'Withdrawal',
+  withdrawal:      'Withdrawal',
+  bet_placed:      'Bet placed',
+  bet_won:         'Bet won',
+  bet_lost:        'Bet lost',
+  cash_out:        'Cash-out',
+  jackpot_entry:   'Jackpot entry',
 };
 
 export default function WalletPage() {
