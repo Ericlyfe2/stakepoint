@@ -5,6 +5,7 @@ import { MemoryRouter } from 'react-router-dom';
 import StitchSportsbook from '../pages/premium/StitchSportsbook.jsx';
 import StitchMobile from '../pages/premium/StitchMobile.jsx';
 import StitchLiveTracker from '../pages/premium/StitchLiveTracker.jsx';
+import StitchMyBets from '../pages/premium/StitchMyBets.jsx';
 
 /* ---------------------------------------------------------------------------
    Render tests for the four Stitch ports.
@@ -593,5 +594,89 @@ describe('realtime wiring', () => {
     );
     // The event also carries the new score through to the hero.
     expect(container.querySelector('.stx-mhero-score').textContent).toContain('3');
+  });
+});
+
+/* ---- My Bets -------------------------------------------------------------- */
+
+describe('My Bets & history centre', () => {
+  test('shows an honest empty state when the account has no bets', async () => {
+    fetchBetHistory.mockResolvedValue({ bets: [] });
+    const { container } = PAGE(<StitchMyBets />);
+
+    expect(await screen.findByText(/You have no open bets/i)).toBeTruthy();
+    // The design's sample acca (#BX-89420 / GHS 540) is never reproduced.
+    expect(container.textContent).not.toContain('BX-89420');
+    expect(container.querySelector('.stx-bet')).toBeNull();
+  });
+
+  test('renders a real open ticket and cashes out at the real offer', async () => {
+    fetchBetHistory.mockResolvedValue({ bets: [{
+      id: 'bet-9',
+      status: 'open',
+      mode: 'single',
+      stake: 200,
+      totalOdds: 1.9,
+      potentialWin: 380,
+      placedAt: '2026-05-01T10:00:00.000Z',
+      legs: [{ matchId: 'seed-ars-che', market: '1X2', outcome: '1', home: 'Arsenal', away: 'Chelsea', odds: 1.9 }],
+    }] });
+    fetchCashoutOffer.mockResolvedValue({ offer: 250, locked: false });
+
+    const { container } = PAGE(<StitchMyBets />);
+    await screen.findByRole('heading', { name: 'My Bets' });
+
+    const card = await waitFor(() => {
+      const el = container.querySelector('.stx-bet');
+      expect(el).toBeTruthy();
+      return el;
+    });
+    expect(card.textContent).toContain('Arsenal vs Chelsea');
+    expect(card.textContent).toContain('GHS 200.00');   // real stake / returns
+
+    await waitFor(() => expect(container.querySelector('.stx-bet-cashout').textContent)
+      .toContain('GHS 250.00'));
+
+    const panel = container.querySelector('.stx-bet-cashout');
+    expect(panel.textContent).toContain('GHS 250.00');   // real offer
+    expect(panel.textContent).toContain('+25% PROFIT');  // (250 - 200) / 200
+
+    fireEvent.click(within(panel).getByRole('button', { name: /Cash Out GHS/i }));
+    await waitFor(() => expect(executeCashout).toHaveBeenCalledWith('bet-9', 250, 1));
+  });
+
+  test('settled tickets surface their real returns', async () => {
+    fetchBetHistory.mockResolvedValue({ bets: [
+      { id: 'bet-won', status: 'won', mode: 'single', stake: 100, totalOdds: 2, totalReturn: 200, settledAt: '2026-10-01T10:00:00.000Z', legs: [] },
+      { id: 'bet-open', status: 'open', mode: 'single', stake: 50, totalOdds: 3, potentialWin: 150, legs: [] },
+    ] });
+
+    const { container } = PAGE(<StitchMyBets />);
+    await screen.findByRole('heading', { name: 'My Bets' });
+
+    fireEvent.click(screen.getByRole('tab', { name: /Settled/i }));
+
+    const card = await waitFor(() => {
+      const el = container.querySelector('.stx-bet');
+      expect(el).toBeTruthy();
+      return el;
+    });
+    expect(card.textContent).toContain('WON');
+    expect(card.textContent).toContain('GHS 200.00');
+    // Net P/L uses the real settled figures (+100).
+    expect(container.querySelector('.stx-bets-kpis').textContent).toContain('+GHS 100.00');
+  });
+
+  test('an open ticket with no live offer reports cash-out unavailable', async () => {
+    fetchBetHistory.mockResolvedValue({ bets: [
+      { id: 'bet-9', status: 'open', mode: 'single', stake: 100, totalOdds: 2, potentialWin: 200, legs: [] },
+    ] });
+    fetchCashoutOffer.mockResolvedValue({ offer: 0, locked: false });
+
+    const { container } = PAGE(<StitchMyBets />);
+    await screen.findByRole('heading', { name: 'My Bets' });
+
+    await waitFor(() => expect(container.querySelector('.stx-bet-cashout-note')).toBeTruthy());
+    expect(container.querySelector('.stx-bet-cashout-note').textContent).toMatch(/isn't available/i);
   });
 });

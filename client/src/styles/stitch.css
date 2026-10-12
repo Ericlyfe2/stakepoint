@@ -1313,7 +1313,7 @@
   position: relative;
 }
 .stx-tabbar a .stx-ic { font-size: 17px; }
-.stx-tabbar a--on { color: var(--stx-primary-container); }
+.stx-tabbar a.stx-tabbar--on { color: var(--stx-primary-container); }
 .stx-tabbar .stx-badge-dot { top: 7px; right: 50%; margin-right: -20px; }
 
 /* ---------- 11. LIVE TRACKER (screen 3) ------------------------------------ */
@@ -1622,6 +1622,130 @@
 .stx-switch a:hover { color: var(--stx-text); }
 .stx-switch a[aria-current='page'] { background: var(--stx-primary-container); color: var(--stx-on-primary); }
 
+/* ---------- 12b. MY BETS ---------------------------------------------------- */
+
+.stx-bets {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: var(--stx-lg) var(--stx-lg) var(--stx-xl);
+  display: flex;
+  flex-direction: column;
+  gap: var(--stx-md);
+}
+.stx-mob .stx-bets { padding: 0; max-width: none; }
+.stx-bets .stx-sectionhead { align-items: flex-start; }
+
+.stx-bets-kpis {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--stx-sm);
+}
+.stx-kpi {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: var(--stx-md);
+  border: 1px solid var(--stx-border);
+  border-radius: var(--stx-r-md);
+  background: var(--stx-l2);
+}
+.stx-kpi span { font: var(--stx-badge); color: var(--stx-muted); }
+.stx-kpi b { font: 700 16px/1.2 var(--stx-mono); color: var(--stx-text); }
+.stx-kpi small { font: var(--stx-body-sm); color: var(--stx-muted); }
+.stx-bets-kpis .stx-gold { color: var(--stx-tertiary-container); }
+
+.stx-bets-toolbar { display: flex; align-items: center; gap: var(--stx-sm); flex-wrap: wrap; }
+.stx-bets-tabs { display: flex; gap: var(--stx-xs); flex-wrap: wrap; }
+.stx-bets-toolbar .stx-search { margin-left: auto; max-width: 260px; height: 34px; }
+
+.stx-bets-list { display: flex; flex-direction: column; gap: var(--stx-md); }
+
+.stx-bet {
+  border: 1px solid var(--stx-border);
+  border-radius: var(--stx-r-md);
+  background: var(--stx-l2);
+  padding: var(--stx-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--stx-sm);
+}
+.stx-bet-head { display: flex; align-items: center; gap: var(--stx-sm); }
+.stx-bet-mode {
+  font: 600 var(--stx-badge);
+  color: var(--stx-text);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.stx-bet-status {
+  margin-left: auto;
+  padding: 3px 9px;
+  border-radius: var(--stx-r-pill);
+  font: 700 10px/1 var(--stx-mono);
+  letter-spacing: 0.06em;
+  border: 1px solid var(--stx-border);
+  color: var(--stx-muted);
+}
+.stx-bet-status--open { color: var(--stx-primary-container); border-color: color-mix(in srgb, var(--stx-primary-container) 40%, transparent); }
+.stx-bet-status--won { color: var(--stx-odds-up); border-color: color-mix(in srgb, var(--stx-odds-up) 40%, transparent); }
+.stx-bet-status--lost { color: var(--stx-odds-down); border-color: color-mix(in srgb, var(--stx-odds-down) 40%, transparent); }
+.stx-bet-status--cashout { color: var(--stx-secondary); border-color: color-mix(in srgb, var(--stx-secondary) 40%, transparent); }
+.stx-bet-status--void { color: var(--stx-muted); }
+
+.stx-bet-when {
+  display: flex;
+  gap: var(--stx-md);
+  flex-wrap: wrap;
+  font: var(--stx-body-sm);
+  color: var(--stx-muted);
+}
+
+.stx-bet-legs {
+  display: flex;
+  flex-direction: column;
+  gap: var(--stx-sm);
+  padding: var(--stx-sm) 0;
+  border-top: 1px solid var(--stx-border-soft);
+  border-bottom: 1px solid var(--stx-border-soft);
+}
+.stx-bet-leg { display: flex; flex-direction: column; gap: 2px; }
+.stx-bet-leg-top { display: flex; align-items: center; gap: var(--stx-sm); }
+.stx-bet-leg-match { font: 500 13px/1.3 var(--stx-body); color: var(--stx-text); }
+.stx-bet-leg-res { margin-left: auto; font: 700 10px/1 var(--stx-mono); color: var(--stx-muted); }
+.stx-bet-leg-res--won { color: var(--stx-odds-up); }
+.stx-bet-leg-res--lost { color: var(--stx-odds-down); }
+.stx-bet-leg-pick { font: var(--stx-body-sm); color: var(--stx-on-surface); }
+.stx-bet-leg-pick b { font: 700 12px/1 var(--stx-mono); color: var(--stx-primary-container); margin-left: 4px; }
+.stx-bet-leg-mkt { font: var(--stx-body-sm); color: var(--stx-muted); }
+
+.stx-bet-sum { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--stx-sm); }
+.stx-bet-sum > div { display: flex; flex-direction: column; gap: 2px; }
+.stx-bet-sum span { font: var(--stx-badge); color: var(--stx-muted); }
+.stx-bet-sum b { font: 700 14px/1.2 var(--stx-mono); color: var(--stx-text); }
+
+.stx-bet-cashout {
+  display: flex;
+  flex-direction: column;
+  gap: var(--stx-sm);
+  padding: var(--stx-md);
+  border: 1px solid color-mix(in srgb, var(--stx-primary-container) 40%, transparent);
+  border-radius: var(--stx-r);
+  background: color-mix(in srgb, var(--stx-primary-container) 8%, transparent);
+}
+.stx-bet-cashout-big { display: flex; align-items: center; gap: var(--stx-sm); }
+.stx-bet-cashout-big > span { display: flex; flex-direction: column; font: var(--stx-badge); color: var(--stx-muted); }
+.stx-bet-cashout-big b { margin-left: auto; font: 700 16px/1 var(--stx-mono); color: var(--stx-text); }
+.stx-bet-profit { font: 700 11px/1.4 var(--stx-mono); color: var(--stx-odds-up); }
+.stx-bet-fracs { display: flex; gap: var(--stx-xs); }
+.stx-bet-cashout-note { margin: 0; font: var(--stx-body-sm); color: var(--stx-muted); }
+
+.stx-bets-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--stx-md);
+  padding: var(--stx-lg) 0;
+}
+
 /* ---------- 13. RESPONSIVE -------------------------------------------------- */
 
 @media (max-width: 1279px) {
@@ -1646,6 +1770,7 @@
   .stx-search { max-width: none; }
   .stx-dock { bottom: 64px; }
   .stx-tabbar { display: flex; }
+  .stx-bets-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 @media (max-width: 767px) {
@@ -1660,6 +1785,8 @@
   .stx-pl-box { width: 56px; }
   .stx-pl-goal { width: 26px; }
   .stx-odds--4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .stx-bets-toolbar .stx-search { max-width: none; width: 100%; margin-left: 0; }
+  .stx-bet-sum { gap: var(--stx-xs); }
 }
 
 @media (prefers-reduced-motion: reduce) {

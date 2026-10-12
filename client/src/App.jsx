@@ -27,6 +27,7 @@ import StitchSportsbook from './pages/premium/StitchSportsbook.jsx';
 import StitchMobile from './pages/premium/StitchMobile.jsx';
 import StitchLiveTracker from './pages/premium/StitchLiveTracker.jsx';
 import StitchHome from './pages/premium/StitchHome.jsx';
+import StitchMyBets from './pages/premium/StitchMyBets.jsx';
 
 import { AdminProvider, AdminGuard } from './providers/AdminProvider.jsx';
 import AdminShell from './layout/AdminShell.jsx';
@@ -138,6 +139,7 @@ export default function App() {
                   account + theme + the maintenance gate. */}
               <Route path="/"              element={<StitchHome />} />
               <Route path="/live"          element={<StitchLiveTracker />} />
+              <Route path="/my-bets"       element={<StitchMyBets />} />
               {/* /premium* kept wired as deep-link/preview aliases for the same
                   four screens. */}
               <Route path="/premium"               element={<StitchSportsbook />} />
@@ -150,7 +152,7 @@ export default function App() {
                     lost while the premium home takes over "/". */}
                 <Route path="/classic"      element={<Home />} />
                 <Route path="/classic/live" element={<Home initialChip="live" />} />
-                <Route path="/my-bets"   element={<BetHistoryPage />} />
+                <Route path="/classic/my-bets" element={<BetHistoryPage />} />
                 <Route path="/code-hub"  element={<CodeHubPage />} />
                 <Route path="/ticket/:code" element={<TicketPage />} />
                 <Route path="/casino"             element={<CasinoPage />} />

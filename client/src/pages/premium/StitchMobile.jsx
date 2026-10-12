@@ -25,14 +25,14 @@ const TABS = [
   { to: '/profile', label: 'Account', icon: '◍' },
 ];
 
-function TabBar({ betCount }) {
+export function TabBar({ betCount, current = '/' }) {
   return (
     <nav className="stx-tabbar" aria-label="Primary">
       {TABS.map((t) => (
         <Link
           key={t.label}
           to={t.to}
-          className={t.to === '/' ? 'stx-tabbar--on' : undefined}
+          className={current === t.to ? 'stx-tabbar--on' : undefined}
         >
           <Ic name={t.icon} size="lg" />
           {t.label}
