@@ -171,6 +171,39 @@ describe('screen 01 — premium sportsbook', () => {
     expect(screen.queryByText(/XENTRA100/)).toBeNull();
   });
 
+  test('the chrome carries no fabricated notification badge or sport counts', async () => {
+    const { container } = PAGE(<StitchSportsbook />);
+    await ready();
+
+    // No invented unread badge and no made-up per-sport event counts.
+    expect(container.querySelector('.stx-top .stx-badge-dot')).toBeNull();
+    expect(container.querySelectorAll('.stx-sportpill b').length).toBe(0);
+  });
+
+  test('the header search filters fixtures to matching teams', async () => {
+    PAGE(<StitchSportsbook />);
+    await ready();
+    expect(screen.getAllByText('Arsenal').length).toBeGreaterThan(0);
+
+    fireEvent.change(screen.getByRole('searchbox', { name: /search teams/i }), {
+      target: { value: 'Liverpool' },
+    });
+
+    await waitFor(() => expect(screen.queryByText('Arsenal')).toBeNull());
+    expect(screen.getByText('Liverpool')).toBeTruthy();
+  });
+
+  test('an unmatched search shows an honest empty state', async () => {
+    PAGE(<StitchSportsbook />);
+    await ready();
+
+    fireEvent.change(screen.getByRole('searchbox', { name: /search teams/i }), {
+      target: { value: 'zzzznotateam' },
+    });
+
+    expect(await screen.findByText(/No fixtures match/i)).toBeTruthy();
+  });
+
   test('an odds click becomes a real selection labelled by the engine', async () => {
     const { container } = PAGE(<StitchSportsbook />);
     await ready();

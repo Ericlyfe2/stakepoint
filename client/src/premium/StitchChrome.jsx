@@ -17,7 +17,7 @@ const NAV_LINKS = [
   { to: '/my-bets', label: 'My Bets' },
 ];
 
-export function StitchTopNav({ slip, current, betCount }) {
+export function StitchTopNav({ slip, current, betCount, search = '', onSearch }) {
   const { account, openDeposit } = slip;
 
   return (
@@ -31,10 +31,19 @@ export function StitchTopNav({ slip, current, betCount }) {
         BetXentra
       </Link>
 
-      <div className="stx-search">
-        <Ic name="⌕" />
-        Search teams, leagues, markets…
-      </div>
+      {onSearch && (
+        <form className="stx-search" role="search" onSubmit={(e) => e.preventDefault()}>
+          <Ic name="⌕" />
+          <input
+            className="stx-search-input"
+            type="search"
+            value={search}
+            onChange={(e) => onSearch(e.target.value)}
+            placeholder="Search teams, leagues, markets…"
+            aria-label="Search teams, leagues and markets"
+          />
+        </form>
+      )}
 
       <nav className="stx-navlinks">
         {NAV_LINKS.map((l) => (
@@ -48,13 +57,9 @@ export function StitchTopNav({ slip, current, betCount }) {
         ))}
       </nav>
 
-      <button type="button" className="stx-iconbtn" aria-label="My tickets">
+      <Link to="/my-bets" className="stx-iconbtn" aria-label="My bets">
         <Ic name="▤" />
-      </button>
-      <button type="button" className="stx-iconbtn" aria-label="Notifications">
-        <Ic name="◔" />
-        <span className="stx-badge-dot">3</span>
-      </button>
+      </Link>
 
       <div className="stx-wallet">
         <span className="stx-wallet-amt">GHS {formatAmt(account?.balance || 0)}</span>
@@ -100,7 +105,9 @@ export function StitchSideRail({ liveCount, activeSport, onSport, mode, onMode }
             >
               <Ic name={s.icon} />
               <span>{s.label}</span>
-              <span className="stx-rail-count">{liveCount && s.id === 'football' ? liveCount : s.count}</span>
+              {s.id === 'football' && liveCount > 0 && (
+                <span className="stx-rail-count">{liveCount}</span>
+              )}
             </Link>
           ))}
         </nav>
@@ -136,7 +143,7 @@ export function StitchFooter({ current }) {
         <Link to="/help">Help Center</Link>
       </nav>
 
-      <small>© 2025 BetXentra Ltd. Licensed and regulated by the Gaming Commission of Ghana. 18+ Play Responsibly.</small>
+      <small>© {new Date().getFullYear()} BetXentra Ltd. Licensed and regulated by the Gaming Commission of Ghana. 18+ Play Responsibly.</small>
 
       <div className="stx-pay">
         <span>MTN MoMo</span>

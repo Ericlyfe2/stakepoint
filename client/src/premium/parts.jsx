@@ -135,7 +135,7 @@ export function SportPill({ item, active, onClick }) {
     >
       <span aria-hidden="true">{item.icon}</span>
       {item.label}
-      <b>{item.count}</b>
+      {item.count != null && <b>{item.count}</b>}
     </button>
   );
 }

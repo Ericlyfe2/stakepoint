@@ -306,16 +306,18 @@ const VFL = {
   ],
 };
 
-/* ---- sport category counts from the Stitch side rail -------------------- */
+/* ---- sport categories from the Stitch side rail -------------------------
+   Labels only — no invented per-sport event counts. The only real count we
+   hold is the live football total, which the rail fills from the feed. */
 export const SPORT_CATEGORIES = [
-  { id: 'football', label: 'Football', icon: '⚽', count: 18 },
-  { id: 'basketball', label: 'Basketball', icon: '🏀', count: 6 },
-  { id: 'tennis', label: 'Tennis', icon: '🎾', count: 4 },
-  { id: 'baseball', label: 'Baseball', icon: '⚾', count: 2 },
-  { id: 'esports', label: 'Esports', icon: '🎮', count: 11 },
-  { id: 'hockey', label: 'Ice Hockey', icon: '🏒', count: 3 },
-  { id: 'boxing', label: 'Boxing', icon: '🥊', count: 5 },
-  { id: 'tabletennis', label: 'Table Tennis', icon: '🏓', count: 9 },
+  { id: 'football', label: 'Football', icon: '⚽' },
+  { id: 'basketball', label: 'Basketball', icon: '🏀' },
+  { id: 'tennis', label: 'Tennis', icon: '🎾' },
+  { id: 'baseball', label: 'Baseball', icon: '⚾' },
+  { id: 'esports', label: 'Esports', icon: '🎮' },
+  { id: 'hockey', label: 'Ice Hockey', icon: '🏒' },
+  { id: 'boxing', label: 'Boxing', icon: '🥊' },
+  { id: 'tabletennis', label: 'Table Tennis', icon: '🏓' },
 ];
 
 export const MARKET_FILTERS = [

@@ -88,16 +88,8 @@ export default function StitchMobile({ light = false }) {
             <button type="button" className="stx-depbtn" onClick={slip.openDeposit}>
               + ADD
             </button>
-            <button type="button" className="stx-iconbtn" aria-label="Search">
-              <Ic name="⌕" />
-            </button>
-            <button type="button" className="stx-iconbtn" aria-label="Notifications">
-              <Ic name="◔" />
-              <span className="stx-badge-dot">3</span>
-            </button>
           </div>
         </header>
-
         <div className="stx-mob-body">
           {usingSeed && (
             <p className="stx-badge stx-muted" style={{ margin: 0 }}>

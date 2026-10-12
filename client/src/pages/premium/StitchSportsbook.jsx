@@ -68,26 +68,37 @@ export default function StitchSportsbook() {
   const [filter, setFilter] = useState('1X2');
   const [railMode, setRailMode] = useState('upcoming');
   const [leagueTabs, setLeagueTabs] = useState({});
+  const [query, setQuery] = useState('');
 
   const onToggle = slip.toggleSelection;
 
+  const q = query.trim().toLowerCase();
+
   const liveLeagues = useMemo(() => {
     const ids = new Set(liveMatches.map((m) => m.id));
+    const hit = (m, lg) => !q
+      || String(m.home).toLowerCase().includes(q)
+      || String(m.away).toLowerCase().includes(q)
+      || String(lg.name).toLowerCase().includes(q);
     return leagues
-      .map((lg) => ({ ...lg, matches: lg.matches.filter((m) => ids.has(m.id)) }))
+      .map((lg) => ({ ...lg, matches: lg.matches.filter((m) => ids.has(m.id) && hit(m, lg)) }))
       .filter((lg) => lg.matches.length);
-  }, [leagues, liveMatches]);
+  }, [leagues, liveMatches, q]);
 
   const upcomingLeagues = useMemo(() => {
     const ids = new Set(upcomingMatches.map((m) => m.id));
+    const hit = (m, lg) => !q
+      || String(m.home).toLowerCase().includes(q)
+      || String(m.away).toLowerCase().includes(q)
+      || String(lg.name).toLowerCase().includes(q);
     return leagues
-      .map((lg) => ({ ...lg, matches: lg.matches.filter((m) => ids.has(m.id)) }))
+      .map((lg) => ({ ...lg, matches: lg.matches.filter((m) => ids.has(m.id) && hit(m, lg)) }))
       .filter((lg) => lg.matches.length);
-  }, [leagues, upcomingMatches]);
+  }, [leagues, upcomingMatches, q]);
 
   return (
     <div className="stx">
-      <StitchTopNav slip={slip} current="/" betCount={slip.selectionCount} />
+      <StitchTopNav slip={slip} current="/" betCount={slip.selectionCount} search={query} onSearch={setQuery} />
 
       <div className="stx-desk">
         <StitchSideRail
@@ -165,6 +176,12 @@ export default function StitchSportsbook() {
               />
             ))}
           </div>
+
+          {q && liveLeagues.length === 0 && upcomingLeagues.length === 0 && (
+            <p className="stx-badge stx-muted" style={{ margin: 0 }}>
+              No fixtures match “{query.trim()}”.
+            </p>
+          )}
 
           {liveLeagues.length > 0 && (
             <section>

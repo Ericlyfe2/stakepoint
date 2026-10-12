@@ -259,6 +259,21 @@
   font: var(--stx-body-sm);
 }
 
+.stx-search:focus-within { border-color: var(--stx-primary-container); }
+
+.stx-search-input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--stx-text);
+  font: var(--stx-body-sm);
+}
+
+.stx-search-input::placeholder { color: var(--stx-muted); }
+.stx-search-input::-webkit-search-cancel-button { filter: invert(0.55); }
+
 .stx-navlinks {
   display: flex;
   align-items: center;
