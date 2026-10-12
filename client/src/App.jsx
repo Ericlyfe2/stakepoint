@@ -28,6 +28,8 @@ import StitchMobile from './pages/premium/StitchMobile.jsx';
 import StitchLiveTracker from './pages/premium/StitchLiveTracker.jsx';
 import StitchHome from './pages/premium/StitchHome.jsx';
 import StitchMyBets from './pages/premium/StitchMyBets.jsx';
+import StitchWallet from './pages/premium/StitchWallet.jsx';
+import StitchWithdraw from './pages/premium/StitchWithdraw.jsx';
 
 import { AdminProvider, AdminGuard } from './providers/AdminProvider.jsx';
 import AdminShell from './layout/AdminShell.jsx';
@@ -140,6 +142,8 @@ export default function App() {
               <Route path="/"              element={<StitchHome />} />
               <Route path="/live"          element={<StitchLiveTracker />} />
               <Route path="/my-bets"       element={<StitchMyBets />} />
+              <Route path="/wallet"        element={<StitchWallet />} />
+              <Route path="/withdraw"      element={<StitchWithdraw />} />
               {/* /premium* kept wired as deep-link/preview aliases for the same
                   four screens. */}
               <Route path="/premium"               element={<StitchSportsbook />} />
@@ -153,6 +157,8 @@ export default function App() {
                 <Route path="/classic"      element={<Home />} />
                 <Route path="/classic/live" element={<Home initialChip="live" />} />
                 <Route path="/classic/my-bets" element={<BetHistoryPage />} />
+                <Route path="/classic/wallet" element={<WalletPage />} />
+                <Route path="/classic/withdraw" element={<WithdrawPage />} />
                 <Route path="/code-hub"  element={<CodeHubPage />} />
                 <Route path="/ticket/:code" element={<TicketPage />} />
                 <Route path="/casino"             element={<CasinoPage />} />
@@ -163,8 +169,6 @@ export default function App() {
                 <Route path="/jackpot"   element={<JackpotPage />} />
                 <Route path="/promos"    element={<PromosPage />} />
                 <Route path="/profile"   element={<ProfilePage />} />
-                <Route path="/wallet"    element={<WalletPage />} />
-                <Route path="/withdraw"  element={<WithdrawPage />} />
                 <Route path="/az-menu"   element={<AZMenuPage />} />
                 <Route path="/info"      element={<InfoPage />} />
                 <Route path="/terms"     element={<Navigate to="/info#terms" replace />} />

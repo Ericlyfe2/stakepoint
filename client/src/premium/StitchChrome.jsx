@@ -15,6 +15,7 @@ const NAV_LINKS = [
   { to: '/jackpot', label: 'Jackpots' },
   { to: '/promos', label: 'Promotions' },
   { to: '/my-bets', label: 'My Bets' },
+  { to: '/wallet', label: 'Wallet' },
 ];
 
 export function StitchTopNav({ slip, current, betCount, search = '', onSearch }) {
@@ -62,7 +63,7 @@ export function StitchTopNav({ slip, current, betCount, search = '', onSearch })
       </Link>
 
       <div className="stx-wallet">
-        <span className="stx-wallet-amt">GHS {formatAmt(account?.balance || 0)}</span>
+        <Link to="/wallet" className="stx-wallet-amt">GHS {formatAmt(account?.balance || 0)}</Link>
         <button type="button" className="stx-depbtn" onClick={openDeposit}>
           + DEPOSIT
         </button>

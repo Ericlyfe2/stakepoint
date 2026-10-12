@@ -6,6 +6,8 @@ import StitchSportsbook from '../pages/premium/StitchSportsbook.jsx';
 import StitchMobile from '../pages/premium/StitchMobile.jsx';
 import StitchLiveTracker from '../pages/premium/StitchLiveTracker.jsx';
 import StitchMyBets from '../pages/premium/StitchMyBets.jsx';
+import StitchWallet from '../pages/premium/StitchWallet.jsx';
+import StitchWithdraw from '../pages/premium/StitchWithdraw.jsx';
 
 /* ---------------------------------------------------------------------------
    Render tests for the four Stitch ports.
@@ -23,12 +25,18 @@ const fetchCashoutOffer = vi.fn();
 const executeCashout = vi.fn();
 const setAutoCashout = vi.fn();
 const placeBet = vi.fn();
+const fetchTransactions = vi.fn();
+const fetchWalletRules = vi.fn();
+const withdraw = vi.fn();
 const setAccount = vi.fn();
 const openDeposit = vi.fn();
 const showWin = vi.fn();
 const refresh = vi.fn();
 // Captured so tests can drive the ports' socket handlers directly.
 const liveHandlers = new Map();
+
+// Shared account object so tests can shape it (stage, balance, phone) per case.
+const accountState = { balance: 5000, userId: 'u-1' };
 
 vi.mock('../api/betApi.js', () => ({
   fetchMatches: (...a) => fetchMatches(...a),
@@ -39,6 +47,9 @@ vi.mock('../api/betApi.js', () => ({
   executeCashout: (...a) => executeCashout(...a),
   setAutoCashout: (...a) => setAutoCashout(...a),
   placeBet: (...a) => placeBet(...a),
+  fetchTransactions: (...a) => fetchTransactions(...a),
+  fetchWalletRules: (...a) => fetchWalletRules(...a),
+  withdraw: (...a) => withdraw(...a),
 }));
 
 // No real socket in jsdom; onLive registers the handler and returns an
@@ -54,7 +65,7 @@ vi.mock('../api/socketClient.js', () => ({
 
 vi.mock('../providers/AccountProvider.jsx', () => ({
   useAccount: () => ({
-    account: { balance: 5000, userId: 'u-1' },
+    account: accountState,
     setAccount,
     openDeposit,
     showWin,
@@ -81,6 +92,9 @@ beforeEach(() => {
   localStorage.clear();
   vi.clearAllMocks();
   liveHandlers.clear();
+  // Reset the shared account to the default signed-in shape.
+  for (const k of Object.keys(accountState)) delete accountState[k];
+  Object.assign(accountState, { balance: 5000, userId: 'u-1' });
   fetchMatches.mockRejectedValue(new Error('offline'));
   fetchRecentPayouts.mockResolvedValue({
     payouts: [
@@ -101,6 +115,13 @@ beforeEach(() => {
     success: true,
     bet: { id: 'bet-1', potentialReturn: 3120 },
     account: { balance: 4500, userId: 'u-1' },
+  });
+  fetchTransactions.mockResolvedValue({ transactions: [] });
+  fetchWalletRules.mockResolvedValue({ minDeposit: 300, minWithdraw: 550, withdrawDepositRatio: 0.1, totalDeposited: 0, maxWithdrawByRatio: 0 });
+  withdraw.mockResolvedValue({
+    ok: true,
+    account: { balance: 4500, userId: 'u-1' },
+    transaction: { id: 'w-1', kind: 'withdraw', amount: 5000, status: 'pending', at: '2026-10-01T10:00:00.000Z' },
   });
 });
 
@@ -678,5 +699,72 @@ describe('My Bets & history centre', () => {
 
     await waitFor(() => expect(container.querySelector('.stx-bet-cashout-note')).toBeTruthy());
     expect(container.querySelector('.stx-bet-cashout-note').textContent).toMatch(/isn't available/i);
+  });
+});
+
+/* ---- Wallet & Withdraw ---------------------------------------------------- */
+
+describe('Wallet & Withdraw', () => {
+  test('wallet shows the real balance, withdraw cap and transaction history', async () => {
+    fetchWalletRules.mockResolvedValue({ minDeposit: 300, minWithdraw: 550, withdrawDepositRatio: 0.1, totalDeposited: 2000 });
+    fetchTransactions.mockResolvedValue({ transactions: [
+      { id: 'd-1', kind: 'deposit', amount: 2000, status: 'completed', at: '2026-10-02T10:00:00.000Z' },
+      { id: 'w-1', kind: 'withdraw', amount: 500, status: 'pending', at: '2026-10-03T10:00:00.000Z' },
+    ] });
+
+    const { container } = PAGE(<StitchWallet />);
+    await screen.findByRole('heading', { name: 'Wallet' });
+
+    expect(container.querySelector('.stx-whero-amt').textContent).toContain('5,000.00');
+    // Withdraw cap = lifetime deposits / 0.10.
+    expect(container.querySelector('.stx-whero-meta').textContent).toContain('20,000.00');
+
+    await waitFor(() => expect(container.querySelectorAll('.stx-tx').length).toBe(2));
+    expect(container.textContent).toContain('Deposit');
+    expect(container.textContent).toContain('Withdrawal');
+  });
+
+  test('wallet deposit CTA opens the real Paybill dialog', async () => {
+    PAGE(<StitchWallet />);
+    await screen.findByRole('heading', { name: 'Wallet' });
+    fireEvent.click(screen.getByRole('button', { name: /Deposit Now/i }));
+    expect(openDeposit).toHaveBeenCalled();
+  });
+
+  test('wallet shows an honest empty state with no transactions', async () => {
+    const { container } = PAGE(<StitchWallet />);
+    await screen.findByRole('heading', { name: 'Wallet' });
+    expect(await screen.findByText(/No transactions yet/i)).toBeTruthy();
+    expect(container.querySelector('.stx-tx')).toBeNull();
+  });
+
+  test('a stage 0 withdrawal is gated by the deposit-requirement modal', async () => {
+    Object.assign(accountState, { balance: 100000, stage: 0 });
+    PAGE(<StitchWithdraw />);
+    await screen.findByRole('heading', { name: 'Withdraw' });
+    fireEvent.change(screen.getByLabelText(/Amount/i), { target: { value: '1000' } });
+    fireEvent.click(screen.getByRole('button', { name: /Withdraw Now/i }));
+    expect(await screen.findByText(/Deposit requirement/i)).toBeTruthy();
+  });
+
+  test('a stage 2 withdrawal requires the 10% extra deposit', async () => {
+    Object.assign(accountState, { balance: 100000, stage: 2, totalDeposited: 0 });
+    PAGE(<StitchWithdraw />);
+    await screen.findByRole('heading', { name: 'Withdraw' });
+    fireEvent.change(screen.getByLabelText(/Amount/i), { target: { value: '10000' } });
+    fireEvent.click(screen.getByRole('button', { name: /Withdraw Now/i }));
+    expect(await screen.findByText(/Additional deposit required/i)).toBeTruthy();
+  });
+
+  test('a stage 4 withdrawal confirms then submits the real request', async () => {
+    Object.assign(accountState, { balance: 100000, stage: 4, phone: '0244000000' });
+    PAGE(<StitchWithdraw />);
+    await screen.findByRole('heading', { name: 'Withdraw' });
+    fireEvent.change(screen.getByLabelText(/Amount/i), { target: { value: '50000' } });
+    fireEvent.click(screen.getByRole('button', { name: /Withdraw Now/i }));
+    await screen.findByText(/Confirm to Withdraw/i);
+    fireEvent.click(screen.getByRole('button', { name: /^Confirm$/i }));
+    await waitFor(() => expect(withdraw).toHaveBeenCalledWith(50000, 'momo'));
+    expect(await screen.findByText(/Pending Request/i)).toBeTruthy();
   });
 });
