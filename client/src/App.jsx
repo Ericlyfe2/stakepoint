@@ -32,6 +32,7 @@ import StitchWallet from './pages/premium/StitchWallet.jsx';
 import StitchWithdraw from './pages/premium/StitchWithdraw.jsx';
 import StitchPromos from './pages/premium/StitchPromos.jsx';
 import StitchCodeHub from './pages/premium/StitchCodeHub.jsx';
+import StitchProfile from './pages/premium/StitchProfile.jsx';
 
 import { AdminProvider, AdminGuard } from './providers/AdminProvider.jsx';
 import AdminShell from './layout/AdminShell.jsx';
@@ -149,6 +150,7 @@ export default function App() {
               <Route path="/promos"        element={<StitchPromos />} />
               <Route path="/codes"         element={<StitchCodeHub />} />
               <Route path="/code-hub"      element={<StitchCodeHub />} />
+              <Route path="/profile"       element={<StitchProfile />} />
               {/* /premium* kept wired as deep-link/preview aliases for the same
                   four screens. */}
               <Route path="/premium"               element={<StitchSportsbook />} />
@@ -166,6 +168,7 @@ export default function App() {
                 <Route path="/classic/withdraw" element={<WithdrawPage />} />
                 <Route path="/classic/promos" element={<PromosPage />} />
                 <Route path="/classic/code-hub" element={<CodeHubPage />} />
+                <Route path="/classic/profile" element={<ProfilePage />} />
                 <Route path="/ticket/:code" element={<TicketPage />} />
                 <Route path="/casino"             element={<CasinoPage />} />
                 <Route path="/casino/dice"        element={<DicePage />} />
@@ -173,7 +176,6 @@ export default function App() {
                 <Route path="/casino/red-black"   element={<RedBlackPage />} />
                 <Route path="/virtuals"  element={<VirtualsPage />} />
                 <Route path="/jackpot"   element={<JackpotPage />} />
-                <Route path="/profile"   element={<ProfilePage />} />
                 <Route path="/az-menu"   element={<AZMenuPage />} />
                 <Route path="/info"      element={<InfoPage />} />
                 <Route path="/terms"     element={<Navigate to="/info#terms" replace />} />

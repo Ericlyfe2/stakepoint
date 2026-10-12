@@ -10,6 +10,7 @@ import StitchWallet from '../pages/premium/StitchWallet.jsx';
 import StitchWithdraw from '../pages/premium/StitchWithdraw.jsx';
 import StitchPromos from '../pages/premium/StitchPromos.jsx';
 import StitchCodeHub from '../pages/premium/StitchCodeHub.jsx';
+import StitchProfile from '../pages/premium/StitchProfile.jsx';
 
 /* ---------------------------------------------------------------------------
    Render tests for the four Stitch ports.
@@ -31,11 +32,18 @@ const fetchTransactions = vi.fn();
 const fetchWalletRules = vi.fn();
 const withdraw = vi.fn();
 const fetchBetByCode = vi.fn();
+const updateProfile = vi.fn();
+const changePassword = vi.fn();
 const setAccount = vi.fn();
 const openDeposit = vi.fn();
 const showWin = vi.fn();
 const refresh = vi.fn();
 const toast = vi.fn();
+const openWithdraw = vi.fn();
+const signOut = vi.fn();
+const clearNotifications = vi.fn();
+const markNotificationRead = vi.fn();
+const notificationsState = [];
 // Captured so tests can drive the ports' socket handlers directly.
 const liveHandlers = new Map();
 
@@ -55,6 +63,8 @@ vi.mock('../api/betApi.js', () => ({
   fetchWalletRules: (...a) => fetchWalletRules(...a),
   withdraw: (...a) => withdraw(...a),
   fetchBetByCode: (...a) => fetchBetByCode(...a),
+  updateProfile: (...a) => updateProfile(...a),
+  changePassword: (...a) => changePassword(...a),
 }));
 
 // No real socket in jsdom; onLive registers the handler and returns an
@@ -70,11 +80,17 @@ vi.mock('../api/socketClient.js', () => ({
 
 vi.mock('../providers/AccountProvider.jsx', () => ({
   useAccount: () => ({
-    account: accountState,
+    account: accountState.userId ? accountState : null,
     setAccount,
     openDeposit,
+    openWithdraw: openWithdraw,
     showWin,
     refresh,
+    signOut,
+    notifications: notificationsState,
+    unreadCount: notificationsState.filter((n) => !n.read).length,
+    clearNotifications,
+    markNotificationRead,
   }),
   useToast: () => ({ toast }),
 }));
@@ -97,6 +113,7 @@ const ready = async () => {
 beforeEach(() => {
   localStorage.clear();
   sessionStorage.clear();
+  notificationsState.length = 0;
   vi.clearAllMocks();
   liveHandlers.clear();
   // Reset the shared account to the default signed-in shape.
@@ -879,5 +896,46 @@ describe('Code Hub', () => {
     await waitFor(() => expect(fetchBetByCode).toHaveBeenCalledWith('ABC123'));
     expect(JSON.parse(sessionStorage.getItem('sp_recommended_legs')).legs.length).toBe(1);
     sessionStorage.clear();
+  });
+});
+
+/* ---- Account -------------------------------------------------------------- */
+
+describe('Account', () => {
+  test('signed-in account shows identity, real balance and the menu', async () => {
+    Object.assign(accountState, { balance: 7000, phone: '0244123456', accountStatus: 'PREMIUM' });
+    const { container } = PAGE(<StitchProfile />);
+
+    await screen.findByText('0244123456');
+    expect(container.querySelector('.stx-whero-amt').textContent).toContain('7,000.00');
+    expect(screen.getByText('PREMIUM')).toBeTruthy();
+    expect(screen.getAllByRole('button', { name: /Deposit/i }).length).toBeGreaterThan(0);
+    expect(screen.getByText('Sports Bet History')).toBeTruthy();
+  });
+
+  test('guest sees an honest sign-in prompt', async () => {
+    delete accountState.userId;
+    PAGE(<StitchProfile />);
+    expect(await screen.findByText(/Sign in to manage your account/i)).toBeTruthy();
+  });
+
+  test('the transactions menu opens a sheet with the real history', async () => {
+    fetchTransactions.mockResolvedValue({ transactions: [
+      { id: 't-1', kind: 'deposit', amount: 2000, status: 'completed', at: '2026-10-02T10:00:00.000Z' },
+    ] });
+    PAGE(<StitchProfile />);
+    fireEvent.click(await screen.findByText('Transactions'));
+    await waitFor(() => expect(fetchTransactions).toHaveBeenCalled());
+    expect(await screen.findByText('Deposit')).toBeTruthy();
+  });
+
+  test('invalid phone in the settings sheet reports a validation error', async () => {
+    PAGE(<StitchProfile />);
+    fireEvent.click(await screen.findByText('Account Settings'));
+    const phone = await screen.findByLabelText(/Phone number/i);
+    fireEvent.change(phone, { target: { value: '12' } });
+    fireEvent.click(screen.getByRole('button', { name: /Save changes/i }));
+    expect(await screen.findByText(/valid phone number/i)).toBeTruthy();
+    expect(updateProfile).not.toHaveBeenCalled();
   });
 });
