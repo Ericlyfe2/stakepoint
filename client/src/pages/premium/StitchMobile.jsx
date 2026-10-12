@@ -114,9 +114,9 @@ export default function StitchMobile({ light = false }) {
                 {heroPromo.body}
               </p>
               {heroPromo.cta && (
-                <button type="button" className="stx-promo-cta">
+                <Link to="/promos" className="stx-promo-cta">
                   {heroPromo.cta} <Ic name="→" size="sm" />
-                </button>
+                </Link>
               )}
             </div>
           ) : (

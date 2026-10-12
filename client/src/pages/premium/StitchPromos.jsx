@@ -165,7 +165,7 @@ export default function StitchPromos() {
           </header>
           <div className="stx-mob-body">{content}</div>
         </div>
-        <TabBar current="/" />
+        <TabBar current="/promos" />
       </div>
     );
   }

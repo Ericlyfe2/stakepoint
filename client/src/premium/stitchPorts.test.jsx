@@ -547,6 +547,12 @@ describe('screen 03 — live tracker', () => {
     expect(container.querySelector('.stx-pitchbox')).toBeNull();
     expect(screen.getByRole('link', { name: /Back to Sportsbook/ })).toBeTruthy();
   });
+
+  test('flags designed preview data when the live API is unreachable', async () => {
+    const { container } = PAGE(<StitchLiveTracker />);
+    await screen.findByText(/SWITCH MATCH/);
+    expect(container.textContent).toContain('Showing designed preview fixtures');
+  });
 });
 
 /* ---- realtime feed -------------------------------------------------------- */

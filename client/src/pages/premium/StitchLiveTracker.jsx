@@ -184,7 +184,7 @@ function CashOutPanel({ match }) {
 }
 
 export default function StitchLiveTracker() {
-  const { snapshot, leagues, liveMatches, liveCount } = useStitchFixtures('football');
+  const { snapshot, leagues, liveMatches, liveCount, usingSeed } = useStitchFixtures('football');
   const slip = useStitchSlip({ snapshot });
   const [tab, setTab] = useState(MARKET_TABS[0].key);
   const [selectedId, setSelectedId] = useState(null);
@@ -246,6 +246,12 @@ export default function StitchLiveTracker() {
         <StitchSideRail liveCount={liveCount} activeSport="football" />
 
         <main className="stx-stage">
+          {usingSeed && (
+            <p className="stx-badge stx-muted" style={{ margin: 0 }}>
+              Showing designed preview fixtures — the live API is unreachable.
+            </p>
+          )}
+
           <nav className="stx-crumbs">
             <Link to="/live">Live Sports</Link> /
             <Link to="/">Football</Link> /

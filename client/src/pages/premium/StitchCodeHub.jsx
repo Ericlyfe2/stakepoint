@@ -128,12 +128,6 @@ export default function StitchCodeHub() {
     [snapshot, usingSeed],
   );
 
-  const addCard = (card) => {
-    try { sessionStorage.setItem(LEGS_KEY, JSON.stringify({ legs: card.legs })); } catch { /* ignore */ }
-    toast(`${card.folds}-fold added to your betslip.`);
-    navigate('/');
-  };
-
   const loadCode = async (e) => {
     e?.preventDefault();
     const code = bookingCode.trim().toUpperCase();
@@ -283,7 +277,7 @@ export default function StitchCodeHub() {
           </header>
           <div className="stx-mob-body">{shared}</div>
         </div>
-        <TabBar current="/" />
+        <TabBar current="/codes" />
       </div>
     );
   }

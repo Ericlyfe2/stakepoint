@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import { marketName } from '../lib/betslipEngine.js';
 
 /* ---------------------------------------------------------------------------
@@ -295,9 +296,9 @@ export function PromoCard({ eyebrow, title, copy, cta, icon, accent }) {
       <span className="stx-promo-title">{icon ? `${icon} ` : ''}{title}</span>
       {copy && <span className="stx-promo-copy">{copy}</span>}
       {cta && (
-        <button type="button" className="stx-promo-cta">
+        <Link to="/promos" className="stx-promo-cta">
           {cta} <Ic name="→" size="sm" />
-        </button>
+        </Link>
       )}
     </div>
   );
