@@ -8,8 +8,8 @@ import { Ic } from './parts.jsx';
    PitchVisualizer  tactical radar canvas — markings, heat bloom, attack vector,
                     pulsing ball, free-kick beacon, HUD rows.
    MomentumChart    15 five-minute pressure blocks derived from the fixture's
-                    real goal events.
-   StatBar          symmetric possession / shots / attacks / corners / cards.
+                    real event feed.
+   StatBar          goals and cards only, counted from the real event feed.
    EventTimeline    reverse-chronological match feed.
    ------------------------------------------------------------------------- */
 

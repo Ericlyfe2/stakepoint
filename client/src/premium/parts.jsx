@@ -155,43 +155,6 @@ export function MarketChip({ item, active, onClick, live }) {
   );
 }
 
-export function LeagueBlock({ league, marketTab, onMarketTab, renderMatch }) {
-  return (
-    <section className="stx-league">
-      <header className="stx-league-head">
-        <Crest league={league} />
-        <div style={{ minWidth: 0 }}>
-          <div className="stx-league-name">{league.name}</div>
-          <div className="stx-league-meta">
-            {league.country} — {league.meta}
-          </div>
-        </div>
-        <div className="stx-right">
-          <span className="stx-league-meta">{league.matches.length} EVENTS</span>
-          <Ic name="›" />
-        </div>
-      </header>
-
-      {onMarketTab && (
-        <nav className="stx-mtabs">
-          {marketTab.tabs.map((t) => (
-            <button
-              key={t}
-              type="button"
-              className={`stx-mtab${t === marketTab.active ? ' stx-mtab--on' : ''}`}
-              onClick={() => onMarketTab.set(t)}
-            >
-              {t}
-            </button>
-          ))}
-        </nav>
-      )}
-
-      {league.matches.map((m) => renderMatch(m, marketTab?.active))}
-    </section>
-  );
-}
-
 export function FixtureRow({ match, market, selections, onToggle, columns, tags }) {
   return (
     <article className={`stx-fixture${columns === 1 ? ' stx-fixture--stacked' : ''}`}>
@@ -304,40 +267,3 @@ export function PromoCard({ eyebrow, title, copy, cta, icon, accent }) {
   );
 }
 
-export function BoostBanner({ title, copy, value, valueLabel }) {
-  return (
-    <div className="stx-boost">
-      <Ic name="◈" size="lg" />
-      <div style={{ minWidth: 0 }}>
-        <h3>{title}</h3>
-        <p>{copy}</p>
-      </div>
-      <div className="stx-right">
-        <div className="stx-boost-num">
-          <b>{value}</b>
-          <span>{valueLabel}</span>
-        </div>
-        <Ic name="→" size="lg" />
-      </div>
-    </div>
-  );
-}
-
-export function ScreenSwitch({ current, items }) {
-  return (
-    <nav className="stx-switch" aria-label="Stitch port screens">
-      {items.map((i) => (
-        <a key={i.to} href={i.to} aria-current={current === i.to ? 'page' : undefined}>
-          {i.label}
-        </a>
-      ))}
-    </nav>
-  );
-}
-
-export const SCREEN_LINKS = [
-  { to: '/premium', label: '01 SPORTSBOOK' },
-  { to: '/premium/mobile', label: '02 MOBILE' },
-  { to: '/premium/live', label: '03 LIVE TRACKER' },
-  { to: '/premium/mobile-light', label: '04 MOBILE LIGHT' },
-];
