@@ -1,0 +1,1281 @@
+/* ============================================================================
+   BETXENTRA — APP SHELL & SPORTSBOOK SURFACE
+   ----------------------------------------------------------------------------
+   Restyles the existing .sb-* / .xb-* / .app-header class contract that
+   Home.jsx / AppShell.jsx already render. Pure presentation layer: no JSX or
+   business logic is required to be changed for any rule in this file.
+   ========================================================================== */
+
+/* ============================================================================
+   1. HEADER
+   ========================================================================== */
+
+.app-header {
+  position: sticky;
+  top: 0;
+  z-index: var(--z-header);
+  background: var(--bx-glass) !important;
+  -webkit-backdrop-filter: var(--bx-blur);
+  backdrop-filter: var(--bx-blur);
+  border-bottom: 1px solid var(--bx-hairline) !important;
+  box-shadow: var(--bx-toplight), 0 6px 24px -12px rgba(0, 0, 0, 0.5) !important;
+  transition: box-shadow var(--bx-dur) var(--bx-ease), background var(--bx-dur) var(--bx-ease);
+}
+
+.header-inner {
+  display: flex;
+  align-items: center;
+  gap: var(--bx-s-5) !important;
+  height: var(--bx-header-h);
+  max-width: var(--bx-shell-max);
+  margin: 0 auto;
+  padding: 0 var(--bx-s-5) !important;
+}
+
+/* Logo */
+.logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px !important;
+  text-decoration: none;
+  font: 800 1.125rem / 1 var(--bx-font);
+  letter-spacing: var(--bx-track-tight);
+  color: var(--text);
+  flex-shrink: 0;
+  border-radius: var(--bx-r-md);
+  transition: opacity var(--bx-dur-fast) var(--bx-ease);
+}
+.logo:hover {
+  opacity: 0.86;
+}
+.logo-mark {
+  display: grid;
+  place-items: center;
+  width: 34px !important;
+  height: 34px !important;
+  border-radius: var(--bx-r-md);
+  background: var(--bx-accent-gradient);
+  box-shadow: var(--bx-accent-glow-sm), var(--bx-toplight-strong);
+  transition: transform var(--bx-dur) var(--bx-ease-spring);
+}
+.logo:hover .logo-mark {
+  transform: rotate(-4deg) scale(1.04);
+}
+.logo-text {
+  color: var(--text);
+}
+.logo-text em,
+.sb-logo em {
+  color: var(--accent);
+  font-style: normal;
+  font-weight: 800;
+}
+
+/* Primary nav */
+nav#main-nav {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+nav#main-nav a {
+  position: relative;
+  padding: 8px 13px !important;
+  border: 1px solid transparent;
+  border-radius: var(--bx-r-md);
+  background: transparent;
+  color: var(--text-soft);
+  font: 700 0.8125rem / 1 var(--bx-font) !important;
+  letter-spacing: var(--bx-track-tight);
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background var(--bx-dur-fast) var(--bx-ease),
+    color var(--bx-dur-fast) var(--bx-ease),
+    border-color var(--bx-dur-fast) var(--bx-ease),
+    transform var(--bx-dur-fast) var(--bx-ease);
+}
+nav#main-nav a:hover {
+  background: var(--bx-surface-2) !important;
+  border-color: var(--bx-hairline);
+  color: var(--text);
+  transform: translateY(-1px);
+}
+nav#main-nav a.active {
+  background: var(--bx-accent-wash) !important;
+  border-color: var(--bx-accent-line) !important;
+  color: var(--accent) !important;
+  font-weight: 800 !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+nav#main-nav a.active::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: -7px;
+  width: 16px;
+  height: 2px;
+  border-radius: var(--bx-r-pill);
+  background: var(--accent);
+  transform: translateX(-50%);
+  animation: bx-fade-in var(--bx-dur) var(--bx-ease-out) both;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: var(--bx-s-2);
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+/* Balance pill */
+.balance {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 13px;
+  border: 1px solid var(--bx-hairline) !important;
+  border-radius: var(--bx-r-pill) !important;
+  background: var(--bx-surface-1) !important;
+  box-shadow: var(--bx-e1) !important;
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    border-color var(--bx-dur-fast) var(--bx-ease),
+    background var(--bx-dur-fast) var(--bx-ease),
+    transform var(--bx-dur-fast) var(--bx-ease);
+}
+.balance:hover {
+  border-color: var(--bx-accent-line) !important;
+  background: var(--bx-surface-2) !important;
+  transform: translateY(-1px);
+}
+.balance > span:first-child {
+  font: var(--bx-eyebrow);
+  text-transform: uppercase;
+  letter-spacing: var(--bx-track-caps);
+  color: var(--text-dim);
+}
+.balance-amt {
+  font: 800 0.8125rem / 1 var(--bx-font);
+  color: var(--accent);
+}
+
+/* ============================================================================
+   2. MOBILE HEADER
+   ========================================================================== */
+
+.sb-mobile-header {
+  position: sticky;
+  top: 0;
+  z-index: var(--z-header);
+  display: flex;
+  align-items: center;
+  gap: var(--bx-s-2);
+  height: var(--bx-mobile-header-h);
+  padding: 0 var(--bx-s-3);
+  padding-top: env(safe-area-inset-top);
+  background: var(--bx-glass) !important;
+  -webkit-backdrop-filter: var(--bx-blur-sm);
+  backdrop-filter: var(--bx-blur-sm);
+  border-bottom: 1px solid var(--bx-hairline);
+  box-shadow: var(--bx-toplight) !important;
+}
+
+.sb-logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-right: auto;
+  font: 800 1.0625rem / 1 var(--bx-font);
+  letter-spacing: var(--bx-track-tight) !important;
+  color: var(--text);
+  text-decoration: none;
+  flex-shrink: 0;
+  border-radius: var(--bx-r-sm);
+}
+
+.sb-search-btn,
+.sb-theme-btn,
+.sb-avatar {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  border: 1px solid var(--bx-hairline);
+  border-radius: var(--bx-r-md);
+  background: var(--bx-surface-1);
+  color: var(--text-soft);
+  cursor: pointer;
+  box-shadow: var(--bx-e1) !important;
+  transition:
+    transform var(--bx-dur-fast) var(--bx-ease),
+    background var(--bx-dur-fast) var(--bx-ease),
+    color var(--bx-dur-fast) var(--bx-ease);
+}
+.sb-search-btn:hover,
+.sb-theme-btn:hover {
+  background: var(--bx-surface-2);
+  color: var(--text);
+  transform: translateY(-1px);
+}
+.sb-avatar {
+  background: var(--bx-accent-gradient) !important;
+  border-color: transparent;
+  color: #fff;
+  font: 800 0.8125rem / 1 var(--bx-font);
+  box-shadow: var(--bx-accent-glow-sm) !important;
+}
+
+.sb-balance-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 32px;
+  padding: 0 10px;
+  border-radius: var(--bx-r-pill) !important;
+  font: inherit;
+  white-space: nowrap;
+  cursor: pointer;
+  box-shadow: var(--bx-e1) !important;
+}
+.sb-balance-chip b {
+  font: 800 0.75rem / 1 var(--bx-font);
+  color: var(--text);
+}
+
+.sb-cta-join {
+  height: 32px;
+  padding: 0 13px;
+  border: 0;
+  border-radius: var(--bx-r-md) !important;
+  background: var(--bx-accent-gradient);
+  color: #fff;
+  font: 800 0.75rem / 1 var(--bx-font);
+  cursor: pointer;
+  box-shadow: var(--bx-accent-glow-sm) !important;
+  white-space: nowrap;
+}
+.sb-cta-login {
+  height: 32px;
+  padding: 0 11px;
+  border: 1px solid var(--bx-hairline-strong);
+  border-radius: var(--bx-r-md) !important;
+  background: transparent;
+  color: var(--text-soft);
+  font: 700 0.75rem / 1 var(--bx-font);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+/* ============================================================================
+   3. SPORTS NAVIGATION
+   ========================================================================== */
+
+.sb-sport-tabs {
+  display: flex;
+  align-items: center;
+  gap: var(--bx-s-2) !important;
+  padding: var(--bx-s-3) var(--bx-s-4) !important;
+  overflow-x: auto;
+  scroll-snap-type: x proximity;
+  -webkit-overflow-scrolling: touch;
+  background: color-mix(in srgb, var(--bg-soft) 62%, transparent);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--bx-hairline) !important;
+}
+.sb-sport-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.sb-sport-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  scroll-snap-align: start;
+  height: 34px;
+  padding: 0 14px;
+  border: 1px solid var(--bx-hairline);
+  border-radius: var(--bx-r-pill) !important;
+  background: var(--bx-surface-1);
+  color: var(--text-soft);
+  font: 800 0.8125rem / 1 var(--bx-font) !important;
+  letter-spacing: var(--bx-track-tight);
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    background var(--bx-dur-fast) var(--bx-ease),
+    color var(--bx-dur-fast) var(--bx-ease),
+    border-color var(--bx-dur-fast) var(--bx-ease),
+    box-shadow var(--bx-dur-fast) var(--bx-ease),
+    transform var(--bx-dur-fast) var(--bx-ease);
+}
+.sb-sport-tab:hover:not(.active) {
+  background: var(--bx-surface-2);
+  border-color: var(--bx-hairline-strong);
+  color: var(--text);
+  transform: translateY(-1px);
+}
+.sb-sport-tab.active {
+  background: var(--bx-accent-gradient) !important;
+  border-color: transparent !important;
+  color: #fff !important;
+  box-shadow: var(--bx-accent-glow-sm), var(--bx-toplight-strong) !important;
+}
+.sb-sport-tab .ct {
+  display: inline-grid;
+  place-items: center;
+  min-width: 20px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: var(--bx-r-pill);
+  background: var(--bx-surface-2);
+  color: var(--text-dim);
+  font: 700 0.625rem / 1 var(--bx-font);
+  transition: background var(--bx-dur-fast) var(--bx-ease), color var(--bx-dur-fast) var(--bx-ease);
+}
+.sb-sport-tab.active .ct {
+  background: rgba(255, 255, 255, 0.22) !important;
+  color: #fff !important;
+}
+
+/* Secondary tabs */
+.sb-sub-tabs {
+  display: flex;
+  align-items: center;
+  gap: var(--bx-s-4) !important;
+  padding: 0 var(--bx-s-4);
+  overflow-x: auto;
+  border-bottom: 1px solid var(--bx-hairline);
+  scroll-snap-type: x proximity;
+}
+.sb-sub-tabs::-webkit-scrollbar {
+  display: none;
+}
+.sb-sub-tab {
+  position: relative;
+  flex-shrink: 0;
+  scroll-snap-align: start;
+  padding: 11px 2px !important;
+  border: 0;
+  background: transparent;
+  color: var(--text-dim);
+  font: 800 0.8125rem / 1 var(--bx-font) !important;
+  letter-spacing: var(--bx-track-tight);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color var(--bx-dur-fast) var(--bx-ease);
+}
+.sb-sub-tab:hover:not(.active) {
+  color: var(--text-soft);
+}
+.sb-sub-tab.active {
+  color: var(--text) !important;
+}
+.sb-sub-tab.active::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 2px;
+  border-radius: var(--bx-r-pill);
+  background: var(--accent);
+  animation: bx-fade-in var(--bx-dur) var(--bx-ease-out) both;
+}
+
+/* Market filter chips */
+.sb-market-chips {
+  display: flex;
+  align-items: center;
+  gap: var(--bx-s-2) !important;
+  padding: var(--bx-s-3) var(--bx-s-4) !important;
+}
+.sb-market-chips-scroll {
+  display: flex;
+  gap: var(--bx-s-2);
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+  scroll-snap-type: x proximity;
+  padding-bottom: 1px;
+}
+.sb-market-chips-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.sb-chip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+  scroll-snap-align: start;
+  height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--bx-hairline);
+  border-radius: var(--bx-r-md) !important;
+  background: var(--bx-surface-1);
+  color: var(--text-soft);
+  font: 800 0.75rem / 1 var(--bx-font) !important;
+  letter-spacing: var(--bx-track-tight);
+  cursor: pointer;
+  white-space: nowrap;
+  box-shadow: var(--bx-e1);
+  transition:
+    background var(--bx-dur-fast) var(--bx-ease),
+    color var(--bx-dur-fast) var(--bx-ease),
+    border-color var(--bx-dur-fast) var(--bx-ease),
+    box-shadow var(--bx-dur-fast) var(--bx-ease),
+    transform var(--bx-dur-fast) var(--bx-ease);
+}
+.sb-chip:hover {
+  transform: translateY(-1px) !important;
+  background: var(--bx-surface-2);
+  border-color: var(--bx-hairline-strong);
+  color: var(--text);
+  box-shadow: var(--bx-e2);
+}
+.sb-chip.active {
+  background: var(--bx-accent-wash) !important;
+  border-color: var(--bx-accent-line) !important;
+  color: var(--accent) !important;
+  box-shadow: var(--bx-e1), var(--ring-accent) !important;
+}
+.sb-chip-icon {
+  width: 32px;
+  padding: 0;
+  justify-content: center;
+}
+
+/* Favourites strip */
+.sb-favs-strip {
+  display: flex;
+  align-items: center;
+  gap: var(--bx-s-2);
+  padding: var(--bx-s-2) var(--bx-s-4);
+  overflow-x: auto;
+  border-bottom: 1px solid var(--bx-hairline);
+}
+.sb-favs-strip::-webkit-scrollbar {
+  display: none;
+}
+.sb-favs-strip-label {
+  flex-shrink: 0;
+  font: var(--bx-eyebrow);
+  text-transform: uppercase;
+  letter-spacing: var(--bx-track-caps);
+  color: var(--text-dim);
+}
+.sb-favs-strip-icon {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  color: var(--gold);
+}
+.sb-favs-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid color-mix(in srgb, var(--gold) 30%, transparent);
+  border-radius: var(--bx-r-pill);
+  background: var(--bx-gold-wash);
+  color: var(--gold);
+  font: 700 0.6875rem / 1 var(--bx-font);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.sb-favs-chip .ct {
+  font-size: 0.625rem;
+  opacity: 0.75;
+}
+
+/* ============================================================================
+   4. LEAGUE SECTION
+   ========================================================================== */
+
+.sb-league {
+  margin: var(--bx-s-3) var(--bx-s-4) !important;
+  border: 1px solid var(--bx-hairline) !important;
+  border-radius: var(--bx-r-xl) !important;
+  background: var(--bx-surface-1);
+  overflow: hidden;
+  box-shadow: var(--bx-e1) !important;
+  transition: box-shadow var(--bx-dur) var(--bx-ease-out);
+  animation: bx-float-in var(--bx-dur-slow) var(--bx-ease-out) both;
+}
+.sb-league:hover {
+  box-shadow: var(--bx-e2) !important;
+}
+
+.sb-league-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--bx-s-2);
+  padding: var(--bx-s-3) var(--bx-s-4);
+  background: linear-gradient(135deg, #0d5a2e 0%, #0e6b36 55%, #117a3d 100%) !important;
+  color: #fff;
+  cursor: pointer;
+  border: 0;
+  border-left-width: 0 !important;
+  user-select: none;
+  position: relative;
+  transition: filter var(--bx-dur-fast) var(--bx-ease);
+}
+.sb-league-head::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.11), transparent 55%);
+  pointer-events: none;
+}
+.sb-league-head:hover {
+  filter: brightness(1.08);
+}
+html[data-theme='light'] .sb-league-head {
+  background: linear-gradient(135deg, #0a4d29 0%, #0b5c31 55%, #0d6b39 100%) !important;
+}
+.sb-league-head-left,
+.sb-league-head-right {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--bx-s-2);
+  min-width: 0;
+  position: relative;
+  z-index: 1;
+}
+.sb-league-head .sb-caret {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+  opacity: 0.8;
+  transition: transform var(--bx-dur) var(--bx-ease-out);
+}
+.sb-league.collapsed .sb-caret {
+  transform: rotate(-90deg);
+}
+.sb-league-head .sb-league-name {
+  font: 800 0.8125rem / 1.2 var(--bx-font);
+  letter-spacing: var(--bx-track-tight);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sb-league-head .sb-flag {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--bx-r-sm);
+  background: rgba(255, 255, 255, 0.18) !important;
+  border: 1px solid rgba(255, 255, 255, 0.22) !important;
+  color: #fff !important;
+  font: 800 0.625rem / 1 var(--bx-font);
+  letter-spacing: 0.02em;
+}
+.sb-league-head .sb-count {
+  display: inline-grid;
+  place-items: center;
+  min-width: 22px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: var(--bx-r-pill);
+  background: rgba(255, 255, 255, 0.14) !important;
+  border: 1px solid rgba(255, 255, 255, 0.18) !important;
+  color: #fff !important;
+  font: 700 0.625rem / 1 var(--bx-font);
+}
+.sb-fav-btn {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+  border: 0;
+  border-radius: var(--bx-r-sm);
+  background: transparent;
+  color: rgba(255, 255, 255, 0.75);
+  cursor: pointer;
+  position: relative;
+  z-index: 1;
+  transition: color var(--bx-dur-fast) var(--bx-ease), background var(--bx-dur-fast) var(--bx-ease),
+    transform var(--bx-dur-fast) var(--bx-ease);
+}
+.sb-fav-btn:hover {
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+  transform: scale(1.1);
+}
+.sb-fav-btn.active {
+  color: var(--gold);
+}
+
+.sb-league.collapsed .sb-league-body {
+  display: none;
+}
+
+.sb-league-cols {
+  display: grid;
+  grid-template-columns: 52px 1fr repeat(3, minmax(0, 1fr));
+  gap: var(--bx-s-2);
+  padding: var(--bx-s-2) var(--bx-s-4);
+  border-bottom: 1px solid var(--bx-hairline);
+  background: color-mix(in srgb, var(--surface-2) 55%, transparent);
+}
+.sb-league-cols.cols-2 {
+  grid-template-columns: 52px 1fr repeat(2, minmax(0, 1fr)) !important;
+}
+.sb-league-cols span {
+  font: var(--bx-eyebrow);
+  text-transform: uppercase;
+  letter-spacing: var(--bx-track-caps);
+  color: var(--text-dim);
+}
+.sb-league-cols span:not(:first-child):not(:nth-child(2)) {
+  text-align: center;
+}
+
+/* ============================================================================
+   5. MATCH CARD — hierarchy: meta → teams → odds → action
+   ========================================================================== */
+
+.sb-match {
+  position: relative;
+  border-bottom: 1px solid var(--bx-hairline) !important;
+  background: transparent !important;
+  transition: background var(--bx-dur-fast) var(--bx-ease);
+  animation: bx-float-in var(--bx-dur-slow) var(--bx-ease-out) both;
+}
+.sb-match:last-child {
+  border-bottom: none !important;
+}
+.sb-match:hover {
+  background: color-mix(in srgb, var(--surface-2) 68%, transparent) !important;
+}
+
+/* Left accent rail — colour carries meaning: accent = tradable,
+   hot = live, dim = closed. The status text always states it too. */
+.sb-match::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 8px;
+  bottom: 8px;
+  width: 3px;
+  border-radius: 0 var(--bx-r-pill) var(--bx-r-pill) 0;
+  background: transparent;
+  transition: background var(--bx-dur) var(--bx-ease);
+}
+.sb-match:has(.sb-badge-hot)::before {
+  background: var(--accent-hot);
+}
+.sb-match:has(.sb-badge-best)::before {
+  background: var(--accent);
+}
+
+.sb-match-badges {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: var(--bx-s-2) var(--bx-s-4) 0;
+}
+.sb-badge-hot,
+.sb-badge-best,
+.sb-badge-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 18px;
+  padding: 0 6px;
+  border-radius: var(--bx-r-xs);
+  font: 800 0.5625rem / 1 var(--bx-font);
+  text-transform: uppercase;
+  letter-spacing: var(--bx-track-caps);
+  white-space: nowrap;
+}
+.sb-badge-hot {
+  background: var(--bx-hot-wash);
+  border: 1px solid color-mix(in srgb, var(--accent-hot) 34%, transparent);
+  color: var(--accent-hot);
+}
+.sb-badge-hot::before {
+  content: '';
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: bx-pulse 1.5s var(--bx-ease-in-out) infinite;
+}
+.sb-badge-best {
+  background: var(--bx-accent-wash);
+  border: 1px solid var(--bx-accent-line);
+  color: var(--accent);
+}
+.sb-badge-status {
+  background: var(--bx-surface-3);
+  border: 1px solid var(--bx-hairline-strong);
+  color: var(--text-soft);
+}
+
+.sb-match-id-bar {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: var(--bx-s-2) var(--bx-s-4) 0;
+  font: var(--bx-caption);
+  color: var(--text-dim);
+  opacity: 0.9;
+}
+.sb-match-id-bar span:first-child {
+  font-weight: 700;
+}
+
+.sb-match-row {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--bx-s-3) !important;
+  padding: var(--bx-s-2) var(--bx-s-4) var(--bx-s-3) !important;
+}
+
+/* Time / live block */
+.sb-match-time {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  min-height: 40px;
+  padding: 4px 2px;
+  border: 1px solid transparent;
+  border-radius: var(--bx-r-sm);
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  transition: background var(--bx-dur-fast) var(--bx-ease), border-color var(--bx-dur-fast) var(--bx-ease);
+}
+.sb-match-time:hover:not(:disabled) {
+  background: var(--bx-surface-2);
+  border-color: var(--bx-hairline);
+}
+.sb-match-time:disabled {
+  cursor: not-allowed;
+}
+.sb-match-time .live {
+  font: 800 0.5625rem / 1 var(--bx-font);
+  letter-spacing: var(--bx-track-caps);
+  color: var(--accent-hot);
+  animation: bx-pulse 1.6s var(--bx-ease-in-out) infinite;
+}
+.sb-match-time .score {
+  font: 800 0.9375rem / 1 var(--bx-font);
+  letter-spacing: var(--bx-track-tight);
+  color: var(--text);
+}
+.sb-match-time .minute {
+  font: 700 0.5625rem / 1 var(--bx-font);
+  color: var(--text-dim);
+}
+.sb-match-time .kickoff {
+  font: 800 0.8125rem / 1 var(--bx-font) !important;
+  letter-spacing: var(--bx-track-tight);
+  color: var(--text);
+}
+
+/* Teams */
+.sb-match-teams {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+.sb-match-teams:disabled {
+  cursor: not-allowed;
+}
+.sb-match-teams .row {
+  position: relative;
+  display: block;
+  font: 700 0.875rem / 1.25 var(--bx-font);
+  letter-spacing: var(--bx-track-tight);
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding-right: 16px;
+  transition: color var(--bx-dur-fast) var(--bx-ease);
+}
+.sb-match:hover .sb-match-teams .row {
+  color: #fff;
+}
+html[data-theme='light'] .sb-match:hover .sb-match-teams .row {
+  color: var(--text);
+}
+/* selected-match indicator dot */
+.sb-match-teams .row::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  top: 50%;
+  width: 6px;
+  height: 6px;
+  margin-top: -3px;
+  border-radius: 50%;
+  background: var(--accent);
+  opacity: 0;
+  transform: scale(0.4);
+  transition: opacity var(--bx-dur) var(--bx-ease-out), transform var(--bx-dur) var(--bx-ease-spring);
+}
+.sb-match:has(.sb-odd.selected) .sb-match-teams .row::after {
+  opacity: 1;
+  transform: scale(1);
+}
+
+/* Closed matches */
+.sb-match-closed {
+  opacity: 0.58;
+}
+.sb-odd-closed {
+  color: var(--text-dim) !important;
+}
+
+/* ============================================================================
+   6. ODDS BUTTONS — the most important interaction in the product
+   ========================================================================== */
+
+.sb-odds-group {
+  display: flex;
+  align-items: center;
+  gap: var(--bx-s-2) !important;
+}
+
+.sb-odd {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  min-width: 54px;
+  height: 40px !important;
+  padding: 0 10px;
+  border: 1px solid var(--bx-hairline) !important;
+  border-radius: var(--bx-r-md) !important;
+  background: linear-gradient(180deg, var(--bx-surface-2), var(--bx-surface-1)) !important;
+  color: var(--text);
+  font: 800 0.875rem / 1 var(--bx-font) !important;
+  letter-spacing: var(--bx-track-tight);
+  cursor: pointer;
+  overflow: hidden;
+  box-shadow: var(--bx-e1) !important;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  transition:
+    background var(--bx-dur-fast) var(--bx-ease),
+    border-color var(--bx-dur-fast) var(--bx-ease),
+    box-shadow var(--bx-dur-fast) var(--bx-ease),
+    transform var(--bx-dur-fast) var(--bx-ease),
+    color var(--bx-dur-fast) var(--bx-ease);
+}
+
+/* Hover: lift + brand glow. Communicates "this is tappable". */
+.sb-odd:hover:not(:disabled):not(.selected) {
+  transform: translateY(-1px) !important;
+  background: linear-gradient(180deg, var(--bx-surface-3), var(--bx-surface-2)) !important;
+  border-color: var(--bx-accent-line) !important;
+  color: var(--accent);
+  box-shadow: var(--bx-e2), 0 0 0 1px var(--bx-accent-line) !important;
+}
+.sb-odd:active:not(:disabled) {
+  transform: scale(0.96) !important;
+  transition-duration: 70ms;
+}
+
+/* Selected — the single most important state in the app */
+.sb-odd.selected {
+  background: var(--bx-accent-gradient) !important;
+  border-color: transparent !important;
+  color: #fff !important;
+  box-shadow: var(--bx-accent-glow), var(--bx-toplight-strong) !important;
+  animation: bx-press var(--bx-dur-slow) var(--bx-ease-spring);
+}
+/* check glyph — never rely on colour alone */
+.sb-odd.selected::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.95);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23007A45' stroke-width='4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='20 6 9 17 4 12'/%3E%3C/svg%3E");
+  background-size: 8px 8px;
+  background-position: center;
+  background-repeat: no-repeat;
+  animation: bx-pop-in var(--bx-dur) var(--bx-ease-spring) both;
+}
+
+.sb-odd.disabled {
+  opacity: 0.35;
+  pointer-events: none;
+  cursor: not-allowed;
+  box-shadow: none !important;
+}
+.sb-odd-suspended {
+  font: 800 0.5625rem / 1 var(--bx-font) !important;
+  letter-spacing: var(--bx-track-caps);
+  color: var(--text-dim) !important;
+}
+.sb-odd .up,
+.xb-trend-up {
+  color: var(--accent-soft);
+}
+.sb-odd .down,
+.xb-trend-down {
+  color: var(--accent-hot);
+}
+
+/* Match footer */
+.sb-match-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--bx-s-2);
+  padding: 0 var(--bx-s-4) var(--bx-s-2);
+}
+.sb-match-comments {
+  border: 0;
+  background: transparent;
+  color: var(--text-dim);
+  font: var(--bx-caption);
+  font-weight: 600;
+  cursor: pointer;
+  padding: 3px 6px;
+  border-radius: var(--bx-r-xs);
+  transition: color var(--bx-dur-fast) var(--bx-ease), background var(--bx-dur-fast) var(--bx-ease);
+}
+.sb-match-comments:hover {
+  color: var(--text-soft);
+  background: var(--bx-surface-2);
+  text-decoration: none !important;
+}
+
+/* ============================================================================
+   7. BOTTOM NAV
+   ========================================================================== */
+
+.sb-bottom-nav {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: var(--z-sticky);
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  height: var(--bx-bottom-nav-h);
+  padding-bottom: env(safe-area-inset-bottom);
+  background: var(--bx-glass-heavy) !important;
+  -webkit-backdrop-filter: var(--bx-blur);
+  backdrop-filter: var(--bx-blur);
+  border-top: 1px solid var(--bx-hairline-strong) !important;
+  box-shadow: 0 -6px 26px -14px rgba(0, 0, 0, 0.7) !important;
+}
+.sb-nav-item {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-dim);
+  text-decoration: none;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: color var(--bx-dur-fast) var(--bx-ease);
+}
+.sb-nav-item .icon-wrap {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  transition: transform var(--bx-dur) var(--bx-ease-spring);
+}
+.sb-nav-item svg {
+  width: 20px;
+  height: 20px;
+}
+.sb-nav-item .nav-label {
+  font: 700 0.5625rem / 1 var(--bx-font);
+  letter-spacing: 0.02em;
+}
+.sb-nav-item:hover .icon-wrap {
+  transform: translateY(-2px);
+}
+.sb-nav-item.active {
+  color: var(--accent) !important;
+}
+.sb-nav-item.active .icon-wrap {
+  transform: translateY(-1px);
+}
+.sb-nav-item .active-indicator {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 22px;
+  height: 2px;
+  border-radius: 0 0 var(--bx-r-pill) var(--bx-r-pill);
+  background: var(--accent);
+  transform: translateX(-50%);
+  animation: bx-fade-in var(--bx-dur) var(--bx-ease-out) both;
+}
+.sb-nav-item .pip {
+  position: absolute;
+  top: 7px;
+  right: calc(50% - 18px);
+  display: grid;
+  place-items: center;
+  min-width: 15px;
+  height: 15px;
+  padding: 0 4px;
+  border-radius: var(--bx-r-pill);
+  background: var(--accent-hot);
+  color: #fff;
+  font: 800 0.5625rem / 1 var(--bx-font);
+  box-shadow: 0 2px 6px -1px color-mix(in srgb, var(--accent-hot) 60%, transparent);
+}
+
+/* ============================================================================
+   8. GLOBAL BET FAB (components/GlobalFAB.jsx)
+   Floating quick-access pill: opens the betslip when selections exist,
+   otherwise opens the booking-code dialog.
+   ========================================================================== */
+
+.gfab-container {
+  position: fixed;
+  right: var(--bx-s-4);
+  bottom: calc(var(--bx-bottom-nav-h) + env(safe-area-inset-bottom) + var(--bx-s-3));
+  z-index: var(--z-sticky);
+  display: flex;
+  align-items: center;
+  gap: var(--bx-s-2);
+  animation: bx-pop-in var(--bx-dur-slower) var(--bx-ease-spring) both;
+}
+
+.gfab-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--bx-s-2);
+  height: 52px;
+  min-width: 52px;
+  padding: 0 var(--bx-s-4);
+  border: 1px solid var(--bx-hairline-strong);
+  border-radius: var(--bx-r-pill);
+  background: var(--bx-glass);
+  -webkit-backdrop-filter: var(--bx-blur);
+  backdrop-filter: var(--bx-blur);
+  box-shadow: var(--bx-e3), var(--bx-float);
+  color: var(--text);
+  font-family: inherit;
+  cursor: pointer;
+  transition: transform var(--bx-dur) var(--bx-ease-spring), box-shadow var(--bx-dur) var(--bx-ease), border-color var(--bx-dur) var(--bx-ease);
+}
+.gfab-btn:hover {
+  transform: translateY(-2px);
+  border-color: var(--bx-accent-line);
+  box-shadow: var(--bx-e3), 0 14px 40px -10px rgba(0, 0, 0, 0.7);
+}
+.gfab-btn:active {
+  transform: translateY(0) scale(0.97);
+}
+
+/* Selections present — the FAB becomes the primary betslip entry point. */
+.gfab-btn.has-selections {
+  background: linear-gradient(135deg, var(--accent), var(--accent-soft));
+  border-color: transparent;
+  color: #fff;
+  box-shadow: var(--bx-accent-glow), var(--bx-float);
+  padding-right: var(--bx-s-5);
+}
+
+/* A loaded ticket sits in the neutral state — cooler tint, no CTA weight. */
+.gfab-btn.has-ticket {
+  background: color-mix(in srgb, var(--accent-cool) 14%, var(--bx-glass));
+  border-color: color-mix(in srgb, var(--accent-cool) 34%, transparent);
+}
+
+.gfab-gauge {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+.gfab-content {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  line-height: 1.15;
+}
+.gfab-count {
+  font: 800 1rem / 1 var(--bx-font);
+  font-variant-numeric: tabular-nums;
+}
+.gfab-label {
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  opacity: 0.82;
+}
+.gfab-btn.has-selections .gfab-label {
+  opacity: 0.9;
+}
+.gfab-icon {
+  flex-shrink: 0;
+  display: block;
+}
+
+/* Secondary action: jump straight to the booking-code dialog. */
+.gfab-code-mini {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--bx-hairline-strong);
+  border-radius: 50%;
+  background: var(--bx-glass);
+  -webkit-backdrop-filter: var(--bx-blur);
+  backdrop-filter: var(--bx-blur);
+  box-shadow: var(--bx-e2);
+  color: var(--text-soft);
+  cursor: pointer;
+  transition: transform var(--bx-dur) var(--bx-ease-spring), color var(--bx-dur) var(--bx-ease);
+}
+.gfab-code-mini:hover {
+  transform: scale(1.08);
+  color: var(--text);
+}
+.gfab-code-mini:active {
+  transform: scale(0.94);
+}
+
+/* On desktop the bottom nav is gone, so the FAB only clears the safe area. */
+@media (min-width: 961px) {
+  .gfab-container {
+    bottom: calc(var(--bx-s-5) + env(safe-area-inset-bottom));
+    right: var(--bx-s-5);
+  }
+}
+
+/* ============================================================================
+   9. RESPONSIVE — the desktop three-column sportsbook layout
+   ========================================================================== */
+
+/* Mobile: reserve room for the bottom nav, hide the desktop chrome. */
+.sb-mobile-page-pad {
+  padding-bottom: calc(var(--bx-bottom-nav-h) + env(safe-area-inset-bottom) + var(--bx-s-6));
+}
+.app-header {
+  display: none !important;
+}
+.ticker {
+  display: none !important;
+}
+
+@media (min-width: 961px) {
+  .sb-mobile-header,
+  .sb-bottom-nav {
+    display: none !important;
+  }
+  .app-header {
+    display: block !important;
+  }
+  .sb-mobile-page-pad {
+    padding-bottom: 0;
+  }
+}
+
+/* Tablet: tighten the match row so 3 odds still fit comfortably. */
+@media (max-width: 960px) {
+  .sb-match-row {
+    grid-template-columns: 46px minmax(0, 1fr) auto;
+  }
+  .sb-odd {
+    min-width: 50px;
+    height: 38px !important;
+  }
+}
+
+/* Small phones — the tightest layout the product must support. */
+@media (max-width: 400px) {
+  .sb-match-row {
+    grid-template-columns: 40px minmax(0, 1fr);
+    grid-template-areas:
+      'time teams'
+      'odds odds';
+    row-gap: var(--bx-s-3);
+  }
+  .sb-match-time {
+    grid-area: time;
+  }
+  .sb-match-teams {
+    grid-area: teams;
+  }
+  .sb-odds-group {
+    grid-area: odds;
+  }
+  .sb-odds-group .sb-odd {
+    flex: 1;
+    min-width: 0;
+    height: 40px !important;
+  }
+  .sb-match-id-bar,
+  .sb-match-badges {
+    padding-left: var(--bx-s-3);
+    padding-right: var(--bx-s-3);
+  }
+  .sb-match-row,
+  .sb-match-footer {
+    padding-left: var(--bx-s-3) !important;
+    padding-right: var(--bx-s-3) !important;
+  }
+  .sb-league {
+    margin-left: var(--bx-s-2) !important;
+    margin-right: var(--bx-s-2) !important;
+    border-radius: var(--bx-r-lg) !important;
+  }
+  .sb-league-cols {
+    grid-template-columns: 40px 1fr repeat(3, minmax(0, 1fr));
+    padding-left: var(--bx-s-3);
+    padding-right: var(--bx-s-3);
+  }
+  .sb-league-cols.cols-2 {
+    grid-template-columns: 40px 1fr repeat(2, minmax(0, 1fr)) !important;
+  }
+  .sb-sport-tabs,
+  .sb-market-chips,
+  .sb-sub-tabs,
+  .sb-favs-strip {
+    padding-left: var(--bx-s-3);
+    padding-right: var(--bx-s-3);
+  }
+  .sb-match-teams .row {
+    font-size: 0.8125rem;
+  }
+}

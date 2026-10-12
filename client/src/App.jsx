@@ -23,6 +23,10 @@ import AZMenuPage from './pages/AZMenuPage.jsx';
 import HelpPage from './pages/HelpPage.jsx';
 import CodeHubPage from './pages/CodeHubPage.jsx';
 import TicketPage from './pages/TicketPage.jsx';
+import StitchSportsbook from './pages/premium/StitchSportsbook.jsx';
+import StitchMobile from './pages/premium/StitchMobile.jsx';
+import StitchLiveTracker from './pages/premium/StitchLiveTracker.jsx';
+import StitchHome from './pages/premium/StitchHome.jsx';
 
 import { AdminProvider, AdminGuard } from './providers/AdminProvider.jsx';
 import AdminShell from './layout/AdminShell.jsx';
@@ -126,9 +130,26 @@ export default function App() {
               <Route path="/verify"           element={<Navigate to="/login" replace />} />
               <Route path="/forgot-password"  element={<Navigate to="/login" replace />} />
               <Route path="/reset-password"   element={<Navigate to="/login" replace />} />
+              {/* The premium (Stitch) design system is now the primary player
+                  experience: / is the sportsbook (desktop port on wide screens,
+                  mobile port under 1024px) and /live is the in-play tracker.
+                  Full-bleed standalone layouts, so they sit OUTSIDE AppShell
+                  (the legacy header/rail) but INSIDE AppProviders so they get
+                  account + theme + the maintenance gate. */}
+              <Route path="/"              element={<StitchHome />} />
+              <Route path="/live"          element={<StitchLiveTracker />} />
+              {/* /premium* kept wired as deep-link/preview aliases for the same
+                  four screens. */}
+              <Route path="/premium"               element={<StitchSportsbook />} />
+              <Route path="/premium/mobile"        element={<StitchMobile />} />
+              <Route path="/premium/mobile-light"  element={<StitchMobile light />} />
+              <Route path="/premium/live"          element={<StitchLiveTracker />} />
               <Route element={<AppShell />}>
-                <Route path="/"          element={<Home />} />
-                <Route path="/live"      element={<Home initialChip="live" />} />
+                {/* Legacy full sportsbook retained (betslip, booking-code
+                    overlay, payslip share) at /classic so no existing flow is
+                    lost while the premium home takes over "/". */}
+                <Route path="/classic"      element={<Home />} />
+                <Route path="/classic/live" element={<Home initialChip="live" />} />
                 <Route path="/my-bets"   element={<BetHistoryPage />} />
                 <Route path="/code-hub"  element={<CodeHubPage />} />
                 <Route path="/ticket/:code" element={<TicketPage />} />

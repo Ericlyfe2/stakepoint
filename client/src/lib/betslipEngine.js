@@ -1,5 +1,11 @@
 const BONUS = 0.08;
 
+/* The accumulator boost baked into `computeMultiplePayout`. Kept equal to the
+   backend's BONUS_RATE (server/src/matchesData.js) so the slip never promises
+   a return the server won't honour. UI that needs to *display* the boost reads
+   this instead of hardcoding its own percentage. */
+export const BONUS_RATE = BONUS;
+
 export function formatAmt(n) {
   return Number(n || 0).toLocaleString('en-GH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }

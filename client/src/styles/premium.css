@@ -1,0 +1,924 @@
+/* ============================================================================
+   BETXENTRA — PREMIUM DESIGN SYSTEM
+   ----------------------------------------------------------------------------
+   Loaded AFTER app.css so this layer wins the cascade, and BEFORE
+   login.css / admin.css / games.css so those scoped themes keep precedence.
+
+   Rules of this file:
+     · BetXentra brand colours are PRESERVED (#007A45 primary, #FFB547 warm,
+       #FF4D3D hot, #6AD0FF cool, #D4A857 gold, #050D0A canvas).
+     · Everything else — elevation, radius, spacing, motion, typography —
+       is normalised here so every page reads as one product.
+     · Motion is transform/opacity only (GPU friendly) and honours
+       prefers-reduced-motion.
+   ========================================================================== */
+
+/* ============================================================================
+   1. TOKENS
+   ========================================================================== */
+
+:root {
+  /* -- motion ------------------------------------------------------------- */
+  --bx-dur-instant: 120ms;
+  --bx-dur-fast: 170ms;
+  --bx-dur: 240ms;
+  --bx-dur-slow: 340ms;
+  --bx-dur-slower: 460ms;
+  --bx-dur-page: 620ms;
+
+  --bx-ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --bx-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --bx-ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --bx-ease-spring: cubic-bezier(0.34, 1.42, 0.64, 1);
+
+  /* -- radius ------------------------------------------------------------- */
+  --bx-r-xs: 6px;
+  --bx-r-sm: 8px;
+  --bx-r-md: 10px;
+  --bx-r-lg: 12px;
+  --bx-r-xl: 16px;
+  --bx-r-2xl: 20px;
+  --bx-r-3xl: 26px;
+  --bx-r-pill: 999px;
+
+  /* -- spacing (4pt grid, the app's existing rhythm) ---------------------- */
+  --bx-s-1: 4px;
+  --bx-s-2: 8px;
+  --bx-s-3: 12px;
+  --bx-s-4: 16px;
+  --bx-s-5: 20px;
+  --bx-s-6: 24px;
+  --bx-s-8: 32px;
+  --bx-s-10: 40px;
+  --bx-s-12: 48px;
+
+  /* -- typography --------------------------------------------------------- */
+  --bx-font: 'Bricolage Grotesque', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  --bx-font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+
+  --bx-display: 800 clamp(1.75rem, 1.15rem + 2.2vw, 2.75rem) / 1.05 var(--bx-font);
+  --bx-h1: 800 clamp(1.375rem, 1.1rem + 1.1vw, 1.875rem) / 1.12 var(--bx-font);
+  --bx-h2: 800 1.25rem / 1.2 var(--bx-font);
+  --bx-h3: 700 1.0625rem / 1.25 var(--bx-font);
+  --bx-title: 700 0.9375rem / 1.3 var(--bx-font);
+  --bx-body: 500 0.875rem / 1.45 var(--bx-font);
+  --bx-body-sm: 500 0.8125rem / 1.4 var(--bx-font);
+  --bx-label: 700 0.6875rem / 1.2 var(--bx-font);
+  --bx-caption: 600 0.6875rem / 1.25 var(--bx-font);
+  --bx-eyebrow: 800 0.625rem / 1 var(--bx-font);
+
+  --bx-track-caps: 0.09em;
+  --bx-track-tight: -0.02em;
+
+  /* -- surfaces derived from brand ---------------------------------------- */
+  --bx-surface-1: var(--surface);
+  --bx-surface-2: var(--surface-2);
+  --bx-surface-3: var(--surface-3);
+
+  --bx-hairline: color-mix(in srgb, var(--line) 92%, transparent);
+  --bx-hairline-strong: color-mix(in srgb, var(--line-strong) 92%, transparent);
+  --bx-toplight: inset 0 1px 0 rgba(255, 255, 255, 0.055);
+  --bx-toplight-strong: inset 0 1px 0 rgba(255, 255, 255, 0.09);
+
+  /* -- brand-derived washes ---------------------------------------------- */
+  --bx-accent-wash: color-mix(in srgb, var(--accent) 12%, transparent);
+  --bx-accent-wash-soft: color-mix(in srgb, var(--accent) 7%, transparent);
+  --bx-accent-line: color-mix(in srgb, var(--accent) 32%, transparent);
+  --bx-warm-wash: color-mix(in srgb, var(--accent-warm) 13%, transparent);
+  --bx-hot-wash: color-mix(in srgb, var(--accent-hot) 13%, transparent);
+  --bx-cool-wash: color-mix(in srgb, var(--accent-cool) 13%, transparent);
+  --bx-gold-wash: color-mix(in srgb, var(--gold) 14%, transparent);
+
+  --bx-accent-gradient: linear-gradient(135deg, var(--accent) 0%, var(--accent-soft) 100%);
+  --bx-accent-gradient-hover: linear-gradient(135deg, var(--accent-soft) 0%, var(--accent-soft) 60%, #10a055 100%);
+  --bx-accent-glow: 0 6px 22px -4px color-mix(in srgb, var(--accent) 55%, transparent);
+  --bx-accent-glow-sm: 0 2px 10px -2px color-mix(in srgb, var(--accent) 45%, transparent);
+
+  /* -- glass -------------------------------------------------------------- */
+  --bx-glass: color-mix(in srgb, var(--bg-soft) 78%, transparent);
+  --bx-glass-heavy: color-mix(in srgb, var(--bg) 90%, transparent);
+  --bx-blur: blur(20px) saturate(165%);
+  --bx-blur-sm: blur(12px) saturate(150%);
+
+  /* -- elevation ---------------------------------------------------------- */
+  --bx-e1: var(--elev-1);
+  --bx-e2: var(--elev-2);
+  --bx-e3: var(--elev-3);
+  --bx-float: 0 10px 34px -10px rgba(0, 0, 0, 0.55);
+  --bx-sheet: 0 -14px 44px -12px rgba(0, 0, 0, 0.62);
+
+  /* -- focus -------------------------------------------------------------- */
+  --bx-focus-ring: 0 0 0 2px var(--bg-soft), 0 0 0 4px color-mix(in srgb, var(--accent) 62%, transparent);
+
+  /* -- layout ------------------------------------------------------------- */
+  --bx-header-h: 60px;
+  --bx-mobile-header-h: 56px;
+  --bx-bottom-nav-h: 60px;
+  --bx-rail-w: 348px;
+  --bx-shell-max: 1560px;
+}
+
+html[data-theme='light'] {
+  --bx-hairline: color-mix(in srgb, #0f1413 10%, transparent);
+  --bx-hairline-strong: color-mix(in srgb, #0f1413 18%, transparent);
+  --bx-toplight: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  --bx-toplight-strong: inset 0 1px 0 rgba(255, 255, 255, 1);
+  --bx-accent-wash: color-mix(in srgb, var(--accent) 9%, transparent);
+  --bx-accent-wash-soft: color-mix(in srgb, var(--accent) 5%, transparent);
+  --bx-accent-line: color-mix(in srgb, var(--accent) 26%, transparent);
+  --bx-glass: color-mix(in srgb, #ffffff 82%, transparent);
+  --bx-glass-heavy: color-mix(in srgb, #f4f7f5 92%, transparent);
+  --bx-float: 0 10px 30px -12px rgba(15, 20, 19, 0.22);
+  --bx-sheet: 0 -12px 40px -14px rgba(15, 20, 19, 0.24);
+  --bx-accent-glow: 0 6px 18px -6px color-mix(in srgb, var(--accent) 45%, transparent);
+  --bx-accent-glow-sm: 0 2px 8px -2px color-mix(in srgb, var(--accent) 35%, transparent);
+}
+
+/* ============================================================================
+   2. BASE, FOCUS, MOTION SAFETY
+   ========================================================================== */
+
+html {
+  -webkit-text-size-adjust: 100%;
+  scrollbar-gutter: stable;
+}
+
+body {
+  font-family: var(--bx-font);
+  font-feature-settings: 'cv02', 'cv03', 'cv04';
+  background-color: var(--bg);
+  overflow-x: hidden;
+}
+
+/* Numbers must never jitter. Odds, stakes and balances all use this. */
+.bx-num,
+.sb-odd,
+.xb-sel-odds,
+.xb-summary-row span:last-child,
+.bc-summary-val,
+.drag-fab-count,
+.sb-count,
+.sb-sport-tab .ct,
+.sb-favs-chip .ct,
+.xb-winner-amount,
+.balance-amt,
+.xb-balance,
+.md-odd,
+.odd-btn .ov {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1;
+}
+
+/* Global, always-visible focus ring. Keyboard users must never be lost. */
+:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent) 78%, white 10%);
+  outline-offset: 2px;
+  border-radius: var(--bx-r-sm);
+}
+
+/* Only hide focus for pointer users who already got a visual state. */
+:where(button):focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* Scrollbars — thin, brand tinted, non-intrusive */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--text-dim) 45%, transparent) transparent;
+}
+*::-webkit-scrollbar {
+  width: 9px;
+  height: 9px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--text-dim) 38%, transparent);
+  border-radius: var(--bx-r-pill);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--accent) 62%, transparent);
+  background-clip: padding-box;
+}
+
+/* Screen-reader + skip link */
+.bx-skip {
+  position: fixed;
+  top: -100px;
+  left: 12px;
+  z-index: var(--z-tooltip);
+  padding: 10px 18px;
+  border-radius: var(--bx-r-md);
+  background: var(--accent);
+  color: #fff;
+  font: var(--bx-title);
+  box-shadow: var(--bx-float);
+  transition: top var(--bx-dur) var(--bx-ease-out);
+}
+.bx-skip:focus {
+  top: 12px;
+}
+
+.bx-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ============================================================================
+   3. BUTTONS — one language: primary / secondary / ghost / outline /
+      destructive / compact / icon
+   ========================================================================== */
+
+.bx-btn {
+  --bx-btn-h: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--bx-s-2);
+  height: var(--bx-btn-h);
+  padding: 0 var(--bx-s-4);
+  border: 1px solid transparent;
+  border-radius: var(--bx-r-md);
+  background: transparent;
+  color: var(--text);
+  font: var(--bx-title);
+  letter-spacing: var(--bx-track-tight);
+  cursor: pointer;
+  white-space: nowrap;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  transition:
+    background var(--bx-dur-fast) var(--bx-ease),
+    border-color var(--bx-dur-fast) var(--bx-ease),
+    color var(--bx-dur-fast) var(--bx-ease),
+    box-shadow var(--bx-dur-fast) var(--bx-ease),
+    transform var(--bx-dur-fast) var(--bx-ease),
+    opacity var(--bx-dur-fast) var(--bx-ease);
+}
+
+.bx-btn:disabled,
+.bx-btn[aria-disabled='true'] {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none !important;
+  box-shadow: none;
+}
+
+.bx-btn:not(:disabled):hover {
+  transform: translateY(-1px);
+}
+.bx-btn:not(:disabled):active {
+  transform: translateY(0) scale(0.985);
+  transition-duration: 80ms;
+}
+
+/* primary — brand green */
+.bx-btn--primary {
+  background: var(--bx-accent-gradient);
+  color: #fff;
+  font-weight: 800;
+  box-shadow: var(--bx-accent-glow-sm), var(--bx-toplight);
+}
+.bx-btn--primary:not(:disabled):hover {
+  background: var(--bx-accent-gradient-hover);
+  box-shadow: var(--bx-accent-glow), var(--bx-toplight-strong);
+  filter: brightness(1.06);
+}
+
+/* secondary — filled neutral */
+.bx-btn--secondary {
+  background: var(--bx-surface-2);
+  border-color: var(--bx-hairline);
+  color: var(--text);
+  box-shadow: var(--bx-e1);
+}
+.bx-btn--secondary:not(:disabled):hover {
+  background: var(--bx-surface-3);
+  border-color: var(--bx-hairline-strong);
+}
+
+/* outline — bordered, transparent */
+.bx-btn--outline {
+  background: transparent;
+  border-color: var(--bx-hairline-strong);
+  color: var(--text);
+}
+.bx-btn--outline:not(:disabled):hover {
+  background: var(--bx-surface-2);
+  border-color: var(--bx-accent-line);
+  color: var(--text);
+}
+
+/* ghost — no chrome until hover */
+.bx-btn--ghost {
+  background: transparent;
+  color: var(--text-soft);
+}
+.bx-btn--ghost:not(:disabled):hover {
+  background: var(--bx-surface-2);
+  color: var(--text);
+}
+
+/* destructive */
+.bx-btn--danger {
+  background: linear-gradient(135deg, var(--accent-hot) 0%, #d63a2c 100%);
+  color: #fff;
+  font-weight: 800;
+  box-shadow: 0 4px 16px -4px color-mix(in srgb, var(--accent-hot) 55%, transparent), var(--bx-toplight);
+}
+.bx-btn--danger:not(:disabled):hover {
+  filter: brightness(1.08);
+  box-shadow: 0 8px 22px -6px color-mix(in srgb, var(--accent-hot) 62%, transparent);
+}
+
+/* sizes */
+.bx-btn--sm {
+  --bx-btn-h: 32px;
+  padding: 0 var(--bx-s-3);
+  font: var(--bx-body-sm);
+  border-radius: var(--bx-r-sm);
+}
+.bx-btn--lg {
+  --bx-btn-h: 48px;
+  padding: 0 var(--bx-s-6);
+  font: var(--bx-h3);
+  border-radius: var(--bx-r-lg);
+}
+.bx-btn--block {
+  width: 100%;
+}
+
+/* icon button */
+.bx-btn--icon {
+  width: var(--bx-btn-h);
+  padding: 0;
+}
+.bx-btn--icon.bx-btn--sm {
+  width: 32px;
+}
+.bx-btn--icon.bx-btn--lg {
+  width: 48px;
+}
+
+/* pressed/toggle state */
+.bx-btn[aria-pressed='true'] {
+  background: var(--bx-accent-wash);
+  border-color: var(--bx-accent-line);
+  color: var(--accent);
+}
+
+/* loading — spinner replaces content, width is preserved */
+.bx-btn--loading {
+  color: transparent !important;
+  pointer-events: none;
+}
+.bx-btn--loading::after {
+  content: '';
+  position: absolute;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  border: 2px solid color-mix(in srgb, currentColor 30%, transparent);
+  border-top-color: #fff;
+  animation: bx-spin 620ms linear infinite;
+}
+.bx-btn--loading {
+  position: relative;
+}
+@keyframes bx-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ============================================================================
+   4. INPUTS
+   ========================================================================== */
+
+.bx-input,
+.bx-select,
+.bx-textarea {
+  width: 100%;
+  min-height: 42px;
+  padding: 0 var(--bx-s-3);
+  border: 1px solid var(--bx-hairline);
+  border-radius: var(--bx-r-md);
+  background: var(--bx-surface-1);
+  color: var(--text);
+  font: var(--bx-body);
+  transition:
+    border-color var(--bx-dur-fast) var(--bx-ease),
+    box-shadow var(--bx-dur-fast) var(--bx-ease),
+    background var(--bx-dur-fast) var(--bx-ease);
+}
+.bx-textarea {
+  padding: var(--bx-s-3);
+  min-height: 96px;
+  resize: vertical;
+}
+.bx-input::placeholder,
+.bx-textarea::placeholder {
+  color: var(--text-dim);
+}
+.bx-input:hover,
+.bx-select:hover,
+.bx-textarea:hover {
+  border-color: var(--bx-hairline-strong);
+}
+.bx-input:focus,
+.bx-select:focus,
+.bx-textarea:focus {
+  outline: none;
+  border-color: color-mix(in srgb, var(--accent) 60%, transparent);
+  box-shadow: var(--ring-accent);
+}
+.bx-input[aria-invalid='true'],
+.bx-select[aria-invalid='true'] {
+  border-color: color-mix(in srgb, var(--accent-hot) 62%, transparent);
+}
+.bx-input:disabled,
+.bx-select:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* native select needs explicit arrow room */
+.bx-select {
+  appearance: none;
+  padding-right: var(--bx-s-8);
+  background-image: linear-gradient(45deg, transparent 50%, currentColor 50%),
+    linear-gradient(135deg, currentColor 50%, transparent 50%);
+  background-position: calc(100% - 17px) 50%, calc(100% - 12px) 50%;
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+  cursor: pointer;
+}
+.bx-select option {
+  background: var(--bg-soft);
+  color: var(--text);
+}
+
+/* search */
+.bx-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.bx-search__icon {
+  position: absolute;
+  left: 11px;
+  color: var(--text-dim);
+  pointer-events: none;
+}
+.bx-search .bx-input {
+  padding-left: 36px;
+}
+
+/* ============================================================================
+   5. CARDS & PANELS
+   ========================================================================== */
+
+.bx-card {
+  background: var(--bx-surface-1);
+  border: 1px solid var(--bx-hairline);
+  border-radius: var(--bx-r-xl);
+  box-shadow: var(--bx-e1);
+  color: var(--text);
+}
+.bx-card--pad {
+  padding: var(--bx-s-4);
+}
+.bx-card--glass {
+  background: var(--bx-glass);
+  -webkit-backdrop-filter: var(--bx-blur);
+  backdrop-filter: var(--bx-blur);
+  border-color: var(--bx-hairline-strong);
+}
+.bx-card--interactive {
+  cursor: pointer;
+  transition:
+    transform var(--bx-dur) var(--bx-ease-out),
+    box-shadow var(--bx-dur) var(--bx-ease-out),
+    border-color var(--bx-dur) var(--bx-ease-out);
+}
+.bx-card--interactive:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--bx-e2), 0 0 0 1px var(--bx-accent-line);
+  border-color: var(--bx-accent-line);
+}
+.bx-card--interactive:active {
+  transform: translateY(0);
+}
+
+/* section heading used across pages */
+.bx-section {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--bx-s-3);
+  margin-bottom: var(--bx-s-3);
+}
+.bx-section__title {
+  display: flex;
+  align-items: center;
+  gap: var(--bx-s-2);
+  font: var(--bx-h3);
+  letter-spacing: var(--bx-track-tight);
+  color: var(--text);
+  margin: 0;
+}
+.bx-section__title svg {
+  color: var(--accent);
+  flex-shrink: 0;
+}
+.bx-section__sub {
+  font: var(--bx-caption);
+  color: var(--text-dim);
+}
+.bx-section__action {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  font: var(--bx-body-sm);
+  font-weight: 700;
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: var(--bx-r-sm);
+  transition: background var(--bx-dur-fast) var(--bx-ease), gap var(--bx-dur-fast) var(--bx-ease);
+}
+.bx-section__action:hover {
+  background: var(--bx-accent-wash-soft);
+  gap: 7px;
+}
+
+/* ============================================================================
+   6. BADGES / PILLS / TABS
+   ========================================================================== */
+
+.bx-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 20px;
+  padding: 0 7px;
+  border-radius: var(--bx-r-xs);
+  border: 1px solid var(--bx-hairline);
+  background: var(--bx-surface-2);
+  color: var(--text-soft);
+  font: var(--bx-eyebrow);
+  text-transform: uppercase;
+  letter-spacing: var(--bx-track-caps);
+  white-space: nowrap;
+}
+.bx-badge--accent {
+  background: var(--bx-accent-wash);
+  border-color: var(--bx-accent-line);
+  color: var(--accent);
+}
+.bx-badge--warm {
+  background: var(--bx-warm-wash);
+  border-color: color-mix(in srgb, var(--accent-warm) 34%, transparent);
+  color: var(--accent-warm);
+}
+.bx-badge--hot {
+  background: var(--bx-hot-wash);
+  border-color: color-mix(in srgb, var(--accent-hot) 34%, transparent);
+  color: var(--accent-hot);
+}
+.bx-badge--cool {
+  background: var(--bx-cool-wash);
+  border-color: color-mix(in srgb, var(--accent-cool) 34%, transparent);
+  color: var(--accent-cool);
+}
+.bx-badge--gold {
+  background: var(--bx-gold-wash);
+  border-color: color-mix(in srgb, var(--gold) 34%, transparent);
+  color: var(--gold);
+}
+.bx-badge--live {
+  background: var(--bx-hot-wash);
+  border-color: color-mix(in srgb, var(--accent-hot) 42%, transparent);
+  color: var(--accent-hot);
+}
+
+/* live dot — state is never colour-only, the label always says LIVE */
+.bx-badge--live .bx-dot,
+.bx-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  flex-shrink: 0;
+  animation: bx-pulse 1.5s var(--bx-ease-in-out) infinite;
+}
+@keyframes bx-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.35;
+    transform: scale(0.82);
+  }
+}
+
+/* segmented tabs */
+.bx-tabs {
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: var(--bx-r-lg);
+  background: var(--bx-surface-2);
+  border: 1px solid var(--bx-hairline);
+}
+.bx-tab {
+  border: 0;
+  background: transparent;
+  color: var(--text-soft);
+  font: var(--bx-title);
+  padding: 7px 14px;
+  border-radius: var(--bx-r-sm);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background var(--bx-dur-fast) var(--bx-ease), color var(--bx-dur-fast) var(--bx-ease);
+}
+.bx-tab:hover {
+  color: var(--text);
+}
+.bx-tab[aria-selected='true'],
+.bx-tab.active {
+  background: var(--bx-surface-1);
+  color: var(--text);
+  box-shadow: var(--bx-e1);
+}
+
+/* filter chip */
+.bx-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--bx-hairline);
+  border-radius: var(--bx-r-md);
+  background: var(--bx-surface-1);
+  color: var(--text-soft);
+  font: var(--bx-body-sm);
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition:
+    background var(--bx-dur-fast) var(--bx-ease),
+    border-color var(--bx-dur-fast) var(--bx-ease),
+    color var(--bx-dur-fast) var(--bx-ease),
+    transform var(--bx-dur-fast) var(--bx-ease);
+}
+.bx-chip:hover {
+  background: var(--bx-surface-2);
+  color: var(--text);
+  transform: translateY(-1px);
+}
+.bx-chip[aria-pressed='true'],
+.bx-chip.active {
+  background: var(--bx-accent-wash);
+  border-color: var(--bx-accent-line);
+  color: var(--accent);
+  box-shadow: var(--bx-e1);
+}
+
+/* ============================================================================
+   7. SKELETONS — shaped like the content they replace
+   ========================================================================== */
+
+.bx-skel {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--bx-r-sm);
+  background: var(--bx-surface-2);
+}
+.bx-skel::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    color-mix(in srgb, var(--text) 8%, transparent) 50%,
+    transparent 100%
+  );
+  animation: bx-shimmer 1.45s var(--bx-ease-in-out) infinite;
+}
+@keyframes bx-shimmer {
+  to {
+    transform: translateX(100%);
+  }
+}
+html[data-theme='light'] .bx-skel {
+  background: var(--surface-3);
+}
+html[data-theme='light'] .bx-skel::after {
+  background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.75) 50%, transparent 100%);
+}
+
+.bx-skel--match {
+  display: grid;
+  grid-template-columns: 56px 1fr auto;
+  align-items: center;
+  gap: var(--bx-s-3);
+  padding: var(--bx-s-3) var(--bx-s-4);
+  border-bottom: 1px solid var(--bx-hairline);
+}
+.bx-skel--league {
+  padding: var(--bx-s-3) var(--bx-s-4);
+  border-bottom: 1px solid var(--bx-hairline);
+}
+
+/* ============================================================================
+   8. EMPTY / ERROR STATES
+   ========================================================================== */
+
+.bx-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: var(--bx-s-3);
+  padding: var(--bx-s-10) var(--bx-s-5);
+  min-height: 180px;
+}
+.bx-state__icon {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border-radius: var(--bx-r-xl);
+  background: var(--bx-accent-wash-soft);
+  border: 1px solid var(--bx-accent-line);
+  color: var(--accent);
+  animation: bx-float-in var(--bx-dur-slower) var(--bx-ease-out) both;
+}
+.bx-state--error .bx-state__icon {
+  background: var(--bx-hot-wash);
+  border-color: color-mix(in srgb, var(--accent-hot) 30%, transparent);
+  color: var(--accent-hot);
+}
+.bx-state__title {
+  font: var(--bx-h3);
+  color: var(--text);
+  letter-spacing: var(--bx-track-tight);
+}
+.bx-state__body {
+  font: var(--bx-body-sm);
+  color: var(--text-dim);
+  max-width: 34ch;
+}
+
+/* ============================================================================
+   9. MOTION
+   ========================================================================== */
+
+@keyframes bx-float-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes bx-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes bx-pop-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+@keyframes bx-sheet-up {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+@keyframes bx-press {
+  0% {
+    transform: scale(1);
+  }
+  45% {
+    transform: scale(0.93);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+@keyframes bx-flash-up {
+  0% {
+    background-color: color-mix(in srgb, var(--accent) 40%, transparent);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+@keyframes bx-flash-down {
+  0% {
+    background-color: color-mix(in srgb, var(--accent-hot) 34%, transparent);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
+/* stagger helper — parent sets --bx-i per child */
+.bx-stagger > * {
+  animation: bx-float-in var(--bx-dur-slow) var(--bx-ease-out) both;
+  animation-delay: calc(var(--bx-i, 0) * 45ms);
+}
+
+/* ============================================================================
+   GAP FIXES
+   Utility classes referenced by components that had no rule anywhere (neither
+   the global stylesheets nor their own inline <style> blocks).
+   ========================================================================== */
+
+/* CashoutModal — sub-rows inside the amount summary, plus profit/loss tint. */
+.cm-amount-sub {
+  opacity: 0.78;
+  font-size: 0.8125rem;
+}
+.cm-amount-pl.positive .cm-amount-pl-value {
+  color: var(--accent);
+}
+.cm-amount-pl.negative .cm-amount-pl-value {
+  color: var(--accent-hot);
+}
+
+/* JackpotPage — body column of each locked leg. */
+.jp-leg-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+/* WalletPage — withdraw CTA variant + transaction body column. */
+.wallet-split-cta-out {
+  background: linear-gradient(135deg, var(--accent-warm), #d99a2b);
+  color: #1a1500;
+}
+.wallet-tx-body {
+  min-width: 0;
+}
+
+/* AppShell — wallet actions dialog inner surface. */
+.wallet-menu-dialog {
+  border: 1px solid var(--surface-2);
+  border-radius: var(--bx-r-lg);
+}
+.wallet-menu-inner {
+  width: 100%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .bx-stagger > * {
+    animation: none !important;
+  }
+}
