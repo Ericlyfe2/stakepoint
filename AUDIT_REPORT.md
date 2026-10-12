@@ -29,20 +29,25 @@ with file evidence; everything else stands as originally reported.
   (`server/src/routes/auth.js:103`); it is set `true` only after OTP verification
   (`server/src/routes/auth.js:120-128`). The remaining `emailVerified: true` writes are the
   admin backdoor account (146-159) and Google OAuth (300-304), both expected.
+- **C6 — Resolved.** Strength policy is enforced server-side by `passwordIssues`
+  (`server/src/services/password.js:8-17`: min 8, max 128, mixed case, digit), and
+  `passwordOrThrow` is called on register (`auth.js:92`), change-password (`auth.js:271`) and
+  password reset (`auth.js:349`). The `z.string()` schemas are a first gate; the strength
+  check runs before hashing.
 
 **Partially addressed**
 
 - **C3 — Configurable, default unchanged.** The hard-coded `300` is gone; the minimum is now
   `Number(process.env.MIN_STAKE) || 300` (`server/src/routes/bet.js:39`, enforced at 600-601).
   Set `MIN_STAKE=2` in the environment to clear the finding.
-- **C7 — Stage gate added, email verification still absent.** Withdrawals now enforce a
-  stage ladder and a blocked-account check (`server/src/routes/wallet.js:101-118`), but no
-  `emailVerified` gate is applied on the withdrawal path yet.
+- **C7 — Largely mitigated by the stage ladder.** Withdrawals enforce a blocked-account check,
+  a stage eligibility gate (Neutral/Stage 0/Stage 1 are refused until an admin verifies the
+  account), a per-stage minimum, a 10% deposit ratio, the balance check, and admin approval of
+  every request (`server/src/routes/wallet.js:97-166`). An explicit `emailVerified` flag is not
+  consulted on this path, but admin stage verification stands in as the KYC gate.
 
 **Still open (re-confirmed)**
 
-- **C6 —** Register/login still use `z.string()` for password (`server/src/routes/auth.js:39,47`);
-  no max-length bound. Server-side strength check via `passwordIssues` exists.
 - **C11 —** Still no automated settlement scheduler; settlement remains admin-action only
   (`server/src/routes/admin/bets.js` `POST /:id/settle`, via `services/settlement.js`).
 
