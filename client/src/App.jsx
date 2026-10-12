@@ -30,6 +30,8 @@ import StitchHome from './pages/premium/StitchHome.jsx';
 import StitchMyBets from './pages/premium/StitchMyBets.jsx';
 import StitchWallet from './pages/premium/StitchWallet.jsx';
 import StitchWithdraw from './pages/premium/StitchWithdraw.jsx';
+import StitchPromos from './pages/premium/StitchPromos.jsx';
+import StitchCodeHub from './pages/premium/StitchCodeHub.jsx';
 
 import { AdminProvider, AdminGuard } from './providers/AdminProvider.jsx';
 import AdminShell from './layout/AdminShell.jsx';
@@ -144,6 +146,9 @@ export default function App() {
               <Route path="/my-bets"       element={<StitchMyBets />} />
               <Route path="/wallet"        element={<StitchWallet />} />
               <Route path="/withdraw"      element={<StitchWithdraw />} />
+              <Route path="/promos"        element={<StitchPromos />} />
+              <Route path="/codes"         element={<StitchCodeHub />} />
+              <Route path="/code-hub"      element={<StitchCodeHub />} />
               {/* /premium* kept wired as deep-link/preview aliases for the same
                   four screens. */}
               <Route path="/premium"               element={<StitchSportsbook />} />
@@ -159,7 +164,8 @@ export default function App() {
                 <Route path="/classic/my-bets" element={<BetHistoryPage />} />
                 <Route path="/classic/wallet" element={<WalletPage />} />
                 <Route path="/classic/withdraw" element={<WithdrawPage />} />
-                <Route path="/code-hub"  element={<CodeHubPage />} />
+                <Route path="/classic/promos" element={<PromosPage />} />
+                <Route path="/classic/code-hub" element={<CodeHubPage />} />
                 <Route path="/ticket/:code" element={<TicketPage />} />
                 <Route path="/casino"             element={<CasinoPage />} />
                 <Route path="/casino/dice"        element={<DicePage />} />
@@ -167,7 +173,6 @@ export default function App() {
                 <Route path="/casino/red-black"   element={<RedBlackPage />} />
                 <Route path="/virtuals"  element={<VirtualsPage />} />
                 <Route path="/jackpot"   element={<JackpotPage />} />
-                <Route path="/promos"    element={<PromosPage />} />
                 <Route path="/profile"   element={<ProfilePage />} />
                 <Route path="/az-menu"   element={<AZMenuPage />} />
                 <Route path="/info"      element={<InfoPage />} />

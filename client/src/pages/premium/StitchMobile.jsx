@@ -1,12 +1,14 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import useStitchFixtures from '../../premium/useStitchFixtures.js';
+import useStitchIntake from '../../premium/useStitchIntake.js';
 import useStitchPromos from '../../premium/useStitchPromos.js';
 import useStitchSlip from '../../premium/useStitchSlip.js';
 import { BetslipDock, SlipToast } from '../../premium/StitchBetslip.jsx';
 import { SPORT_CATEGORIES } from '../../premium/stitchSeed.js';
 import { Crest, Ic, LiveMinute, MarketOdds, PromoCard, SportPill } from '../../premium/parts.jsx';
 import { formatAmt } from '../../lib/betslipEngine.js';
+import { useToast } from '../../providers/AccountProvider.jsx';
 
 /* ---------------------------------------------------------------------------
    Stitch screens 02 & 04 — BetXentra Mobile App with Bottom Betslip
@@ -49,6 +51,8 @@ export default function StitchMobile({ light = false }) {
   const { snapshot, leagues, liveMatches, liveCount, usingSeed } = useStitchFixtures('football');
   const { promos } = useStitchPromos();
   const slip = useStitchSlip({ snapshot });
+  const { toast } = useToast();
+  useStitchIntake(slip, toast);
   const [sport, setSport] = useState('football');
 
   const heroPromo = promos[0] || null;

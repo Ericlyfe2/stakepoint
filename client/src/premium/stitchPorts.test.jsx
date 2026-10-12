@@ -8,6 +8,8 @@ import StitchLiveTracker from '../pages/premium/StitchLiveTracker.jsx';
 import StitchMyBets from '../pages/premium/StitchMyBets.jsx';
 import StitchWallet from '../pages/premium/StitchWallet.jsx';
 import StitchWithdraw from '../pages/premium/StitchWithdraw.jsx';
+import StitchPromos from '../pages/premium/StitchPromos.jsx';
+import StitchCodeHub from '../pages/premium/StitchCodeHub.jsx';
 
 /* ---------------------------------------------------------------------------
    Render tests for the four Stitch ports.
@@ -28,10 +30,12 @@ const placeBet = vi.fn();
 const fetchTransactions = vi.fn();
 const fetchWalletRules = vi.fn();
 const withdraw = vi.fn();
+const fetchBetByCode = vi.fn();
 const setAccount = vi.fn();
 const openDeposit = vi.fn();
 const showWin = vi.fn();
 const refresh = vi.fn();
+const toast = vi.fn();
 // Captured so tests can drive the ports' socket handlers directly.
 const liveHandlers = new Map();
 
@@ -50,6 +54,7 @@ vi.mock('../api/betApi.js', () => ({
   fetchTransactions: (...a) => fetchTransactions(...a),
   fetchWalletRules: (...a) => fetchWalletRules(...a),
   withdraw: (...a) => withdraw(...a),
+  fetchBetByCode: (...a) => fetchBetByCode(...a),
 }));
 
 // No real socket in jsdom; onLive registers the handler and returns an
@@ -71,6 +76,7 @@ vi.mock('../providers/AccountProvider.jsx', () => ({
     showWin,
     refresh,
   }),
+  useToast: () => ({ toast }),
 }));
 
 const PAGE = (ui) => render(<MemoryRouter>{ui}</MemoryRouter>);
@@ -90,6 +96,7 @@ const ready = async () => {
 
 beforeEach(() => {
   localStorage.clear();
+  sessionStorage.clear();
   vi.clearAllMocks();
   liveHandlers.clear();
   // Reset the shared account to the default signed-in shape.
@@ -123,6 +130,7 @@ beforeEach(() => {
     account: { balance: 4500, userId: 'u-1' },
     transaction: { id: 'w-1', kind: 'withdraw', amount: 5000, status: 'pending', at: '2026-10-01T10:00:00.000Z' },
   });
+  fetchBetByCode.mockResolvedValue({ bet: { legs: [] } });
 });
 
 afterEach(() => vi.useRealTimers());
@@ -766,5 +774,110 @@ describe('Wallet & Withdraw', () => {
     fireEvent.click(screen.getByRole('button', { name: /^Confirm$/i }));
     await waitFor(() => expect(withdraw).toHaveBeenCalledWith(50000, 'momo'));
     expect(await screen.findByText(/Pending Request/i)).toBeTruthy();
+  });
+});
+
+/* ---- Promotions & Code Hub ------------------------------------------------ */
+
+const CODE_HUB_SNAPSHOT = {
+  leagues: [{
+    id: 'lg-1',
+    name: 'Ghana Premier League',
+    country: 'Ghana',
+    meta: 'Premier',
+    crest: { label: 'GPL', style: 'var(--stx-sc-high)' },
+    matches: [
+      { id: 'm-1', home: 'Hearts of Oak', away: 'Asante Kotoko', markets: hubMarkets(1.50, 1.90, 1.70) },
+      { id: 'm-2', home: 'Great Olympics', away: 'Medeama', markets: hubMarkets(1.60, 2.00, 1.80) },
+      { id: 'm-3', home: 'Aduana Stars', away: 'Berekum Chelsea', markets: hubMarkets(1.80, 2.10, 1.75) },
+    ],
+  }],
+};
+
+function hubMarkets(home, over, bttsYes) {
+  return {
+    '1X2': { selections: [{ key: '1', odds: home }, { key: 'X', odds: 3.4 }, { key: '2', odds: 4.5 }] },
+    OU25: { selections: [{ key: 'Over', odds: over }, { key: 'Under', odds: 1.95 }] },
+    BTTS: { selections: [{ key: 'Yes', odds: bttsYes }, { key: 'No', odds: 2.05 }] },
+  };
+}
+
+describe('Promotions', () => {
+  test('renders real admin offers from the API', async () => {
+    fetchPromotions.mockResolvedValue({ promotions: [
+      { id: 'p-1', tag: 'WELCOME', title: 'Welcome Bonus', body: '100% first deposit', cta: 'Claim now' },
+      { id: 'p-2', tag: 'CASHBACK', title: 'Weekly Cashback', body: 'Up to GHS 200 back', cta: 'Opt in' },
+    ] });
+
+    PAGE(<StitchPromos />);
+    await screen.findByText('Welcome Bonus');
+    expect(screen.getByText('Weekly Cashback')).toBeTruthy();
+    // Stats bar counts the real offers.
+    expect(document.querySelector('.stx-phead-stats').textContent).toContain('2');
+  });
+
+  test('claiming records the offer locally and shows the claimed state', async () => {
+    fetchPromotions.mockResolvedValue({ promotions: [
+      { id: 'p-1', tag: 'WELCOME', title: 'Welcome Bonus', body: '100% first deposit', cta: 'Claim now' },
+    ] });
+
+    PAGE(<StitchPromos />);
+    fireEvent.click(await screen.findByRole('button', { name: /Claim now/i }));
+    expect(await screen.findByRole('button', { name: /Claimed/i })).toBeTruthy();
+    expect(JSON.parse(localStorage.getItem('bv_claimed'))).toContain('p-1');
+    expect(toast).toHaveBeenCalled();
+  });
+
+  test('no active offers shows an honest empty state', async () => {
+    fetchPromotions.mockResolvedValue({ promotions: [] });
+    PAGE(<StitchPromos />);
+    expect(await screen.findByText(/No active promotions right now/i)).toBeTruthy();
+  });
+
+  test('an unreachable feed shows an unavailable state, not invented copy', async () => {
+    fetchPromotions.mockRejectedValue(new Error('offline'));
+    PAGE(<StitchPromos />);
+    expect(await screen.findByText(/Promotions are unavailable right now/i)).toBeTruthy();
+  });
+});
+
+describe('Code Hub', () => {
+  test('derives recommended accumulators from the real odds feed', async () => {
+    fetchMatches.mockResolvedValue(CODE_HUB_SNAPSHOT);
+
+    const { container } = PAGE(<StitchCodeHub />);
+    expect(await screen.findByText(/Top Picks/i)).toBeTruthy();
+    expect(container.textContent).toContain('Hearts of Oak vs Asante Kotoko');
+    expect(container.querySelectorAll('.stx-ccard').length).toBeGreaterThan(0);
+  });
+
+  test('falls back to an honest unavailable state when the feed is down', async () => {
+    fetchMatches.mockRejectedValue(new Error('offline'));
+    PAGE(<StitchCodeHub />);
+    expect(await screen.findByText(/Live odds feed unavailable/i)).toBeTruthy();
+  });
+
+  test('Add to Betslip hands the legs to the slip via sessionStorage', async () => {
+    fetchMatches.mockResolvedValue(CODE_HUB_SNAPSHOT);
+
+    PAGE(<StitchCodeHub />);
+    const addButtons = await screen.findAllByRole('button', { name: /Add to Betslip/i });
+    fireEvent.click(addButtons[0]);
+    const stored = JSON.parse(sessionStorage.getItem('sp_recommended_legs'));
+    expect(stored.legs.length).toBeGreaterThanOrEqual(3);
+    sessionStorage.clear();
+  });
+
+  test('a booking code is validated then handed to the slip', async () => {
+    fetchBetByCode.mockResolvedValue({ bet: { legs: [
+      { matchId: 'm-1', market: '1X2', outcome: '1', odds: 1.5, home: 'Hearts of Oak', away: 'Asante Kotoko', marketName: 'Match Result' },
+    ] } });
+
+    PAGE(<StitchCodeHub />);
+    fireEvent.change(await screen.findByLabelText(/Insert a booking code/i), { target: { value: 'abc123' } });
+    fireEvent.submit(screen.getByRole('button', { name: /^Load$/i }).closest('form'));
+    await waitFor(() => expect(fetchBetByCode).toHaveBeenCalledWith('ABC123'));
+    expect(JSON.parse(sessionStorage.getItem('sp_recommended_legs')).legs.length).toBe(1);
+    sessionStorage.clear();
   });
 });

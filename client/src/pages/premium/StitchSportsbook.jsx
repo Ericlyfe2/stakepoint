@@ -1,8 +1,10 @@
 import { useMemo, useState } from 'react';
 import useStitchFixtures from '../../premium/useStitchFixtures.js';
+import useStitchIntake from '../../premium/useStitchIntake.js';
 import useStitchPayouts from '../../premium/useStitchPayouts.js';
 import useStitchPromos from '../../premium/useStitchPromos.js';
 import useStitchSlip from '../../premium/useStitchSlip.js';
+import { useToast } from '../../providers/AccountProvider.jsx';
 import { BetslipRail, SlipToast } from '../../premium/StitchBetslip.jsx';
 import { StitchFooter, StitchSideRail, StitchTopNav } from '../../premium/StitchChrome.jsx';
 import { MARKET_FILTERS, SPORT_CATEGORIES } from '../../premium/stitchSeed.js';
@@ -63,6 +65,8 @@ export default function StitchSportsbook() {
   const { payouts, unavailable: payoutsUnavailable } = useStitchPayouts();
   const { promos } = useStitchPromos();
   const slip = useStitchSlip({ snapshot });
+  const { toast } = useToast();
+  useStitchIntake(slip, toast);
 
   const [sport, setSport] = useState('football');
   const [filter, setFilter] = useState('1X2');

@@ -139,6 +139,7 @@ export function StitchFooter({ current }) {
         <Link to="/info">Terms of Service</Link>
         <Link to="/info#responsible-gaming">Responsible Gaming</Link>
         <Link to="/info#privacy">Privacy Policy</Link>
+        <Link to="/codes">Booking Codes</Link>
         <Link to="/help">MoMo Deposit Guide</Link>
         <Link to="/info#affiliates">Affiliates</Link>
         <Link to="/help">Help Center</Link>
