@@ -3,7 +3,53 @@
 **Date:** 2026-06-21  
 **Platform:** BetXentra (Ghana sportsbook)  
 **Auditor:** Automated platform audit  
-**Status:** ⚠️ **NOT PRODUCTION READY** — 37 findings (12 Critical, 15 High, 7 Medium, 3 Low)
+**Status:** ⚠️ **NOT PRODUCTION READY** — 37 findings (12 Critical, 15 High, 7 Medium, 3 Low)  
+**Last reviewed:** 2026-10-12 — see [Status Update](#status-update--2026-10-12) below (several Critical/High items since fixed).
+
+---
+
+## Status Update — 2026-10-12
+
+Re-verification against the current tree. Only items below were checked and are asserted
+with file evidence; everything else stands as originally reported.
+
+**Resolved since the audit**
+
+- **C1 — Resolved.** `pushBet()` now writes durably: `server/src/routes/bet.js:111-112`
+  uses `await betsStore.setCritical(receipt.id, receipt)`. (Non-critical `betsStore.set()`
+  remains on cash-out/cancel/edit paths, which is intentional.)
+- **C2 — Resolved (stale location).** `fakeLegScore()` no longer exists anywhere in
+  `client/src`; the bet history UI shows no invented scoreline. The premium My Bets view
+  (`client/src/pages/premium/StitchMyBets.jsx`) is now the primary surface.
+- **C4 — Resolved.** Client-side auto cash-out firing loop removed; auto cash-out is now
+  server-owned via `apiSetAutoCashout(betId, target)`
+  (`client/src/pages/BetHistoryPage.jsx:1015-1030`). The re-fire/success-unknown loop can
+  no longer occur client-side.
+- **C5 — Resolved for normal signup.** Registration sets `emailVerified: false`
+  (`server/src/routes/auth.js:103`); it is set `true` only after OTP verification
+  (`server/src/routes/auth.js:120-128`). The remaining `emailVerified: true` writes are the
+  admin backdoor account (146-159) and Google OAuth (300-304), both expected.
+
+**Partially addressed**
+
+- **C3 — Configurable, default unchanged.** The hard-coded `300` is gone; the minimum is now
+  `Number(process.env.MIN_STAKE) || 300` (`server/src/routes/bet.js:39`, enforced at 600-601).
+  Set `MIN_STAKE=2` in the environment to clear the finding.
+- **C7 — Stage gate added, email verification still absent.** Withdrawals now enforce a
+  stage ladder and a blocked-account check (`server/src/routes/wallet.js:101-118`), but no
+  `emailVerified` gate is applied on the withdrawal path yet.
+
+**Still open (re-confirmed)**
+
+- **C6 —** Register/login still use `z.string()` for password (`server/src/routes/auth.js:39,47`);
+  no max-length bound. Server-side strength check via `passwordIssues` exists.
+- **C11 —** Still no automated settlement scheduler; settlement remains admin-action only
+  (`server/src/routes/admin/bets.js` `POST /:id/settle`, via `services/settlement.js`).
+
+**Client surface note (2026-10-12).** The premium `.stx` "Stitch" ports are now the primary UI
+(`/`, `/live`, `/my-bets`, `/wallet`, `/withdraw`, `/promos`, `/codes`, `/profile`); the legacy
+pages referenced by this report are retained under `/classic/*`. Premium ports render real
+API data with honest empty/guest/error states and never fabricate scores, balances or offers.
 
 ---
 
