@@ -732,6 +732,15 @@ client/src/api/betApi.js         player API client + token handling
 - Client builds without errors
 - All lifecycle endpoints registered and functional
 
+### Latest verified state (2026-10-29)
+- HEAD `f4c1f50` — "feat(settings): add No login kill switch with login-page light switch";
+  `main` was in sync with `origin/main` after the push (`680bf11..f4c1f50`).
+- Server: **464/464 tests pass** (`node --test`).
+- Client: **97/97 tests pass, 7 files** (`npx vitest run`).
+- Client: `npx vite build` succeeds (only the pre-existing >500 kB chunk warning).
+- New since the previous state: the **"No login"** kill switch (Admin → Settings toggle +
+  desktop-only textless login-page light switch, animated "Server is down" state).
+
 ### Verified 2026-10-29 (orientation pass)
 - Working tree clean, branch `main` in sync with `origin/main`
 - HEAD: `3a3b276` — "feat(admin): show admin fund credits as 'Deposit approve' in wallet history" (2026-09-24)
@@ -867,11 +876,17 @@ Admin sign-in stays exempt so the owner can never be locked out of `/admin`.
 - `client/src/styles/login.css` — switch plate/lever/LED styling, server-down animation
   keyframes, `@media (max-width: 960px)` hides the switch, and a
   `prefers-reduced-motion` block that disables all of it.
+- `client/src/pages/LoginPage.lock.test.jsx` — **new**, 2 tests: flag-on renders the animated
+  down panel (no form), and clicking the switch calls `setLoginLock(true)` then swaps in the
+  panel.
 
 **Verified**
 - `node --test` in `server/`: **464 tests pass, 0 fail** (456 previous + 8 new).
-- `npx vitest run` in `client/`: **95 tests pass (6 files)**.
+- `npx vitest run` in `client/`: **97 tests pass (7 files)** (95 previous + 2 new).
 - `npx vite build` in `client/`: succeeds (only the pre-existing chunk-size warning).
+- Committed as `f4c1f50` — "feat(settings): add No login kill switch with login-page light
+  switch" — and pushed to `origin/main` (`680bf11..f4c1f50`). Working tree clean, `main` in
+  sync with the remote at that point.
 
 ## Next Steps
 1. Run `npm test` to verify existing tests still pass
