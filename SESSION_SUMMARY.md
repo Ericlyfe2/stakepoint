@@ -64,6 +64,34 @@
 - Client builds without errors
 - All lifecycle endpoints registered and functional
 
+### Verified 2026-10-29 (orientation pass)
+- Working tree clean, branch `main` in sync with `origin/main`
+- HEAD: `3a3b276` — "feat(admin): show admin fund credits as 'Deposit approve' in wallet history" (2026-09-24)
+- Cross-checked this document against the code — all items below confirmed present:
+  - `MATCH_STATUSES` / `computeMatchStatus` / `isKickoffPassed` in `server/src/matchesData.js`
+  - `emitFixtureStatusChanged` exported in `server/src/services/realtime.js`, called from `sportsAdmin.js`, `admin/sports.js`, `oddsAggregator.js`
+  - Lifecycle routes `POST /fixtures/:id/status|archive|...` in `server/src/routes/admin/sports.js`
+  - `KICKOFF_PASSED` guard in both `/book` and `/place` (`server/src/routes/bet.js:448`, `:539`)
+  - `adminSetFixtureStatus` in `client/src/api/adminApi.js`, `.sb-badge-status` in `client/src/styles/app.css`, used in `Home.jsx` and `admin/Sports.jsx`
+- Test suite exists at `server/test/` (settlement, cashout, betSlipEdit, adminWalletAdjust, stages, etc.) — not yet run in this session
+
+## Session Log
+
+### 2026-10-29 — Orientation
+- Read this summary, verified repo state and that documented work is present in the codebase.
+- No code changes made. Next action: run the server test suite and work the "Next Steps" list.
+
+### 2026-10-29 — PayBill number change (836209 → 754991)
+- `client/src/providers/AccountProvider.jsx:778` — `PaybillInstructions` now receives `paybillId="754991"`
+  (was `"836209"`). Merchant name left as `NOVENTRA TECHNOLOGIES`.
+- Only one hardcoded copy existed; `grep` over the repo confirms no remaining `836209` anywhere.
+- `PaybillInstructions.jsx` defaults (`222000` / `Xenbet`) are unused fallbacks — every render is
+  driven by props from `AccountProvider.jsx`, so they were left untouched.
+- The guide text ("Enter the merchant ID: …") and both displayed/copyable values derive from the
+  `paybillId` prop, so they update automatically.
+- Verified: `npx vite build` in `client/` succeeds (built in 3.59s; only the pre-existing
+  >500 kB chunk-size warning).
+
 ## Next Steps
 1. Run `npm test` to verify existing tests still pass
 2. Manually test lifecycle flow:
