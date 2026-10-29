@@ -20,6 +20,10 @@ const settingsSchema = z.object({
   bonusRate: z.number().min(0).max(1).optional(),
   referralBonus: z.number().min(0).optional(),
   contactEmail: z.string().email().optional().or(z.literal('')),
+  // Free-form on purpose: ops need to point the deposit flow at a different
+  // merchant (or a telco code that isn't purely digits) without a release.
+  paybillNumber: z.string().trim().min(1).max(40).optional(),
+  paybillName: z.string().trim().max(80).optional(),
   featureJackpot: z.boolean().optional(),
   featureCasino: z.boolean().optional(),
   featureVirtuals: z.boolean().optional(),

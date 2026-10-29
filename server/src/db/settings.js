@@ -15,6 +15,10 @@ const DEFAULTS = {
   bonusRate: 0.08,
   referralBonus: 10,
   contactEmail: 'support@betxentra.gh',
+  // PayBill details shown in the deposit flow. Editable from
+  // Admin → Settings so ops can rotate merchants without a redeploy.
+  paybillNumber: '754991',
+  paybillName: 'NOVENTRA TECHNOLOGIES',
   featureJackpot: true,
   featureCasino: true,
   featureVirtuals: true,
@@ -31,5 +35,7 @@ export function updateSettings(patch) {
   const current = store.get('platform') || {};
   const merged = { ...current, ...patch };
   store.set('platform', merged);
-  return merged;
+  // Return the fully-resolved view (defaults + stored) so callers such as the
+  // admin Settings page can replace their state wholesale after a save.
+  return getSettings();
 }

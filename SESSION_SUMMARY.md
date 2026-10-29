@@ -92,6 +92,47 @@
 - Verified: `npx vite build` in `client/` succeeds (built in 3.59s; only the pre-existing
   >500 kB chunk-size warning).
 
+### 2026-10-29 — PayBill is now editable from Admin → Settings
+Goal: ops can change the deposit PayBill number/merchant name themselves, no redeploy.
+
+**Server**
+- `server/src/db/settings.js` — new defaults `paybillNumber: '754991'`,
+  `paybillName: 'NOVENTRA TECHNOLOGIES'`.
+  Also fixed `updateSettings()` to return `getSettings()` (defaults + stored) instead of only
+  the raw stored patch; previously a save on a fresh store returned a partial object, which
+  would blank out fields on the admin Settings page.
+- `server/src/routes/admin/settings.js` — `paybillNumber` (string, 1–40 chars, trimmed) and
+  `paybillName` (string, ≤80, trimmed) added to the zod schema. Free-form on purpose so a
+  non-numeric telco code also works.
+- `server/src/index.js` — `GET /api/settings/public` now exposes `paybillNumber` and
+  `paybillName` (public by design; already on the deposit screen). The maintenance gate
+  already allowlists this path.
+
+**Client**
+- `client/src/api/betApi.js` — new `fetchPublicSettings()`.
+- `client/src/pages/admin/Settings.jsx` — new **PayBill** card between "Financial limits" and
+  "Contact & branding": PayBill number + Merchant name inputs, plus Save/Reset.
+  Draft-state + explicit save (not save-on-blur) because a half-typed merchant ID should
+  never go live; read-only admins see the values as text.
+- `client/src/providers/AccountProvider.jsx` — no more hardcoded ID. Fetches
+  `/settings/public` on mount and again in `openDeposit()`, keeps last known values on
+  failure, falls back to `FALLBACK_PAYBILL` (754991 / NOVENTRA TECHNOLOGIES) so the deposit
+  screen always shows something usable offline.
+- `client/src/providers/AccountProvider.jsx` now passes `paybillId={paybill.number}` and
+  `merchantName={paybill.name}` to `PaybillInstructions`.
+
+**Verified**
+- `node --test` in `server/`: **456 tests pass, 0 fail**.
+- `npx vitest run` in `client/`: **95 tests pass (6 files)**.
+- `npx vite build` in `client/`: succeeds (only the pre-existing chunk-size warning).
+- Round-trip against a temp data dir: defaults resolve to 754991 / NOVENTRA TECHNOLOGIES;
+  `updateSettings` persists the new values *and* returns all defaults intact.
+- Schema checks: empty number rejected, whitespace trimmed, non-numeric value accepted,
+  41-char number rejected, 81-char name rejected.
+
+**Note:** paybill changes still flow through the normal debounced store write; they are not
+`setCritical`, matching every other platform setting.
+
 ## Next Steps
 1. Run `npm test` to verify existing tests still pass
 2. Manually test lifecycle flow:

@@ -6,6 +6,7 @@ import {
   deposit as apiDeposit,
   fetchTransactions,
   fetchUnacknowledgedWins, acknowledgeBet,
+  fetchPublicSettings,
 } from '../api/betApi.js';
 import { onLive, refreshAuth, disconnectSocket } from '../api/socketClient.js';
 import WinTrophyModal from '../components/WinTrophyModal.jsx';
@@ -34,6 +35,11 @@ const DEPOSIT_NETWORKS = {
   airteltigo: { label: 'AT Money',         tag: 'AT',  bg: '#0055ff' },
 };
 const DEPOSIT_NETWORK_ORDER = ['momo', 'vodafone', 'airteltigo'];
+
+// Fallbacks used until /settings/public answers (and if it never does — a
+// depositor must always see working payment details, even offline). The live
+// values are set in Admin → Settings → PayBill.
+const FALLBACK_PAYBILL = { number: '754991', name: 'NOVENTRA TECHNOLOGIES' };
 
 export const useAccount = () => React.useContext(AccountCtx) || EMPTY_ACCOUNT;
 export const useToast   = () => React.useContext(ToastCtx)   || EMPTY_TOAST;
@@ -93,6 +99,21 @@ export default function AppProviders({ children }) {
   const MAX_DEPOSIT  = 50000;
   const [depositAmt,  setDepositAmt]   = useState(String(MIN_DEPOSIT));
   const [depositNetwork, setDepositNetwork] = useState('momo');
+
+  // PayBill details come from the server (Admin → Settings) so ops can change
+  // the merchant without a redeploy. Refreshed on load and each time the
+  // deposit dialog opens.
+  const [paybill, setPaybill] = useState(FALLBACK_PAYBILL);
+  const refreshPaybill = useCallback(async () => {
+    try {
+      const s = await fetchPublicSettings();
+      setPaybill({
+        number: String(s?.paybillNumber || '').trim() || FALLBACK_PAYBILL.number,
+        name: String(s?.paybillName || '').trim() || FALLBACK_PAYBILL.name,
+      });
+    } catch { /* keep last known / fallback details */ }
+  }, []);
+  useEffect(() => { refreshPaybill(); }, [refreshPaybill]);
   const [showPaybillInstructions, setShowPaybillInstructions] = useState(false);
   const [paybillMeta, setPaybillMeta] = useState(() => ({
     reference: String(Math.floor(100000000 + Math.random() * 900000000)),
@@ -484,8 +505,9 @@ export default function AppProviders({ children }) {
       reference: accountPhoneRef(account) || String(Math.floor(100000000 + Math.random() * 900000000)),
       depositId: String(Math.floor(1000 + Math.random() * 9000)),
     });
+    refreshPaybill();
     depositDlg.current?.showModal();
-  }, [account, toast, navigate]);
+  }, [account, toast, navigate, refreshPaybill]);
 
   const openWithdraw = useCallback(() => {
     if (!account) { toast('Sign in to withdraw.'); navigate('/login'); return; }
@@ -775,8 +797,8 @@ export default function AppProviders({ children }) {
                               </div>
                             )}
                             <PaybillInstructions
-                              paybillId="754991"
-                              merchantName="NOVENTRA TECHNOLOGIES"
+                              paybillId={paybill.number}
+                              merchantName={paybill.name}
                               accountRef={accountPhoneRef(account) || account?.email || ''}
                               amount={formatAmt(amtNum)}
                               reference={paybillMeta.reference}

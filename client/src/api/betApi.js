@@ -121,6 +121,8 @@ const patch= (p, body)  => rawFetch(p, { method: 'PATCH',  body: JSON.stringify(
 /* meta */
 export const fetchHealth = () => get('/health');
 export const fetchAuthConfig = () => get('/auth/config');
+// PayBill number/name + deposit limits, editable from Admin → Settings.
+export const fetchPublicSettings = () => get('/settings/public');
 export const fetchSports = () => get('/bet/sports');
 export const fetchRecentPayouts = (limit = 12) => get(`/bet/recent-payouts?limit=${encodeURIComponent(limit)}`);
 

@@ -12,10 +12,19 @@ export default function SettingsPage() {
   const [settings, setSettings] = useState(null);
   const [busy, setBusy] = useState(false);
 
+  // PayBill is edited as a draft and saved explicitly: it's payment-critical,
+  // so a half-typed merchant ID must never go live on blur.
+  const [paybillDraft, setPaybillDraft] = useState({ number: '', name: '' });
+
   useEffect(() => {
     adminHealth().then(setHealth).catch(() => {});
     adminGetSettings().then(setSettings).catch(() => {});
   }, []);
+
+  useEffect(() => {
+    if (!settings) return;
+    setPaybillDraft({ number: settings.paybillNumber || '', name: settings.paybillName || '' });
+  }, [settings?.paybillNumber, settings?.paybillName]);
 
   if (!settings) return <Spinner label="Loading settings…" />;
 
@@ -146,6 +155,80 @@ export default function SettingsPage() {
           </div>
         </Card>
 
+        {/* PayBill / deposit merchant */}
+        <Card title="PayBill" subtitle="Merchant details shown on the deposit screen">
+          <div className="adm-kv">
+            <div className="adm-kv-row">
+              <dt>PayBill number</dt>
+              <dd>
+                {isSuper ? (
+                  <input
+                    type="text"
+                    className="adm-text-input"
+                    value={paybillDraft.number}
+                    onChange={(e) => setPaybillDraft((d) => ({ ...d, number: e.target.value }))}
+                    placeholder="e.g. 754991"
+                    inputMode="numeric"
+                    maxLength={40}
+                  />
+                ) : (settings.paybillNumber || '—')}
+              </dd>
+            </div>
+            <div className="adm-kv-row">
+              <dt>Merchant name</dt>
+              <dd>
+                {isSuper ? (
+                  <input
+                    type="text"
+                    className="adm-text-input"
+                    value={paybillDraft.name}
+                    onChange={(e) => setPaybillDraft((d) => ({ ...d, name: e.target.value }))}
+                    placeholder="e.g. NOVENTRA TECHNOLOGIES"
+                    maxLength={80}
+                  />
+                ) : (settings.paybillName || '—')}
+              </dd>
+            </div>
+          </div>
+          {isSuper && (
+            <>
+              <div className="adm-paybill-hint">
+                Players see this on the deposit screen straight away — no redeploy needed.
+              </div>
+              <div className="adm-paybill-actions">
+                <button
+                  type="button"
+                  className="adm-paybill-reset"
+                  onClick={() => setPaybillDraft({
+                    number: settings.paybillNumber || '',
+                    name: settings.paybillName || '',
+                  })}
+                  disabled={busy || (
+                    paybillDraft.number === (settings.paybillNumber || '') &&
+                    paybillDraft.name === (settings.paybillName || '')
+                  )}
+                >
+                  Reset
+                </button>
+                <button
+                  type="button"
+                  className="adm-paybill-save"
+                  onClick={() => update({
+                    paybillNumber: paybillDraft.number.trim(),
+                    paybillName: paybillDraft.name.trim(),
+                  })}
+                  disabled={busy || !paybillDraft.number.trim() || (
+                    paybillDraft.number.trim() === (settings.paybillNumber || '') &&
+                    paybillDraft.name.trim() === (settings.paybillName || '')
+                  )}
+                >
+                  Save PayBill
+                </button>
+              </div>
+            </>
+          )}
+        </Card>
+
         {/* Contact & branding */}
         <Card title="Contact & branding">
           <div className="adm-kv">
@@ -239,4 +322,30 @@ const STYLES = `
   color: var(--text); font-size: 13px; resize: vertical;
   font-family: inherit;
 }
+.adm-paybill-hint {
+  font-size: 11.5px; color: var(--text-dim);
+  margin-top: 10px; line-height: 1.45;
+}
+.adm-paybill-actions {
+  display: flex; justify-content: flex-end; align-items: center;
+  gap: 8px; margin-top: 12px;
+}
+.adm-paybill-save,
+.adm-paybill-reset {
+  padding: 7px 16px; border-radius: 8px; font-size: 12px;
+  font-weight: 800; letter-spacing: .03em; cursor: pointer;
+  transition: all .15s ease;
+}
+.adm-paybill-save {
+  border: none;
+  background: var(--accent, #0E8A4A); color: #fff;
+}
+.adm-paybill-save:hover:not(:disabled) { opacity: .85; }
+.adm-paybill-reset {
+  border: 1px solid var(--border); background: transparent;
+  color: var(--text-soft);
+}
+.adm-paybill-reset:hover:not(:disabled) { background: var(--surface-2); }
+.adm-paybill-save:disabled,
+.adm-paybill-reset:disabled { opacity: .45; cursor: not-allowed; }
 `;

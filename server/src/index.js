@@ -113,7 +113,16 @@ app.get('/api/health', (_req, res) => {
 
 app.get('/api/settings/public', (_req, res) => {
   const s = getSettings();
-  res.json({ maintenance: s.maintenance, maintenanceMessage: s.maintenanceMessage, signupsOpen: s.signupsOpen, minDeposit: s.minDeposit, minWithdraw: s.minWithdraw });
+  res.json({
+    maintenance: s.maintenance,
+    maintenanceMessage: s.maintenanceMessage,
+    signupsOpen: s.signupsOpen,
+    minDeposit: s.minDeposit,
+    minWithdraw: s.minWithdraw,
+    // Public by design: these are the payment details every depositor needs.
+    paybillNumber: s.paybillNumber,
+    paybillName: s.paybillName,
+  });
 });
 
 // Maintenance gate. Mounted after /api/health and /api/settings/public are
