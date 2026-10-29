@@ -15,6 +15,7 @@ import { log } from './utils/logger.js';
 import { metricsMiddleware } from './services/metrics.js';
 
 import authRouter    from './routes/auth.js';
+import settingsRouter from './routes/settings.js';
 import betRouter     from './routes/bet.js';
 import cashoutRouter from './routes/cashout.js';
 import walletRouter  from './routes/wallet.js';
@@ -49,7 +50,6 @@ import adminCmsRouter                from './routes/admin/cms.js';
 import { seedMarketTemplates } from './db/markets.js';
 import { initStores } from './db/store.js';
 import { rebuildEmailIndex } from './db/users.js';
-import { getSettings } from './db/settings.js';
 import { PROMOTIONS } from './matchesData.js';
 import { startSettlementLoop } from './services/settlement.js';
 import { attachRealtime } from './services/realtime.js';
@@ -111,19 +111,10 @@ app.get('/api/health', (_req, res) => {
   });
 });
 
-app.get('/api/settings/public', (_req, res) => {
-  const s = getSettings();
-  res.json({
-    maintenance: s.maintenance,
-    maintenanceMessage: s.maintenanceMessage,
-    signupsOpen: s.signupsOpen,
-    minDeposit: s.minDeposit,
-    minWithdraw: s.minWithdraw,
-    // Public by design: these are the payment details every depositor needs.
-    paybillNumber: s.paybillNumber,
-    paybillName: s.paybillName,
-  });
-});
+// Public platform settings + the login kill switch. Mounted before the
+// maintenance gate so the switch keeps working (and the client can always
+// read `loginDisabled`) even while maintenance is on.
+app.use('/api/settings', settingsRouter);
 
 // Maintenance gate. Mounted after /api/health and /api/settings/public are
 // declared and before every other route, but it also allowlists both by path

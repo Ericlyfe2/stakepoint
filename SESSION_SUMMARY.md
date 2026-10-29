@@ -100,8 +100,10 @@ Order in `server/src/index.js`:
 4. `metricsMiddleware` (latency/status counters exposed on `/api/admin/dashboard/health/metrics`)
 5. `generalLimiter` (global rate limit) + a request logger (`method url status ms`)
 6. `GET /api/health` - `{ ok, service, version, google, smtp, env }`
-7. `GET /api/settings/public` - maintenance flag/message, signups open, min deposit,
-   min withdraw, PayBill number/name (public because every depositor needs it)
+7. `/api/settings` router (mounted **before** the gate) - `GET /public` (maintenance
+   flag/message, `loginDisabled`, signups open, deposit/withdraw minimums, PayBill
+   number/name) and `POST /login-lock` (the public "No login" kill switch; rate-limited,
+   3 s cooldown, audited, optional `LOGIN_LOCK_REQUIRE_ADMIN=true` hardening)
 8. `maintenanceGate` - returns 503 + `Retry-After: 300` for player traffic while
    maintenance is on, but allowlists `/api/health`, `/api/settings/public`,
    `/api/admin/**`, and the four auth endpoints needed to sign in (`login`, `refresh`,
@@ -140,6 +142,7 @@ Failures in steps 3-8 are logged and non-fatal; only `initStores()` / listen fai
 | Server | `PORT` (4000), `NODE_ENV`, `CORS_ORIGIN`, `CORS_ALLOW_VERCEL` |
 | Auth | `JWT_SECRET`, `JWT_ACCESS_TTL` (7d), `JWT_REFRESH_TTL` (3650d), issuer `betxentra` |
 | Rate limits | `RATE_LIMIT_LOGIN_MAX` (5), `RATE_LIMIT_OTP_MAX` (3) |
+| Login kill switch | `LOGIN_LOCK_REQUIRE_ADMIN` (false → public login-page switch; true → admin token required), `LOGIN_LOCK_COOLDOWN_MS` (3000) |
 | Email | `SMTP_HOST/PORT/SECURE/USER/PASS/FROM` (`enabled` = host present) |
 | Google | `GOOGLE_CLIENT_ID/SECRET` (`enabled` = client id present) |
 | Odds | `ODDS_API_KEY`, `APIFOOTBALL_KEY/HOST`, `FOOTBALL_DATA_TOKEN`, `SPORTMONKS_TOKEN` |
@@ -217,7 +220,8 @@ manager freezes a price, suspends a market, or sets a result.
 | `/api/wallet` | `GET /transactions`, `GET /rules`, `POST /deposit`, `POST /withdraw` |
 | `/api/profile` | `GET /`, `PATCH /`, `POST /referral/claim`, `GET /referral` |
 | `/api/support` | `POST /tickets` |
-| `/api/health`, `/api/settings/public` | defined directly in `index.js` |
+| `/api/health` | defined directly in `index.js` |
+| `/api/settings` | `GET /public`, `POST /login-lock` (public "No login" switch) |
 
 #### Admin endpoints (all under `/api/admin/...`)
 
@@ -808,6 +812,66 @@ Goal: ops can change the deposit PayBill number/merchant name themselves, no red
   settlement, cash-out, wallet/stages/withdrawals, odds aggregation, jackpot, realtime,
   client architecture, testing, known gaps, and a quick-reference cheat sheet.
 - No application code changed in this pass - documentation only.
+
+### 2026-10-29 — "No login" kill switch (admin toggle + login-page light switch)
+
+Goal: one shared flag that pauses every player login/registration entry point, editable from
+both Admin → Settings and a textless light-switch button on the login page (desktop only).
+Admin sign-in stays exempt so the owner can never be locked out of `/admin`.
+
+**Server**
+- `server/src/db/settings.js` — new default `loginDisabled: false`. `getSettings()` already
+  merges defaults, so existing installs read `false` with no migration.
+- `server/src/routes/admin/settings.js` — `loginDisabled: z.boolean().optional()` added to the
+  admin settings schema (normal super-admin toggle path).
+- `server/src/routes/settings.js` — **new**. Extracted the public settings payload from
+  `index.js` and added:
+  - `GET /api/settings/public` — now includes `loginDisabled`, `Cache-Control: no-store`.
+  - `POST /api/settings/login-lock` — `{ enabled: boolean }`; public by design so the
+    unauthenticated login page can flip the shared flag. Guarded by a dedicated
+    20/min per-IP limiter, a 3 s server-side cooldown (`LOGIN_LOCK_COOLDOWN_MS`), and an
+    audit entry (`settings.login_lock.enabled|disabled`, severity `warning`, IP + UA).
+    Set `LOGIN_LOCK_REQUIRE_ADMIN=true` to require an admin bearer token instead
+    (login-page switch then returns 401 and only the admin panel can flip it).
+- `server/src/config/env.js` — new `LOGIN_LOCK` block (`requireAdmin`, `cooldownMs`).
+- `server/src/utils/httpError.js` — new `serviceUnavailable()` (503) helper.
+- `server/src/index.js` — mounts `/api/settings` **before** `maintenanceGate`, so the switch
+  and the public payload keep working during maintenance; removed the old inline handler.
+- `server/src/routes/auth.js` — `assertLoginEnabled()` throws
+  `503 { error: 'Server is down. Please try again later.', code: 'LOGIN_DISABLED' }`.
+  Applied to `register`, `verify-email`, the player branch of `login` (including unknown /
+  passwordless accounts, so the gate never leaks account existence), `google`,
+  `forgot-password`, and `reset-password`. Deliberately **not** applied to the backdoor
+  account, the dedicated admin-account branch, or the legacy `role === 'admin'` branch.
+  `refresh` / `logout` / `me` / `change-password` stay open so live sessions are not killed.
+- `server/test/helpers/testApp.js` — mounts the settings router.
+- `server/test/loginLock.test.js` — **new**, 8 tests: default off, public enable, player login
+  503, unknown account 503, register 503, admin still signs in, disable restores login,
+  payload validation.
+
+**Client**
+- `client/src/api/betApi.js` — `setLoginLock(enabled)` → `POST /settings/login-lock`.
+- `client/src/pages/LoginPage.jsx`
+  - Polls `/settings/public` on mount, every 5 s while visible, on focus and on
+    `visibilitychange`; keeps the last value on network errors.
+  - Textless light-switch button fixed top-right, desktop only. It is a real switch
+    (sliding lever + green/red LED); `aria-label`/`aria-pressed` exist for screen readers
+    only, nothing is rendered as text.
+  - When the flag is on, the tabs/form are replaced by an animated **"Server is down"**
+    panel (breathing icon, expanding rings, bouncing dots) while the switch stays usable.
+  - A `503 LOGIN_DISABLED` response from an in-flight submit also flips the local state
+    into the animated panel instead of showing a credentials error.
+- `client/src/pages/admin/Settings.jsx` — new **"No login"** row under Feature toggles
+  ("Blocks all player logins and registrations"). Settings poll every 8 s while the panel is
+  visible so a flip from the login page shows up on the admin side too.
+- `client/src/styles/login.css` — switch plate/lever/LED styling, server-down animation
+  keyframes, `@media (max-width: 960px)` hides the switch, and a
+  `prefers-reduced-motion` block that disables all of it.
+
+**Verified**
+- `node --test` in `server/`: **464 tests pass, 0 fail** (456 previous + 8 new).
+- `npx vitest run` in `client/`: **95 tests pass (6 files)**.
+- `npx vite build` in `client/`: succeeds (only the pre-existing chunk-size warning).
 
 ## Next Steps
 1. Run `npm test` to verify existing tests still pass

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { login, register, fetchAuthConfig, googleSignIn } from '../api/betApi.js';
+import { login, register, fetchAuthConfig, fetchPublicSettings, setLoginLock, googleSignIn } from '../api/betApi.js';
 import { setAdminTokens } from '../api/adminApi.js';
 import { useAccount, useToast } from '../providers/AccountProvider.jsx';
 import CountrySelect from '../components/CountrySelect.jsx';
@@ -50,6 +50,10 @@ export default function LoginPage() {
   const [phone, setPhone]           = useState('');
   const [referralCode, setReferralCode] = useState('');
   const [authConfig, setAuthConfig] = useState({ googleEnabled: false, googleClientId: null });
+  // Login kill switch: null = not loaded yet, true = logins/registrations
+  // paused. Polled so the admin panel and the login-page switch stay in sync.
+  const [loginDisabled, setLoginDisabled] = useState(null);
+  const [lockBusy, setLockBusy] = useState(false);
 
   useEffect(() => {
     if (params.get('logout') === '1') signOut();
@@ -64,6 +68,30 @@ export default function LoginPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Keep the shared "no login" flag fresh. 5 s is short enough that flipping
+  // the admin toggle reflects on open login tabs, and light enough to ignore.
+  useEffect(() => {
+    let alive = true;
+    const load = () => {
+      fetchPublicSettings()
+        .then((s) => { if (alive) setLoginDisabled(!!s.loginDisabled); })
+        .catch(() => { /* keep the last known value on a network blip */ });
+    };
+    load();
+    const id = setInterval(() => {
+      if (document.visibilityState !== 'hidden') load();
+    }, 5000);
+    const onWake = () => { if (document.visibilityState === 'visible') load(); };
+    document.addEventListener('visibilitychange', onWake);
+    window.addEventListener('focus', onWake);
+    return () => {
+      alive = false;
+      clearInterval(id);
+      document.removeEventListener('visibilitychange', onWake);
+      window.removeEventListener('focus', onWake);
+    };
+  }, []);
+
   const isEmail = useMemo(() => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(identifier), [identifier]);
   const isPhone = useMemo(() => /^\+?\d{9,15}$/.test(identifier.replace(/\s|-/g, '')), [identifier]);
   const idValid = isEmail || isPhone;
@@ -75,6 +103,30 @@ export default function LoginPage() {
   const regIdValid = regIsEmail || regIsPhone;
 
   const reset = () => setErr('');
+
+  // Flip the shared kill switch. The server is the source of truth, so we
+  // render its answer rather than optimistically guessing.
+  const toggleLoginLock = async () => {
+    if (lockBusy || loginDisabled === null) return;
+    setLockBusy(true);
+    setErr('');
+    try {
+      const res = await setLoginLock(!loginDisabled);
+      setLoginDisabled(!!res.loginDisabled);
+      toast(res.loginDisabled ? 'Logins paused.' : 'Logins resumed.');
+    } catch (e) {
+      if (e?.body?.code === 'LOGIN_LOCK_COOLDOWN') {
+        setErr('Please wait a moment before changing this again.');
+      } else {
+        setErr(e.message || 'Could not change the switch.');
+      }
+      fetchPublicSettings()
+        .then((s) => setLoginDisabled(!!s.loginDisabled))
+        .catch(() => {});
+    } finally {
+      setLockBusy(false);
+    }
+  };
 
   const validate = () => {
     if (mode === 'register') {
@@ -132,7 +184,14 @@ export default function LoginPage() {
         routeAfterLogin(data);
       }
     } catch (e) {
-      setErr(e.message || (mode === 'signin' ? 'Sign in failed.' : 'Sign up failed.'));
+      // In-flight attempt raced the switch being flipped. Show the animated
+      // down state instead of a generic credentials error.
+      if (e?.body?.code === 'LOGIN_DISABLED' || (e?.status === 503 && /server is down/i.test(e?.message || ''))) {
+        setLoginDisabled(true);
+        setErr('Server is down. Please try again later.');
+      } else {
+        setErr(e.message || (mode === 'signin' ? 'Sign in failed.' : 'Sign up failed.'));
+      }
     } finally { setBusy(false); }
   };
 
@@ -141,8 +200,56 @@ export default function LoginPage() {
       <div className="auth-bg-left" />
       <div className="auth-bg-right" />
 
+      {/* Desktop-only kill switch. Deliberately textless: it is a physical
+          light-switch affordance, not a labelled control. The aria-label is
+          for screen readers only and never rendered. */}
+      <button
+        type="button"
+        className={`login-lock-switch${loginDisabled ? ' is-on' : ''}`}
+        onClick={toggleLoginLock}
+        disabled={lockBusy || loginDisabled === null}
+        aria-label={loginDisabled ? 'Turn logins back on' : 'Pause all logins'}
+        aria-pressed={loginDisabled === true}
+      >
+        <span className="login-lock-plate" aria-hidden="true">
+          <span className="login-lock-lever" />
+          <span className="login-lock-led" />
+        </span>
+      </button>
+
       <main className="auth-card">
-        <div className="auth-tabs">
+        {loginDisabled ? (
+          <div className="server-down" role="status" aria-live="polite">
+            <div className="server-down-visual" aria-hidden="true">
+              <span className="server-down-ring" />
+              <span className="server-down-ring d2" />
+              <span className="server-down-core">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 2v4" />
+                  <path d="M12 18v4" />
+                  <path d="m4.93 4.93 2.83 2.83" />
+                  <path d="m16.24 16.24 2.83 2.83" />
+                  <path d="M2 12h4" />
+                  <path d="M18 12h4" />
+                  <path d="m4.93 19.07 2.83-2.83" />
+                  <path d="m16.24 7.76 2.83-2.83" />
+                </svg>
+              </span>
+            </div>
+            <h2 className="server-down-title">Server is down</h2>
+            <p className="server-down-body">
+              Logins and new registrations are paused right now.
+              Please try again shortly.
+            </p>
+            {err && <div className="err" aria-live="polite">{err}</div>}
+            <div className="server-down-dots" aria-hidden="true">
+              <span /><span /><span />
+            </div>
+          </div>
+        ) : (
+          <>
+            <div className="auth-tabs">
           <button type="button" className={`auth-tab${mode === 'register' ? ' active' : ''}`}
                   onClick={() => { setMode('register'); reset(); }}>Register</button>
           <button type="button" className={`auth-tab${mode === 'signin' ? ' active' : ''}`}
@@ -223,6 +330,8 @@ export default function LoginPage() {
             </div>
           )}
         </form>
+          </>
+        )}
       </main>
     </div>
   );

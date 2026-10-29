@@ -12,3 +12,4 @@ export const forbidden    = (msg = 'Forbidden', extras) => new HttpError(403, ms
 export const notFound     = (msg = 'Not found', extras) => new HttpError(404, msg, extras);
 export const conflict     = (msg, extras) => new HttpError(409, msg, extras);
 export const tooMany      = (msg, extras) => new HttpError(429, msg, extras);
+export const serviceUnavailable = (msg = 'Service unavailable', extras) => new HttpError(503, msg, extras);

@@ -10,6 +10,7 @@ const router = Router();
 const settingsSchema = z.object({
   maintenance: z.boolean().optional(),
   maintenanceMessage: z.string().max(1000).optional(),
+  loginDisabled: z.boolean().optional(),
   signupsOpen: z.boolean().optional(),
   defaultOddsSource: z.string().max(50).optional(),
   minDeposit: z.number().positive().optional(),

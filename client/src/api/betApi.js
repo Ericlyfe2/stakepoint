@@ -123,6 +123,8 @@ export const fetchHealth = () => get('/health');
 export const fetchAuthConfig = () => get('/auth/config');
 // PayBill number/name + deposit limits, editable from Admin → Settings.
 export const fetchPublicSettings = () => get('/settings/public');
+// Public login kill switch, shared with Admin → Settings → Feature toggles.
+export const setLoginLock = (enabled) => post('/settings/login-lock', { enabled });
 export const fetchSports = () => get('/bet/sports');
 export const fetchRecentPayouts = (limit = 12) => get(`/bet/recent-payouts?limit=${encodeURIComponent(limit)}`);
 

@@ -5,6 +5,10 @@ const store = createStore('settings', {});
 const DEFAULTS = {
   maintenance: false,
   maintenanceMessage: 'Platform is undergoing scheduled maintenance. Please check back shortly.',
+  // "No login" kill switch. When on, every player login/register entry point
+  // answers 503 with code LOGIN_DISABLED. Admin sign-in is deliberately exempt
+  // so the owner can never be locked out of /admin (see routes/auth.js).
+  loginDisabled: false,
   signupsOpen: true,
   defaultOddsSource: 'auto',
   minDeposit: 300,

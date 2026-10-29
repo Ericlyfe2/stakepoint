@@ -43,6 +43,19 @@ export const RATE_LIMITS = {
   otpMax:   Number(env.RATE_LIMIT_OTP_MAX)   || 3,
 };
 
+// ---- Login kill switch ------------------------------------------------------
+// The login page carries a public switch (so an operator can flip it without
+// reaching /admin), which makes the write endpoint unauthenticated by design.
+// Set LOGIN_LOCK_REQUIRE_ADMIN=true to require an admin bearer token instead —
+// the login-page switch then stops working and only the admin panel can flip
+// the flag. LOGIN_LOCK_COOLDOWN_MS throttles rapid flipping (default 3 s).
+export const LOGIN_LOCK = {
+  requireAdmin: env.LOGIN_LOCK_REQUIRE_ADMIN === 'true',
+  cooldownMs: Number.isFinite(Number(env.LOGIN_LOCK_COOLDOWN_MS))
+    ? Math.max(0, Number(env.LOGIN_LOCK_COOLDOWN_MS))
+    : 3000,
+};
+
 export const ODDS_API_KEY = env.ODDS_API_KEY || '';
 
 // Comma-separated list of allowed origins for CORS in production.

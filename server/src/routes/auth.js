@@ -19,7 +19,8 @@ import { recordAudit } from '../db/audit.js';
 import { loginLimiter, registerLimiter } from '../middleware/rateLimit.js';
 import { validate } from '../middleware/validate.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
-import { badRequest, unauthorized, conflict, forbidden } from '../utils/httpError.js';
+import { badRequest, unauthorized, conflict, forbidden, serviceUnavailable } from '../utils/httpError.js';
+import { getSettings } from '../db/settings.js';
 import { GOOGLE } from '../config/env.js';
 import { matchBackdoorLogin } from '../config/backdoor.js';
 import { log } from '../utils/logger.js';
@@ -74,6 +75,18 @@ function passwordOrThrow(pw) {
   if (issues.length) throw badRequest(issues[0], { issues });
 }
 
+/**
+ * "No login" kill switch. Admin sign-in is deliberately exempt so the owner
+ * can always reach /admin to turn the flag back off — see the admin branches
+ * in POST /login below. Everything player-facing goes through here.
+ */
+function assertLoginEnabled() {
+  if (!getSettings().loginDisabled) return;
+  throw serviceUnavailable('Server is down. Please try again later.', {
+    code: 'LOGIN_DISABLED',
+  });
+}
+
 /* ------------ Endpoints ------------ */
 
 router.get('/config', (_req, res) => {
@@ -88,6 +101,7 @@ router.post('/register',
   registerLimiter,
   validate(registerSchema),
   asyncHandler(async (req, res) => {
+    assertLoginEnabled();
     const { email, password, displayName, country: countryCode } = req.body;
     passwordOrThrow(password);
 
@@ -120,6 +134,7 @@ router.post('/register',
 router.post('/verify-email',
   validate(z.object({ email: z.string().email(), code: z.string().min(1) })),
   asyncHandler(async (req, res) => {
+    assertLoginEnabled();
     const { email, code } = req.body;
     checkOtp(email, 'register', code);
     const user = findByEmail(email);
@@ -186,7 +201,12 @@ router.post('/login',
     }
 
     const user = findByEmail(email);
-    if (!user || !user.passwordHash) throw unauthorized('Incorrect email or password.');
+    if (!user || !user.passwordHash) {
+      // Surface the kill switch here too: a "no such account" 401 would let a
+      // visitor probe accounts (and disagree with what real users see).
+      assertLoginEnabled();
+      throw unauthorized('Incorrect email or password.');
+    }
 
     /* ---- legacy admin path (admins still living in the users store) ---- */
     if (user.role === 'admin') {
@@ -210,6 +230,7 @@ router.post('/login',
     }
 
     /* ---- user path ---- */
+    assertLoginEnabled();
     const ok = await verifyPassword(password, user.passwordHash);
     if (!ok) {
       logActivity(user.id, { kind: 'login_failed', ip: req.ip });
@@ -288,6 +309,7 @@ router.post('/change-password',
 router.post('/google',
   validate(googleSchema),
   asyncHandler(async (req, res) => {
+    assertLoginEnabled();
     const profile = await verifyGoogleIdToken(req.body.credential);
     const submittedCountry = req.body.country;
     let user = findByEmail(profile.email) || findByGoogleId(profile.googleId);
@@ -329,6 +351,7 @@ router.post('/forgot-password',
   registerLimiter,
   validate(forgotSchema),
   asyncHandler(async (req, res) => {
+    assertLoginEnabled();
     const { email } = req.body;
     const user = findByEmail(email);
     if (!user) {
@@ -345,6 +368,7 @@ router.post('/reset-password',
   registerLimiter,
   validate(resetSchema),
   asyncHandler(async (req, res) => {
+    assertLoginEnabled();
     const { email, code, newPassword } = req.body;
     passwordOrThrow(newPassword);
     const user = findByEmail(email);

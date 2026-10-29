@@ -26,6 +26,16 @@ export default function SettingsPage() {
     setPaybillDraft({ number: settings.paybillNumber || '', name: settings.paybillName || '' });
   }, [settings?.paybillNumber, settings?.paybillName]);
 
+  // The login page carries the same "No login" switch, so refresh this view
+  // periodically to keep both sides in sync while the panel is open.
+  useEffect(() => {
+    const id = setInterval(() => {
+      if (busy || document.visibilityState === 'hidden') return;
+      adminGetSettings().then(setSettings).catch(() => {});
+    }, 8000);
+    return () => clearInterval(id);
+  }, [busy]);
+
   if (!settings) return <Spinner label="Loading settings…" />;
 
   const update = async (patch) => {
@@ -73,6 +83,7 @@ export default function SettingsPage() {
         <Card title="Feature toggles" subtitle="Enable or disable platform features">
           {[
             ['maintenance',      'Maintenance mode',      settings.maintenance,      'Blocks all user traffic'],
+            ['loginDisabled',    'No login',              settings.loginDisabled,    'Blocks all player logins and registrations'],
             ['signupsOpen',      'New registrations',     settings.signupsOpen,      'Allow new users to sign up'],
             ['featureJackpot',   'Jackpot',               settings.featureJackpot,   'Jackpot betting'],
             ['featureCasino',    'Casino',                settings.featureCasino,    'Casino games'],

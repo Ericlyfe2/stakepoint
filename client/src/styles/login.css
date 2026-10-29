@@ -194,6 +194,212 @@
   text-decoration: underline;
 }
 
+/* ------------------------------------------------------------------ */
+/* Login kill switch — desktop-only textless "light switch"            */
+/* ------------------------------------------------------------------ */
+
+.login-lock-switch {
+  position: fixed;
+  top: 22px;
+  right: 26px;
+  z-index: 40;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  filter: drop-shadow(0 8px 18px rgba(0, 0, 0, 0.16));
+  transition: transform 0.18s ease;
+}
+.login-lock-switch:hover:not(:disabled) { transform: translateY(-1px); }
+.login-lock-switch:active:not(:disabled) { transform: translateY(0) scale(0.97); }
+.login-lock-switch:disabled { cursor: progress; opacity: 0.7; }
+.login-lock-switch:focus { outline: none; }
+.login-lock-switch:focus-visible .login-lock-plate {
+  box-shadow: inset 0 1px 0 #fff, inset 0 -2px 4px rgba(0, 0, 0, 0.08),
+              0 0 0 3px rgba(0, 90, 50, 0.35);
+}
+
+.login-lock-plate {
+  position: relative;
+  display: block;
+  width: 58px;
+  height: 92px;
+  border-radius: 13px;
+  border: 1px solid #cfcec8;
+  background: linear-gradient(160deg, #fdfdfb, #e9e8e3 55%, #d8d7d1);
+  box-shadow: inset 0 1px 0 #fff, inset 0 -2px 4px rgba(0, 0, 0, 0.08);
+  transition: background 0.25s ease, border-color 0.25s ease;
+}
+.login-lock-switch.is-on .login-lock-plate {
+  border-color: #d7b8b4;
+  background: linear-gradient(160deg, #fff7f6, #f2e2df 55%, #e3cfcb);
+}
+
+.login-lock-lever {
+  position: absolute;
+  top: 9px;
+  left: 50%;
+  width: 30px;
+  height: 44px;
+  border-radius: 7px;
+  border: 1px solid #c3c2bb;
+  background: linear-gradient(180deg, #fafaf7, #dad9d3);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.18), inset 0 1px 0 #fff,
+              inset 0 -6px 8px rgba(0, 0, 0, 0.06);
+  transform: translateX(-50%);
+  transition: top 0.26s cubic-bezier(0.4, 0, 0.2, 1), background 0.26s ease,
+              box-shadow 0.26s ease;
+}
+.login-lock-switch.is-on .login-lock-lever {
+  top: 37px;
+  background: linear-gradient(180deg, #efe5e3, #cdbab6);
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.22), inset 0 1px 0 #fff,
+              inset 0 -6px 8px rgba(0, 0, 0, 0.08);
+}
+
+.login-lock-led {
+  position: absolute;
+  bottom: 5px;
+  left: 50%;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  transform: translateX(-50%);
+  background: radial-gradient(circle at 35% 35%, #d6ffe4, #21c45d 48%, #0b7a35);
+  box-shadow: 0 0 8px rgba(33, 196, 93, 0.85);
+  transition: background 0.25s ease, box-shadow 0.25s ease;
+}
+.login-lock-switch.is-on .login-lock-led {
+  background: radial-gradient(circle at 35% 35%, #ffd9d9, #ef4444 48%, #8f1414);
+  box-shadow: 0 0 9px rgba(239, 68, 68, 0.9);
+  animation: login-lock-led-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes login-lock-led-pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.45; }
+}
+
+/* ------------------------------------------------------------------ */
+/* Animated "Server is down" panel shown while the kill switch is on   */
+/* ------------------------------------------------------------------ */
+
+.server-down {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 8px;
+  padding: 18px 6px 14px;
+  animation: server-down-in 0.38s ease-out both;
+}
+
+.server-down-visual {
+  position: relative;
+  width: 78px;
+  height: 78px;
+  display: grid;
+  place-items: center;
+  margin-bottom: 6px;
+}
+
+.server-down-core {
+  position: relative;
+  z-index: 1;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: #d32f2f;
+  background: #fdecec;
+  box-shadow: inset 0 0 0 1px rgba(211, 47, 47, 0.16);
+  animation: server-down-breathe 2.1s ease-in-out infinite;
+}
+
+.server-down-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 2px solid rgba(211, 47, 47, 0.35);
+  animation: server-down-ring 2.1s ease-out infinite;
+}
+.server-down-ring.d2 { animation-delay: 1.05s; }
+
+.server-down-title {
+  margin: 0;
+  font-size: 23px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: #b42318;
+  animation: server-down-title 0.45s cubic-bezier(0.2, 0.9, 0.3, 1.4) both;
+}
+
+.server-down-body {
+  margin: 0;
+  max-width: 280px;
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--text-soft);
+}
+
+.server-down-dots {
+  display: flex;
+  gap: 6px;
+  margin-top: 10px;
+}
+.server-down-dots span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #d32f2f;
+  opacity: 0.35;
+  animation: server-down-dot 1.2s ease-in-out infinite;
+}
+.server-down-dots span:nth-child(2) { animation-delay: 0.16s; }
+.server-down-dots span:nth-child(3) { animation-delay: 0.32s; }
+
+@keyframes server-down-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes server-down-title {
+  from { opacity: 0; transform: scale(0.92); }
+  to   { opacity: 1; transform: scale(1); }
+}
+@keyframes server-down-breathe {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.06); }
+}
+@keyframes server-down-ring {
+  0%   { transform: scale(0.75); opacity: 0.65; }
+  100% { transform: scale(1.18); opacity: 0; }
+}
+@keyframes server-down-dot {
+  0%, 100% { opacity: 0.25; transform: translateY(0); }
+  50%      { opacity: 1;    transform: translateY(-3px); }
+}
+
+/* Laptop-only by request: no switch on phones/tablets. */
+@media (max-width: 960px) {
+  .login-lock-switch { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .login-lock-switch,
+  .login-lock-lever,
+  .login-lock-led,
+  .server-down,
+  .server-down-core,
+  .server-down-ring,
+  .server-down-title,
+  .server-down-dots span {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
 /* --- Country selector overrides for new theme --- */
 .country-select { position: relative; }
 .country-select.disabled { opacity: .6; pointer-events: none; }

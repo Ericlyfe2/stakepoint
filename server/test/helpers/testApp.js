@@ -36,6 +36,7 @@ export async function buildTestApp(name) {
   const { errorHandler, notFoundHandler } = await import('../../src/middleware/error.js');
 
   const { default: authRouter } = await import('../../src/routes/auth.js');
+  const { default: settingsRouter } = await import('../../src/routes/settings.js');
   const { default: walletRouter } = await import('../../src/routes/wallet.js');
   const { default: adminAuthRouter } = await import('../../src/routes/admin/auth.js');
   const { default: adminUsersRouter } = await import('../../src/routes/admin/users.js');
@@ -48,6 +49,7 @@ export async function buildTestApp(name) {
   const app = express();
   app.use(express.json());
   app.use('/api/auth', authRouter);
+  app.use('/api/settings', settingsRouter);
   app.use('/api/wallet', walletRouter);
   app.use('/api/admin/auth', adminAuthRouter);
   app.use('/api/admin/users', adminUsersRouter);
