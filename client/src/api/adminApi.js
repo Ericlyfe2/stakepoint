@@ -237,6 +237,8 @@ export const adminListPendingDeposits = ()    => get('/deposits/pending');
 export const adminListDepositHistory  = ()    => get('/deposits/history');
 export const adminApproveDeposit     = (id)  => post(`/deposits/${encodeURIComponent(id)}/approve`);
 export const adminRejectDeposit      = (id, body) => post(`/deposits/${encodeURIComponent(id)}/reject`, body);
+export const adminApproveAllDeposits = ()    => post('/deposits/approve-all');
+export const adminRejectAllDeposits  = (body) => post('/deposits/reject-all', body);
 
 /* admin management */
 export const adminListAdmins = (params) => get(`/management${qs(params)}`);

@@ -236,7 +236,7 @@ live, detail, settle, patch, slip-edit, cancel, note, soft-delete/restore, bulk)
 status, duplicate, archive/restore, cancel/postpone, bulk), `settlement` (queue, audit,
 unpaid, repay, fixtures, set result, settle fixture/bet, bulk), `exposure` (liability
 overview, per-fixture), `markets`, `teams`,
-`deposits` (pending, history, approve, reject), `withdrawals` (pending, list, stats,
+`deposits` (pending, history, approve, reject, approve-all, reject-all), `withdrawals` (pending, list, stats,
 approve, reject), `bonuses` (CRUD, issue, clawback, stats), `kyc` (list, detail, stats,
 approve/reject), `referrals` (list, payouts, record payout), `codes` (booking codes CRUD,
 bulk, stats), `cashout` (rules get/put, live offers, adjust offer, stats), `cms` (pages,
@@ -732,6 +732,12 @@ client/src/api/betApi.js         player API client + token handling
 - Client builds without errors
 - All lifecycle endpoints registered and functional
 
+### Latest verified state (2026-10-30)
+- Server: **470/470 tests pass** (`node --test`); Client: **102/102 tests pass, 8 files**
+  (`npx vitest run`); `npx vite build` succeeds (only the pre-existing chunk warning).
+- New since the 2026-10-29 state: bulk **Approve all / Reject all** on Admin → Deposits
+  (see the session log entry for details).
+
 ### Latest verified state (2026-10-29)
 - HEAD `f4c1f50` — "feat(settings): add No login kill switch with login-page light switch";
   `main` was in sync with `origin/main` after the push (`680bf11..f4c1f50`).
@@ -898,6 +904,61 @@ Admin sign-in stays exempt so the owner can never be locked out of `/admin`.
 - No application code changed. Outstanding work is still the "Next Steps" list below
   (manual lifecycle QA, kickoff-lock check, settlement-only-on-verified-results check,
   admin→user realtime check, end-to-end create → bet → result → settle → payout run).
+
+### 2026-10-30 — Admin → Deposits: "Approve all" / "Reject all" bulk actions
+
+Goal: one click to clear the whole pending-deposit queue, from either a laptop or a phone,
+without looping single-item requests in the browser.
+
+**Server** (`server/src/routes/admin/deposits.js`)
+- Refactored the two single-item handlers into reusable `approveDeposit(req, txId)` /
+  `rejectDeposit(req, txId, reason)` helpers — identical behaviour to before (balance credit,
+  `totalDeposited`, Neutral → Stage 0 auto-promotion at ≥ 1000, referral 10% bonus, activity
+  log, `deposit:approved` / `deposit:rejected` sockets, per-item audit).
+- New `POST /api/admin/deposits/approve-all` — snapshots every pending deposit ID, processes
+  them one by one, and returns `{ ok, approvedCount, failedCount, approved[], failed[] }`.
+  A single bad item is collected in `failed[]` and never aborts the run.
+- New `POST /api/admin/deposits/reject-all` — same shape with `{ reason? }` (≤ 500 chars),
+  returns `{ rejectedCount, failedCount, rejected[], failed[] }`. No balances are touched.
+- Both are `requireAdmin` + `requireRole('finance_admin')`, write one summary audit entry
+  (`deposit.approve_all` / `deposit.reject_all`, severity `warning`) and emit
+  `deposits:bulk_approved` / `deposits:bulk_rejected` to the admin socket feed.
+- Declared before `/:id/approve` so the literal paths always win the match. The single-item
+  routes now also return the updated transaction (additive; previously `{ ok: true }`).
+
+**Client**
+- `client/src/api/adminApi.js` — `adminApproveAllDeposits()`, `adminRejectAllDeposits(body)`.
+- `client/src/pages/admin/Deposits.jsx`
+  - New bulk bar under the Pending/History tabs: **Approve all (n)** (green) and
+    **Reject all (n)** (red), each with the live pending count.
+  - Both confirm first (`window.confirm`) spelling out the consequence, are disabled while a
+    bulk run is in flight or when the queue is empty, and swap their label to
+    "Approving…" / "Rejecting…" with `aria-busy`.
+  - Result toast reports the count and appends "— N failed" when the server returned
+    per-item failures; the queue reloads afterwards.
+  - Row-level approve/reject buttons are disabled during a bulk run so the two paths can't
+    overlap.
+- `client/src/styles/admin.css` — `.adm-bulk-bar` (right-aligned flex row on desktop,
+  full-width stacked buttons at ≤ 720 px so it is usable on a phone).
+- `.gitignore` — added `.playwright-mcp/` (browser-tool output directory).
+
+**Verified**
+- `node --test` in `server/`: **470 pass, 0 fail** (464 previous + 6 new in
+  `server/test/depositBulk.test.js`): credits every deposit and clears the queue, keeps the
+  ≥ 1000 auto-promote rule, rejects without crediting, empty-queue no-op, finance_admin gate
+  (support → 403), and 401 without a session.
+- `npx vitest run` in `client/`: **102 pass, 8 files** (97 previous + 5 new in
+  `Deposits.bulk.test.jsx`): buttons show the count, approve/reject call the bulk endpoint
+  once after confirmation, dismissal does nothing, both disabled when empty.
+- `npx vite build`: succeeds (only the pre-existing > 500 kB chunk warning).
+- Live browser pass (dev API + Vite, isolated temp data dir, admin@xenbet.gh):
+  - Desktop 1440×900: bar right-aligned, both buttons visible in the viewport.
+  - Phone 390×844: both buttons full width, stacked, fully inside the viewport, page has no
+    horizontal overflow (`scrollWidth === 390`).
+  - Reject all (3 pending) from the phone layout → queue emptied, both buttons disabled,
+    "No pending deposits" shown, history shows 3 × Rejected, wallets untouched.
+  - Approve all (2 pending: 450 + 600) → both balances credited exactly (450 / 600),
+    `totalDeposited` updated, queue emptied.
 
 ## Next Steps
 1. Run `npm test` to verify existing tests still pass

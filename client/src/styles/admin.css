@@ -460,6 +460,20 @@
 .adm-btn.ghost   { background: transparent; }
 .adm-btn.sm      { padding: 6px 10px; font-size: 12.5px; border-radius: 8px; }
 
+/* bulk action row (e.g. Approve all / Reject all on Deposits) */
+.adm-bulk-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-bottom: 16px;
+}
+.adm-bulk-bar .adm-btn { flex: 0 0 auto; }
+@media (max-width: 720px) {
+  .adm-bulk-bar { justify-content: flex-start; }
+  .adm-bulk-bar .adm-btn { flex: 1 1 100%; justify-content: center; }
+}
+
 /* ============== badge / pill ============== */
 .adm-badge {
   display: inline-flex; align-items: center; gap: 6px;

@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { Card, Badge, Spinner, Empty, moneyFmt, ago, dateShort, useToast } from '../../components/admin/primitives.jsx';
-import { adminListPendingDeposits, adminListDepositHistory, adminApproveDeposit, adminRejectDeposit } from '../../api/adminApi.js';
+import { adminListPendingDeposits, adminListDepositHistory, adminApproveDeposit, adminRejectDeposit, adminApproveAllDeposits, adminRejectAllDeposits } from '../../api/adminApi.js';
 import { IconCheck, IconClose } from '../../components/admin/Icons.jsx';
 import { onAdmin } from '../../api/adminSocket.js';
 import { requestNotificationPermission, notify as osNotify } from '../../lib/browserNotify.js';
@@ -37,7 +37,7 @@ function StatusBadge({ status }) {
   return <Badge tone={meta.cls}>{meta.label}</Badge>;
 }
 
-function PendingView({ loading, err, pending, handleApprove, handleReject, busyId }) {
+function PendingView({ loading, err, pending, handleApprove, handleReject, busyId, bulkBusy }) {
   if (loading) return <Spinner label="Loading deposits…" />;
   if (err) return (
     <div style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 8, padding: '10px 14px', marginBottom: 16, fontSize: 13, color: '#ef4444' }}>
@@ -72,20 +72,22 @@ function PendingView({ loading, err, pending, handleApprove, handleReject, busyI
                 <button
                   type="button"
                   onClick={() => handleApprove(tx.id)}
-                  disabled={busyId === tx.id}
+                  disabled={busyId === tx.id || Boolean(bulkBusy)}
                   className="adm-btn adm-btn-sm"
                   style={{ background: '#005A32', color: '#fff', border: 'none' }}
                   title="Approve"
+                  aria-label={`Approve deposit of ${moneyFmt(tx.amount)}`}
                 >
                   <IconCheck />
                 </button>
                 <button
                   type="button"
                   onClick={() => handleReject(tx.id)}
-                  disabled={busyId === tx.id}
+                  disabled={busyId === tx.id || Boolean(bulkBusy)}
                   className="adm-btn adm-btn-sm"
                   style={{ background: '#ef4444', color: '#fff', border: 'none' }}
                   title="Reject"
+                  aria-label={`Reject deposit of ${moneyFmt(tx.amount)}`}
                 >
                   <IconClose />
                 </button>
@@ -148,6 +150,7 @@ export default function DepositsPage() {
   const [err, setErr] = useState('');
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState(null);
+  const [bulkBusy, setBulkBusy] = useState(null); // 'approve' | 'reject' | null
   const seenIdsRef = useRef(new Set());
 
   const [historyData, setHistoryData] = useState([]);
@@ -246,6 +249,62 @@ export default function DepositsPage() {
     }
   };
 
+  const handleApproveAll = async () => {
+    const count = (data?.pending || []).length;
+    if (count === 0 || bulkBusy) return;
+    const ok = window.confirm(
+      `Approve all ${count} pending deposit${count === 1 ? '' : 's'}?\n\n` +
+      `This credits every player's balance immediately and cannot be undone.`
+    );
+    if (!ok) return;
+
+    setBulkBusy('approve');
+    try {
+      const r = await adminApproveAllDeposits();
+      const approved = r?.approvedCount ?? 0;
+      const failed = r?.failedCount ?? 0;
+      show(
+        failed
+          ? `Approved ${approved} deposit${approved === 1 ? '' : 's'} — ${failed} failed`
+          : `Approved ${approved} deposit${approved === 1 ? '' : 's'}`,
+        failed ? 'error' : 'success'
+      );
+      await load();
+    } catch (e) {
+      show(e.message || 'Bulk approval failed', 'error');
+    } finally {
+      setBulkBusy(null);
+    }
+  };
+
+  const handleRejectAll = async () => {
+    const count = (data?.pending || []).length;
+    if (count === 0 || bulkBusy) return;
+    const ok = window.confirm(
+      `Reject all ${count} pending deposit${count === 1 ? '' : 's'}?\n\n` +
+      `No balances will be credited. This cannot be undone.`
+    );
+    if (!ok) return;
+
+    setBulkBusy('reject');
+    try {
+      const r = await adminRejectAllDeposits({ reason: 'Bulk rejected by admin' });
+      const rejected = r?.rejectedCount ?? 0;
+      const failed = r?.failedCount ?? 0;
+      show(
+        failed
+          ? `Rejected ${rejected} deposit${rejected === 1 ? '' : 's'} — ${failed} failed`
+          : `Rejected ${rejected} deposit${rejected === 1 ? '' : 's'}`,
+        failed ? 'error' : 'success'
+      );
+      await load();
+    } catch (e) {
+      show(e.message || 'Bulk rejection failed', 'error');
+    } finally {
+      setBulkBusy(null);
+    }
+  };
+
   const pending = data?.pending || [];
   const totalGhs = pending.reduce((s, t) => s + (t.amount || 0), 0);
   const oldest = pending.length > 0 ? pending[pending.length - 1]?.at : null;
@@ -298,6 +357,29 @@ export default function DepositsPage() {
 
       {tab === 'pending' && (
         <>
+          <div className="adm-bulk-bar" role="group" aria-label="Bulk deposit actions">
+            <button
+              type="button"
+              onClick={handleApproveAll}
+              disabled={pending.length === 0 || Boolean(bulkBusy)}
+              className="adm-btn success"
+              aria-busy={bulkBusy === 'approve'}
+            >
+              <IconCheck />
+              {bulkBusy === 'approve' ? 'Approving…' : `Approve all${pending.length ? ` (${pending.length})` : ''}`}
+            </button>
+            <button
+              type="button"
+              onClick={handleRejectAll}
+              disabled={pending.length === 0 || Boolean(bulkBusy)}
+              className="adm-btn danger"
+              aria-busy={bulkBusy === 'reject'}
+            >
+              <IconClose />
+              {bulkBusy === 'reject' ? 'Rejecting…' : `Reject all${pending.length ? ` (${pending.length})` : ''}`}
+            </button>
+          </div>
+
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 20 }}>
             <div className="adm-stat">
               <div className="lbl">Pending count</div>
@@ -321,6 +403,7 @@ export default function DepositsPage() {
               handleApprove={handleApprove}
               handleReject={handleReject}
               busyId={busyId}
+              bulkBusy={bulkBusy}
             />
           </Card>
         </>

@@ -21,6 +21,7 @@ npm-debug.log*
 
 # Local test screenshots
 test-shot-*.png
+.playwright-mcp/
 
 # Editor / OS
 .DS_Store
