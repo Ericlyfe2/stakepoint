@@ -959,6 +959,8 @@ without looping single-item requests in the browser.
     "No pending deposits" shown, history shows 3 × Rejected, wallets untouched.
   - Approve all (2 pending: 450 + 600) → both balances credited exactly (450 / 600),
     `totalDeposited` updated, queue emptied.
+- Pushed to `origin/main` (`82e1726..a905add`). Working tree clean, `main` in sync with the
+  remote. Pushing `main` triggers the Render auto-deploy of the API.
 
 ## Next Steps
 1. Run `npm test` to verify existing tests still pass
