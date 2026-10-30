@@ -888,6 +888,17 @@ Admin sign-in stays exempt so the owner can never be locked out of `/admin`.
   switch" — and pushed to `origin/main` (`680bf11..f4c1f50`). Working tree clean, `main` in
   sync with the remote at that point.
 
+### 2026-10-30 — Orientation + baseline verification
+- Read this file end to end and re-confirmed the documented architecture against the repo.
+- Working tree clean, branch `main` in sync with `origin/main`, HEAD `82e1726`
+  ("docs: record verified state and new login-lock test in SESSION_SUMMARY.md").
+- Ran the suites as a baseline (no code changes):
+  - `node --test` in `server/`: **464 pass, 0 fail** (16.3 s).
+  - `npx vitest run` in `client/`: **97 pass, 7 files** (21.7 s).
+- No application code changed. Outstanding work is still the "Next Steps" list below
+  (manual lifecycle QA, kickoff-lock check, settlement-only-on-verified-results check,
+  admin→user realtime check, end-to-end create → bet → result → settle → payout run).
+
 ## Next Steps
 1. Run `npm test` to verify existing tests still pass
 2. Manually test lifecycle flow:
